@@ -117,3 +117,23 @@ plus a MessagePack map with numeric FourCC key_,type,val_ keys. Known open event
 volatile.held.taptempo, type i, value11; exit: volatile.press.exittuner, type i,
 value11. These event ACKs do not expose an active-state or note/cents meter. Known
 global.tuner.* properties contain settings, not live pitch readings.
+
+
+## Native block rearranging (0.5.1)
+
+A within-row reorder rotates occupied blocks and gaps through adjacent swaps using
+`/doAgenda [cmd, MessagePack(commands)]`, where each command contains string keys
+cmnd=0x73776170 (swap), flow, blk0 and blk1 (visible adjacent positions). The agenda
+ACK changed flag is0/1, unlike ordinary status ACKs. No delete/recreate is used.
+
+Before writing, validate origin/preset/snapshot/source identity, all affected model
+metadata and routing boundaries; back up native bytes. Afterward verify the full
+expected layout, every model/harness value and binding configuration. Controller
+entity collections and ctm_.stid are keyed sets whose serialization order may
+change. Source byps/controller togl are runtime flags; preserve actual assignment
+settings and confirm block enabled/parameter values separately. Unknown fields
+remain part of the comparison. No uncertain agenda is automatically retried/saved.
+
+Native hardware checks on new spares confirm movement through occupied positions,
+save/switch/reload, restoration and assignment preservation. IO/split/merge stay
+fixed. Cross-row/path moves and uncertain branch layouts are not implemented.

@@ -3,7 +3,7 @@
 Research/reference: Dwayne Charrington, Vheissu/helix-stadium-tools, MIT,
 commit dad97d3a2011290f7f6630d04cc1a819cc58752b. See REFERENCE_LICENSE.txt.
 Swift implementation and UI use that research; controller interpretation and
-property-envelope behavior are adapted from the reference. See ACKNOWLEDGMENTS.md.
+property-envelope behavior and native block-reorder planning are adapted from the reference. See ACKNOWLEDGMENTS.md.
 
 Python msgpack (msgpack-python) is an Apache-2.0 licensed development/test dependency,
 installed separately, not bundled into the Swift application. See its upstream

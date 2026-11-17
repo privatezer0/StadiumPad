@@ -2,6 +2,7 @@ import Foundation
 import StadiumProtocol
 import StadiumNetwork
 
+struct ReviewedReorderPlan:Codable {let preserved:PreservedPreset;let test:PreservedPreset}
 struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
 @main struct EditCheck {
     static func main()async {
@@ -13,7 +14,34 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
             let trace=try option("--trace").map{try TraceRecorder(path:$0)}
             try await session.connect(host:host,port:UInt16(option("--port") ?? "2001") ?? 2001,trace:trace)
             let state=try await session.snapshot()
-            if args.contains("--prepare") {
+            if args.contains("--reorder-resume"),let catalogue=option("--catalog") {
+                let plan=try JSONDecoder().decode(ReviewedReorderPlan.self,from:Data(contentsOf:URL(fileURLWithPath:path)))
+                guard let testID=plan.test.preset.contentID,let preserveID=plan.preserved.preset.contentID,plan.test.preset.name=="StadiumPad Move Test",plan.preserved.preset.name=="StadiumPad Move Preserve",plan.test.sourceID==preserveID,testID != preserveID,testID != plan.preserved.sourceID,state.presetID==testID,state.presetName==plan.test.preset.name,let saved=try await session.read(.contentData(testID)).data,PresetBackupStore.hash(saved)==plan.test.sourceHash else{throw ProtocolError.invalid("Only the independently reviewed new test copy may resume. Nothing was retried.")}
+                let models=try JSONDecoder().decode([String:ModelDefinition].self,from:Data(contentsOf:URL(fileURLWithPath:catalogue))),definitions=Dictionary(uniqueKeysWithValues:models.values.map{($0.id,$0)})
+                let original=DeviceSnapshot(product:state.product,editBuffer:try MessagePack.decode(saved),preset:state.preset,activeSnapshot:state.activeSnapshot,rawEditBuffer:saved,origin:state.origin)
+                let candidates=original.blocks.filter{$0.slot==0 && (1...12).contains($0.position)}
+                var selected:(SignalBlock,BlockReorderPlan)?
+                for block in candidates {
+                    for destination in candidates where block.path==destination.path && block.position != destination.position {
+                        if let pending=try? BlockReorderPlan(state:original,context:original.context(for:block),to:destination.position,models:definitions) {selected=(block,pending);break}
+                    }
+                    if selected != nil {break}
+                }
+                guard let (source,expected)=selected,expected.matches(state) else{throw ProtocolError.invalid("The existing move does not match all reviewed block settings and assignments. Nothing was retried.")}
+                print("Confirmed previous move by independent full state/settings/assignment readback; no duplicate agenda sent.")
+                _ = try await session.savePreset(expectedID:testID,backups:backups)
+                _ = try await session.loadPreset(preserveID,expectedID:testID)
+                let loaded=try await session.loadPreset(testID,expectedID:preserveID)
+                guard expected.matches(loaded),let moved=loaded.blocks.first(where:{$0.blockID==source.blockID && $0.slot==0}) else{throw ProtocolError.invalid("Moved settings/assignments did not survive save/reload.")}
+                _ = try await session.reorderBlock(context:loaded.context(for:moved),to:source.position,models:definitions,backups:backups)
+                _ = try await session.savePreset(expectedID:testID,backups:backups)
+                _ = try await session.loadPreset(preserveID,expectedID:testID)
+                let restored=try await session.loadPreset(testID,expectedID:preserveID)
+                guard restored.blocks.sorted(by:{$0.id<$1.id})==original.blocks.sorted(by:{$0.id<$1.id}) else{throw ProtocolError.invalid("Restored block layout/settings did not survive save/reload.")}
+                _ = try await session.loadPreset(preserveID,expectedID:testID)
+                print("PASS real-device reorder/save/reload/restore; assignments verified; returned to preserved copy.")
+                await session.disconnect();return
+            } else if args.contains("--prepare") {
                 guard !FileManager.default.fileExists(atPath:path),let id=state.presetID else{throw ProtocolError.invalid("Choose a new plan filename.")}
                 let first=try await session.copyCurrent(name:"iPad Edit Test 1117",expectedID:id,backups:backups)
                 // Persist each allocation before attempting another; never retry blindly.
@@ -25,10 +53,27 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
                 try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:path)
                 _ = try await session.openPreservedCopy(first)
                 print("Independent spare copies verified and opened: \(first.preset.label), \(second.preset.label). Original stored preset was not written.")
-            } else if (args.contains("--exercise") || args.contains("--replace-check")),let catalogPath=option("--catalog") {
+            } else if (args.contains("--exercise") || args.contains("--replace-check") || args.contains("--reorder-check")),let catalogPath=option("--catalog") {
                 let plan=try JSONDecoder().decode(SparePlan.self,from:Data(contentsOf:URL(fileURLWithPath:path)))
                 guard let firstID=plan.first.preset.contentID,let secondID=plan.second.preset.contentID,firstID != secondID,firstID != plan.first.sourceID,secondID != plan.first.sourceID,state.presetID==firstID,state.presetName==plan.first.preset.name,plan.first.preset.name.hasPrefix("iPad Edit Test"),plan.second.preset.name.hasPrefix("iPad Reload Check") else{throw ProtocolError.invalid("Only the prepared spare presets may be tested.")}
                 let catalog=try JSONDecoder().decode([String:ModelDefinition].self,from:Data(contentsOf:URL(fileURLWithPath:catalogPath)))
+                if args.contains("--reorder-check") {
+                    guard let source=state.blocks.first,let target=Int(option("--destination") ?? "7") else{throw ProtocolError.invalid("Missing reorder target.")}
+                    let models=Dictionary(uniqueKeysWithValues:catalog.values.map{($0.id,$0)})
+                    let context=try state.context(for:source),plan=try BlockReorderPlan(state:state,context:context,to:target,models:models)
+                    _ = try await session.reorderBlock(context:context,to:target,models:models,backups:backups)
+                    _ = try await session.savePreset(expectedID:firstID,backups:backups)
+                    _ = try await session.loadPreset(secondID,expectedID:firstID)
+                    let reloaded=try await session.loadPreset(firstID,expectedID:secondID)
+                    guard plan.matches(reloaded),let moved=reloaded.blocks.first(where:{$0.blockID==source.blockID && $0.slot==0}) else{throw ProtocolError.invalid("Move did not survive save/reload.")}
+                    _ = try await session.reorderBlock(context:try reloaded.context(for:moved),to:source.position,models:models,backups:backups)
+                    _ = try await session.savePreset(expectedID:firstID,backups:backups)
+                    _ = try await session.loadPreset(secondID,expectedID:firstID)
+                    let restored=try await session.loadPreset(firstID,expectedID:secondID)
+                    guard restored.blocks.sorted(by:{$0.id<$1.id})==state.blocks.sorted(by:{$0.id<$1.id}) else{throw ProtocolError.invalid("Original block layout/settings were not restored.")}
+                    print("PASS reorder/save/reload/restore")
+                    await session.disconnect();return
+                }
                 if args.contains("--replace-check") {
                     guard let block=state.blocks.first,let source=catalog[String(block.model)],let destination=catalog[option("--replacement") ?? "43"] else{throw ProtocolError.invalid("Missing test model metadata.")}
                     _ = try await session.replaceModel(context:try state.context(for:block),source:source,destination:destination,backups:backups)

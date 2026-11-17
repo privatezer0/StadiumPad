@@ -134,6 +134,21 @@ import StadiumNetwork
             catch {if generation==token {errorText=error.localizedDescription}}
         } catch {if generation==token {errorText=error.localizedDescription}}
     }
+#if DEBUG
+    func storedSpareForVerification(_ id:Int)async throws->DeviceSnapshot {
+        guard connected,let current=session,let state=snapshot,state.presetID==id,state.presetName=="StadiumPad Move Test",let bytes=try await current.read(.contentData(id)).data else{throw ProtocolError.invalid("Only the reviewed reorder test spare may be inspected.")}
+        return DeviceSnapshot(product:state.product,editBuffer:try MessagePack.decode(bytes),preset:state.preset,activeSnapshot:state.activeSnapshot,rawEditBuffer:bytes,origin:state.origin)
+    }
+#endif
+    func reorder(context:EditContext,to:Int)async->SignalBlock? {
+        guard !busy,connected,let current=session else{return nil};busy=true;defer{busy=false};let token=generation
+        do {
+            let definitions=Dictionary(uniqueKeysWithValues:catalog.values.map{($0.id,$0)})
+            let after=try await current.reorderBlock(context:context,to:to,models:definitions,backups:backups)
+            guard generation==token else{return nil};snapshot=after;lastAction="Block rearranged · unsaved";report()
+            return after.blocks.first{$0.path-1==context.path && $0.position==to && $0.blockID==context.blockID && $0.slot==0}
+        } catch {if generation==token {errorText=error.localizedDescription};return nil}
+    }
     func replace(context:EditContext,destination:ModelDefinition)async->SignalBlock? {
         guard !busy,connected,let current=session,let source=catalog[String(context.modelID)] else{return nil}
         busy=true;defer{busy=false};let token=generation

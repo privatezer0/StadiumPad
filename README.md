@@ -11,7 +11,8 @@ for the official desktop editor.
 
 - **Preset view:** scrolling User/Factory preset browser, expandable setlist folders,
   signal chain, named parameter controls, category/model lists, exact selected-model
-  highlighting and automatic scrolling. Includes Looper, FX Loop and Utility models.
+  highlighting and automatic scrolling. Drag effects to rearrange occupied or empty
+  positions within the same signal row. Includes Looper, FX Loop and Utility models.
 - **Scene view:** eight large colored scene buttons using the preset's snapshot names.
   Select an existing scene or confirm copying the current scene into an empty slot.
 - **Footswitch view:** virtual Stomp A/B pedalboards using actual controller assignments,
@@ -34,10 +35,11 @@ for the official desktop editor.
 
 Command Center assignment editing, Global EQ controls, song/Showcase editing and
 transport, IR/clone file import and assignment, preset renaming after creation,
-block insertion/removal/reordering, general routing editing, snapshot renaming,
+block insertion/removal, cross-row/path moves, general routing editing, snapshot renaming,
 firmware updates and PIN authentication. Their navigation tabs are present, with
 unfinished sections labeled. Output destination selection is a narrower supported
-operation, not a complete routing editor. Amp replacement refuses when Auto Cab
+operation, not a complete routing editor. Dragging leaves input/output and split/merge
+nodes fixed; branch layouts that cannot be established safely are refused. Amp replacement refuses when Auto Cab
 would add unexpected blocks; disable Auto Cab on the device first if appropriate.
 
 **Offline preset editing/creation and reconnect synchronization are planned, not

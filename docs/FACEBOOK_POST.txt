@@ -4,7 +4,7 @@ GitHub: https://github.com/privatezer0/StadiumPad
 
 This builds on community work, especially Dwayne Charrington's helix-stadium-tools. Huge thanks to him and the other developers doing the foundation work—and to Line 6's engineers, designers and musicians for creating Helix in the first place.
 
-StadiumPad connects directly to your Stadium over the local network. Preset view has your preset folders/browser on the left, signal chain above, and model choices and parameter controls below. You can edit effects, change supported models/output destinations, and save or make a new preset copy.
+StadiumPad connects directly to your Stadium over the local network. Preset view has your preset folders/browser on the left, signal chain above, and model choices and parameter controls below. You can edit effects, drag blocks to rearrange them within a signal row, change supported models/output destinations, and save or make a new preset copy. Inputs, outputs and split/merge nodes stay fixed.
 
 For playing, Scene view gives you eight large colored scene buttons, and Footswitch view gives you a virtual pedalboard for switching assigned effects from the tablet instead of reaching for the floor switches. Those gig-view ideas take inspiration from Quad Cortex and Tone Master Pro. The preset browser stays visible in each mode. There's also a tuner remote that opens/closes the pedal's tuner; the actual note/needle still appears on the Stadium, not the iPad.
 
@@ -12,9 +12,9 @@ It was designed around my 12.9-inch iPad Pro, with layouts for regular iPads too
 
 I'm also working toward offline mode: editing presets and creating new ones away from the Helix, then syncing changes back when connected. That is planned, not available in this build.
 
-This is an early proof of concept, not full desktop-editor parity. Command Center editing, Global EQ controls, song/Showcase editing and transport, IR/clone file importing/assignment, general block/routing editing and scene renaming aren't implemented yet. Timed, momentary and MIDI/command footswitch assignments aren't supported by the virtual pedalboard yet. The GitHub README keeps the current limitations clear.
+This is an early proof of concept, not full desktop-editor parity. Command Center editing, Global EQ controls, song/Showcase editing and transport, IR/clone file importing/assignment, block insertion/removal, cross-row moves, general routing editing and scene renaming aren't implemented yet. Timed, momentary and MIDI/command footswitch assignments aren't supported by the virtual pedalboard yet. The GitHub README keeps the current limitations clear.
 
-For an easy install, I'm preparing a TestFlight beta: install Apple's TestFlight app, tap the invitation link and tap Install. No coding, Mac, Xcode or cable would be needed by testers. There isn't a live TestFlight invitation yet; I'll share it when the build is approved. The source-build instructions currently on GitHub are for developers, not the intended setup for everyday users.
+For an easy install, I'm preparing a TestFlight beta: install Apple's TestFlight app, tap the invitation link and tap Install. No coding, Mac, Xcode or cable would be needed by testers. The first build is uploaded and the beta groups are set up. There isn't a live public TestFlight invitation yet; I'll share it after the updated build is approved. The source-build instructions currently on GitHub are for developers, not the intended setup for everyday users.
 
 Installation/status: https://github.com/privatezer0/StadiumPad/blob/main/INSTALL.md
 

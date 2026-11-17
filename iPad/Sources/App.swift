@@ -121,7 +121,7 @@ struct StadiumView:View {
             let host=ProcessInfo.processInfo.environment["STADIUM_DEVICE_HOST"] ?? address
             if !host.isEmpty {address=host;monitor.connect(host:host)}
 #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
+            if ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
                 for _ in 0..<70 {if monitor.connected {break};try? await Task.sleep(for:.milliseconds(200))}
                 if ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") {
                     let plan=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("spare-plan.json")
@@ -129,6 +129,8 @@ struct StadiumView:View {
                 }
                 if ProcessInfo.processInfo.arguments.contains("--verify-models") {await verifyModelAndSnapshots(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-performance") {await verifyPerformance(monitor)}
+                if ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") {await verifyReorder(monitor,resume:true)}
+                else if ProcessInfo.processInfo.arguments.contains("--verify-reorder") {await verifyReorder(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-tuner") {
                     await monitor.setTuner(true)
                     let opened=monitor.errorText==nil

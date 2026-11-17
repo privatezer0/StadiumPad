@@ -1,7 +1,9 @@
 # Prepared beta information
 
-Draft for App Store Connect; not evidence of an uploaded or approved build.
-The maintainer must supply the actual feedback email and Apple review contact.
+Template for App Store Connect. The beta description, feedback address and
+owner-approved private Apple review contact are saved there. Contact details are
+intentionally omitted here. Build7 is uploaded; external review/public invitation
+await the updated block-drag build.
 
 ## Beta description
 

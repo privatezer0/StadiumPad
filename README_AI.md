@@ -44,6 +44,14 @@ selection. Never restart a connection by recreating its owning root View with an
 ID changed inside connect(): that creates a reconnect/cancellation loop. Routine
 Task cancellation must not be shown as a connection error.
 
+Native block reordering uses a bounded adjacent-swap `/doAgenda` batch within one
+row, not delete/recreate. Agenda ACK's changed flag may be 0 or 1; it differs from
+ordinary zero-status ACKs. Confirm the entire expected rotated layout, every model/
+harness value and controller assignment configuration. Native entity/set ordering
+and runtime byps/togl flags are not configuration edits. Preserve unknown fields;
+never ignore actual assignment ranges or block enabled/parameter values. Reject
+cross-row/path moves, IO/routing-node moves and uncertain branch boundaries.
+
 ## Validation and delivery
 
 Run `swift test` and Python loopback tests as documented in README. Add meaningful

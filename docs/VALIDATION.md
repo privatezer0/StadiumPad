@@ -74,3 +74,30 @@ The App Store distribution export subsequently succeeded. The resulting IPA pass
 archive integrity, expected public bundle/version/build, distribution-profile and
 TestFlight entitlement checks; the DEBUG automatic-write harness is absent. This
 remains a staged distribution build, not an uploaded or Apple-approved beta.
+
+
+## 0.5.1 block dragging
+
+31 Swift tests and five new executable loopback cases cover native adjacent-swap
+planning, gaps/occupied cells, stale origins, fixed IO/routing boundaries, changed-
+flag ACKs, preserved settings/assignments, runtime/set-order normalization, rejection,
+timeout, stale-source refusal and ACK-without-readback. Existing integration checks
+are run with the new build as part of delivery.
+
+A real Stadium test resumed an independently reviewed new spare after a conservative
+readback refusal. It confirmed the already-applied move without resending the batch,
+saved/reloaded the rearranged chain, reversed it, saved/reloaded the original order
+and settings, and returned to the preserved copy. Only two newly allocated test
+copies were write destinations. Final original-preset hash audit is recorded below.
+The source-copy byte guard was retained; a conservative automatic-open refusal did
+not discard source edits or cause duplicate allocation.
+
+The iPad source builds with finger drag and accessible Move left/right actions.
+Physical finger-gesture qualification and final installation await reconnection of
+the Pro; protocol/state/save tests are distinct from a touchscreen acceptance test.
+
+Final checks for this source:31Swift tests and25executable loopback tests pass.
+All273User presets present before the reorder test were re-read after the real
+save/reload/restore run:zero SHA-256 changes. The two new test copies were the only
+write destinations. The owner Release0.5.1/build8 is signed and packaged externally;
+Pro reconnection is still required for final installation/finger-drag acceptance.

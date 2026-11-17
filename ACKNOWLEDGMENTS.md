@@ -11,7 +11,8 @@ or endorsement by Line 6/Yamaha is implied.
 [helix-stadium-tools](https://github.com/Vheissu/helix-stadium-tools). This project's
 Swift implementation builds on that project's MIT-licensed protocol research and
 reference implementation, including transport behavior, property envelopes, edit
-commands, model metadata extraction and stomp controller/target interpretation.
+commands, model metadata extraction, stomp controller/target interpretation and
+native adjacent-swap block-reorder planning.
 Reference commit: `dad97d3a2011290f7f6630d04cc1a819cc58752b`.
 The [upstream license](docs/REFERENCE_LICENSE.txt) is retained. Credit belongs to
 the developers who did that foundation work; this is not a claim of discovering

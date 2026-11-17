@@ -163,6 +163,20 @@ public actor StadiumSession {
         }
         throw ProtocolError.invalid("Scene creation was not confirmed. No retry was sent.")
     }
+    public func reorderBlock(context:EditContext,to:Int,models:[Int:ModelDefinition],backups:PresetBackupStore)async throws->DeviceSnapshot {
+        await acquire();defer{release()};try Task.checkCancellation()
+        let before=try await snapshotUnlocked();_ = try verify(context,in:before)
+        let plan=try BlockReorderPlan(state:before,context:context,to:to,models:models)
+        try await backup(before,to:backups);try await confirmIdentity(before)
+        try EditCommand.acknowledgeAgenda(await editUnlocked(.reorder(flow:plan.flow,from:plan.from,to:plan.to)))
+        for _ in 0..<8 {
+            let after=try await snapshotUnlocked(product:before.product)
+            guard after.presetID==before.presetID,after.activeSnapshot==before.activeSnapshot else{throw ProtocolError.invalid("The preset or scene changed during the move. Nothing was retried.")}
+            if plan.matches(after) {return after}
+            try await Task.sleep(for:.milliseconds(150))
+        }
+        throw ProtocolError.invalid("The reordered blocks or their settings were not confirmed. Check the chain before retrying; no automatic retry or save was sent.")
+    }
     /// Explicit tuner open/exit events only. An ACK confirms command acceptance;
     /// this firmware does not expose live note/cents through the known protocol.
     public func setTuner(_ enabled:Bool)async throws {

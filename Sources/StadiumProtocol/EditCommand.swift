@@ -2,6 +2,7 @@ import Foundation
 
 public enum EditCommand:Sendable {
     case parameter(EditContext,ParameterDefinition,Value)
+    case reorder(flow:Int,from:Int,to:Int)
     case tuner(Bool)
     case controller(Int,Int),model(EditContext,Int),snapshot(Int),copySnapshot(Int,Int)
     case save(Int),load(Int),createUser(position:Int,name:String),storeNewPreset(Int,Data)
@@ -15,6 +16,11 @@ public enum EditCommand:Sendable {
             } else {
                 address="/ParamValueSet";values += [.int(Int64(context.path)),.int(Int64(context.position)),.int(Int64(context.slot)),.int(Int64(definition.id)),wire,.int(-1)]
             }
+        case .reorder(let flow,let from,let to):
+            guard (0...1).contains(flow),(1...12).contains(from%14),(1...12).contains(to%14),(0...27).contains(from),(0...27).contains(to),from/14==to/14,from != to else{throw ProtocolError.invalid("Reorder within one effect row.")}
+            let step=from<to ? 1:-1
+            let commands=stride(from:from,to:to,by:step).map {position in Value.object(["cmnd":.int(0x73776170),"flow":.int(Int64(flow)),"blk0":.int(Int64(position)),"blk1":.int(Int64(position+step))])}
+            address="/doAgenda";values.append(.binary(try MessagePack.encode(.array(commands))))
         case .tuner(let enabled):
             let key=enabled ? "volatile.held.taptempo":"volatile.press.exittuner"
             var blob=Data("lavppgsm".utf8);blob.append(0x83)
@@ -47,6 +53,9 @@ public enum EditCommand:Sendable {
     public static func validName(_ draft:String)throws->String {
         let name=draft.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !name.isEmpty,name.unicodeScalars.count<=32,!name.unicodeScalars.contains(where:{$0.value<32 || $0.value==127}) else{throw ProtocolError.invalid("Enter a preset name from 1 to 32 characters.")};return name
+    }
+    public static func acknowledgeAgenda(_ message:OSCMessage)throws {
+        guard message.address=="/status",message.values.count>=3,let changed=message.values[1].integer,[0,1].contains(changed),let result=message.values[2].integer,result>=0 else{throw ProtocolError.invalid("The Stadium did not confirm rearranging blocks. Check the current chain before retrying.")}
     }
     public static func acknowledge(_ message:OSCMessage)throws {
         guard message.address=="/status",message.values.count>=3,message.values[1].integer==0,let result=message.values[2].integer,result>=0 else{throw ProtocolError.invalid("The Stadium did not confirm the operation. Check the device before trying again.")}
