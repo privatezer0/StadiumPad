@@ -1,0 +1,3 @@
+// swift-tools-version: 5.9
+import PackageDescription
+let package=Package(name:"StadiumPad",platforms:[.macOS(.v14),.iOS("18.0")],products:[.library(name:"StadiumProtocol",targets:["StadiumProtocol"]),.library(name:"StadiumNetwork",targets:["StadiumNetwork"]),.executable(name:"stadium-probe",targets:["StadiumProbe"]),.executable(name:"stadium-edit-check",targets:["StadiumEditCheck"])],targets:[.target(name:"StadiumProtocol"),.target(name:"StadiumNetwork",dependencies:["StadiumProtocol"]),.executableTarget(name:"StadiumProbe",dependencies:["StadiumNetwork","StadiumProtocol"]),.executableTarget(name:"StadiumEditCheck",dependencies:["StadiumNetwork","StadiumProtocol"]),.testTarget(name:"StadiumProtocolTests",dependencies:["StadiumProtocol"])],swiftLanguageVersions:[.v5])
