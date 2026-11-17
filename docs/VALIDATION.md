@@ -54,3 +54,17 @@ never interpret a command ACK as a tuning result. Full touchscreen/VoiceOver,
 other-device network switching and regular physical-iPad acceptance remain open.
 
 See README for unfinished desktop functions and planned offline/Android work.
+
+
+## Delivered source/build
+
+Public source commit `59177a4` was pushed and anonymously readable. The installed
+owner Release0.5.0/build7 reconnected with device events and named controls; private
+unsaved source edits were left unsaved. Both owner installer mirrors and complete
+ten-product SHA-256 inventories were verified. Public history excludes private
+research/history, device data, signing settings and extracted model metadata.
+
+A separate public-identity Xcode archive builds successfully for TestFlight
+preparation. This is not an uploaded build or approved beta invitation. App Store
+Connect access, feedback/review contact information and Apple's external beta
+review still need to be completed.
