@@ -14,7 +14,7 @@ I'm also working toward offline mode: editing presets and creating new ones away
 
 This is an early proof of concept, not full desktop-editor parity. Command Center editing, Global EQ controls, song/Showcase editing and transport, IR/clone file importing/assignment, block insertion/removal, cross-row moves, general routing editing and scene renaming aren't implemented yet. Timed, momentary and MIDI/command footswitch assignments aren't supported by the virtual pedalboard yet. The GitHub README keeps the current limitations clear.
 
-For an easy install, I'm preparing a TestFlight beta: install Apple's TestFlight app, tap the invitation link and tap Install. No coding, Mac, Xcode or cable would be needed by testers. The first build is uploaded and the beta groups are set up. There isn't a live public TestFlight invitation yet; I'll share it after the updated build is approved. The source-build instructions currently on GitHub are for developers, not the intended setup for everyday users.
+For an easy install, I'm preparing a TestFlight beta: install Apple's TestFlight app, tap the invitation link and tap Install. No coding, Mac, Xcode or cable would be needed by testers. Version 0.5.1 is uploaded and waiting for Apple's external beta review. There isn't a live public TestFlight invitation yet; I'll share it after approval. The source-build instructions currently on GitHub are for developers, not the intended setup for everyday users.
 
 Installation/status: https://github.com/privatezer0/StadiumPad/blob/main/INSTALL.md
 

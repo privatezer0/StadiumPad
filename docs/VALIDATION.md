@@ -64,17 +64,12 @@ unsaved source edits were left unsaved. Both owner installer mirrors and complet
 ten-product SHA-256 inventories were verified. Public history excludes private
 research/history, device data, signing settings and extracted model metadata.
 
-A separate public-identity Xcode archive builds successfully for TestFlight
-preparation. This is not an uploaded build or approved beta invitation. App Store
-Connect access, feedback/review contact information and Apple's external beta
-review still need to be completed.
-
-
-The App Store distribution export subsequently succeeded. The resulting IPA passed
-archive integrity, expected public bundle/version/build, distribution-profile and
-TestFlight entitlement checks; the DEBUG automatic-write harness is absent. This
-remains a staged distribution build, not an uploaded or Apple-approved beta.
-
+The public-identity distribution archive/export passed integrity, expected bundle,
+version/build, distribution-profile and TestFlight entitlement checks; the DEBUG
+automatic-write harness is absent. Updated 0.5.1/build8 was uploaded and Apple
+validated it. On November 17, App Store Connect confirmed **Waiting for Review**
+after external Beta App Review submission. This is not approval or a live public
+invitation. See docs/TESTFLIGHT.md for current release status.
 
 ## 0.5.1 block dragging
 
@@ -101,3 +96,7 @@ All273User presets present before the reorder test were re-read after the real
 save/reload/restore run:zero SHA-256 changes. The two new test copies were the only
 write destinations. The owner Release0.5.1/build8 is signed and packaged externally;
 Pro reconnection is still required for final installation/finger-drag acceptance.
+
+The 0.5.1 owner IPA and full installer inventories were read back and verified in
+both permanent Latest Version delivery folders. The affected installer was updated;
+unrelated products were preserved. Build outputs and installers remain outside Git.

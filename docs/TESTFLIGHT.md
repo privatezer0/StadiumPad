@@ -1,10 +1,12 @@
 # Maintainer TestFlight release
 
-Status: Release0.5.0/build7 has a verified App Store distribution export.
-The StadiumPad app record and internal/external beta groups are created. Build7
-is uploaded and processed; its export-compliance answer and beta information are
-saved. Updated block-drag build8 is being validated before external review. No
-approved public beta or live invitation is claimed.
+Status, November 17, 2026: StadiumPad 0.5.1/build8 is uploaded, validated,
+and submitted for external Beta App Review. App Store Connect shows **Waiting for
+Review** in the StadiumPad Public Beta group. Beta information, hardware setup,
+feedback/review contact, export compliance and What to Test are saved. Automatic
+tester notification is disabled; no testers have been invited. There is no approved
+public beta or live invitation yet. Apple approval is the remaining distribution
+step before enabling and publishing a public invitation.
 Users' simple installation steps are in INSTALL.md. A public repository does not
 produce a TestFlight invitation automatically.
 
