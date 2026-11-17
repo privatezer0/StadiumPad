@@ -1,6 +1,7 @@
 # Maintainer TestFlight release
 
-Status: preparation; no uploaded/approved public beta or live invitation claimed.
+Status: Release0.5.0/build7 has a verified App Store distribution export.
+No uploaded/approved public beta or live invitation is claimed.
 Users' simple installation steps are in INSTALL.md. A public repository does not
 produce a TestFlight invitation automatically.
 

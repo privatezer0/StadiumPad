@@ -68,3 +68,9 @@ A separate public-identity Xcode archive builds successfully for TestFlight
 preparation. This is not an uploaded build or approved beta invitation. App Store
 Connect access, feedback/review contact information and Apple's external beta
 review still need to be completed.
+
+
+The App Store distribution export subsequently succeeded. The resulting IPA passed
+archive integrity, expected public bundle/version/build, distribution-profile and
+TestFlight entitlement checks; the DEBUG automatic-write harness is absent. This
+remains a staged distribution build, not an uploaded or Apple-approved beta.
