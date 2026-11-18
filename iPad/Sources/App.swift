@@ -116,7 +116,7 @@ struct StadiumView:View {
                 guard followExternal,monitor.focusedBlock?.id==focus.id,focus.receivedAt>localSelectionAt,let state=monitor.snapshot else{return}
                 let slot=selected?.context.path==focus.path && selected?.context.position==focus.position ? (selected?.context.slot ?? 0):0
                 let block=state.blocks.first{$0.path-1==focus.path && $0.position==focus.position && $0.slot==slot}
-                if let block {applySelection(block)}
+                if let block {applySelection(block,remember:false)}
             }
         }
         .onChange(of:monitor.lastCopy?.preset.contentID){_,_ in libraryRevision+=1}
@@ -126,12 +126,13 @@ struct StadiumView:View {
             let host=ProcessInfo.processInfo.environment["STADIUM_DEVICE_HOST"] ?? address
             if !host.isEmpty {address=host;monitor.connect(host:host)}
 #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
+            if ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") || ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
                 for _ in 0..<70 {if monitor.connected {break};try? await Task.sleep(for:.milliseconds(200))}
                 if ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") {
                     let plan=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("spare-plan.json")
                     await verifySpareEditing(monitor,planURL:plan)
                 }
+                if ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") {try? await Task.sleep(for:.milliseconds(400));await verifyRememberedSelection(monitor,selection:{selected})}
                 if ProcessInfo.processInfo.arguments.contains("--verify-live-sync") {await verifyLiveSelection(monitor,selection:{selected})}
                 if ProcessInfo.processInfo.arguments.contains("--verify-discard") {await verifyDiscard(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-focus") {await verifyFocus(monitor)}
@@ -225,9 +226,10 @@ struct StadiumView:View {
         localSelectionAt=Date();applySelection(block)
         if !preview,let context=selected?.context {Task {await monitor.selectBlock(context:context)}}
     }
-    private func applySelection(_ block:SignalBlock) {
+    private func applySelection(_ block:SignalBlock,remember:Bool=true) {
         guard let state=monitor.snapshot,let context=try? state.context(for:block) else{return}
         let selection=BlockSelection(block:block,context:context);selected=selection
+        if remember && !preview {monitor.rememberSelection(block,in:state)}
 #if DEBUG
         if !preview,ProcessInfo.processInfo.environment["STADIUM_VERIFY"]=="1" {
             let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
@@ -254,7 +256,12 @@ struct StadiumView:View {
     }
     private func chooseInitialBlock() {
         guard let state=monitor.snapshot else{selected=nil;return}
-        let block=state.blocks.first(where:{$0.position != 0 && $0.position != 13 && $0.position != 14 && $0.position != 27 && !monitor.definitions($0).isEmpty}) ?? state.blocks.first
-        if let block {applySelection(block)}
+        let live:SignalBlock?
+        if !preview,followExternal,monitor.focusedPresetID==state.presetID,let focus=monitor.focusedBlock,focus.receivedAt>monitor.selectionRememberedAt {
+            live=state.blocks.first{$0.path-1==focus.path && $0.position==focus.position && $0.slot==0}
+        } else {live=nil}
+        let remembered=preview ? nil:monitor.rememberedSelection(in:state)
+        let block=live ?? remembered ?? state.blocks.first(where:{$0.position != 0 && $0.position != 13 && $0.position != 14 && $0.position != 27 && !monitor.definitions($0).isEmpty}) ?? state.blocks.first
+        if let block {applySelection(block,remember:false)}else{selected=nil}
     }
 }

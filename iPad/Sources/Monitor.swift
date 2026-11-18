@@ -13,6 +13,9 @@ import StadiumNetwork
     @Published var connecting=false
     @Published var lastEvent:Date?
     @Published var focusedBlock:StadiumBlockFocus?
+    private(set) var focusedPresetID:Int?
+    private(set) var selectionRememberedAt=Date.distantPast
+    private var currentPort:UInt16=2001
     @Published var presets:[PresetSlot]=[]
     @Published var presetFolders:[PresetFolder]=[]
     @Published var factoryPresets:[PresetSlot]=[]
@@ -58,7 +61,7 @@ import StadiumNetwork
     func blockName(_ block:SignalBlock)->String {catalog[String(block.model)]?.name ?? names[String(block.model)] ?? "Effect block \(block.position)"}
     func connect(host:String,port:UInt16=2001) {
         guard !busy else{return}
-        stop();connectionID=UUID();currentHost=host;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];lastCopy=nil;lastAction=nil
+        stop();connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];lastCopy=nil;lastAction=nil
         let token=UUID();generation=token
         lastEvent=nil;let current=StadiumSession();session=current;connecting=true;status="Connecting…"
         worker=Task {
@@ -77,7 +80,7 @@ import StadiumNetwork
                                 liveRevision+=1
                                 if case .selection(let path,let position)=update {
                                     let focus=StadiumBlockFocus(path:path,position:position);pendingFocus=focus
-                                    if snapshot?.blocks.contains(where:{$0.path-1==path && $0.position==position})==true {focusedBlock=focus}
+                                    if snapshot?.blocks.contains(where:{$0.path-1==path && $0.position==position})==true {focusedPresetID=snapshot?.presetID;focusedBlock=focus}
                                 }
                                 refreshFromEvent(current,token:token)
                             }
@@ -91,7 +94,7 @@ import StadiumNetwork
                     let state=try await current.snapshot(product:state.product)
                     guard generation==token,!Task.isCancelled else{return}
                     snapshot=state
-                    if refreshTask==nil,let focus=pendingFocus,state.blocks.contains(where:{$0.path-1==focus.path && $0.position==focus.position}) {focusedBlock=focus;pendingFocus=nil}
+                    if refreshTask==nil,let focus=pendingFocus,state.blocks.contains(where:{$0.path-1==focus.path && $0.position==focus.position}) {focusedPresetID=state.presetID;focusedBlock=focus;rememberExternalSelection(focus,in:state);pendingFocus=nil}
                     report()
                 }
             } catch {if generation==token,!Task.isCancelled {fail(error)}}
@@ -110,7 +113,7 @@ import StadiumNetwork
                     guard generation==token,!Task.isCancelled else{return}
                     snapshot=state
                     if revision==liveRevision,let focus=pendingFocus {
-                        if state.blocks.contains(where:{$0.path-1==focus.path && $0.position==focus.position}) {focusedBlock=focus}
+                        if state.blocks.contains(where:{$0.path-1==focus.path && $0.position==focus.position}) {focusedPresetID=state.presetID;focusedBlock=focus;rememberExternalSelection(focus,in:state)}
                         pendingFocus=nil
                     }
                     report()
@@ -121,10 +124,27 @@ import StadiumNetwork
         }
     }
     func stop() {
-        generation=UUID();refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil
+        generation=UUID();refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;focusedPresetID=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil
         let closeTuner=tunerRequested;tunerRequested=false
         if let old=session {Task {if closeTuner {try? await old.setTuner(false)};await old.disconnect()}}
         session=nil;connected=false;connecting=false;status="Disconnected. Last received values remain visible.";report()
+    }
+    private func selectionKey(_ state:DeviceSnapshot)->String? {
+        RememberedBlockSelection.storageKey(product:state.product,endpoint:"\(currentHost):\(currentPort)",presetID:state.presetID)
+    }
+    private func rememberExternalSelection(_ focus:StadiumBlockFocus,in state:DeviceSnapshot) {
+        guard UserDefaults.standard.object(forKey:"followStadiumSelection") as? Bool ?? true else{return}
+        let previous=rememberedSelection(in:state)
+        let slot=previous?.path==focus.path+1 && previous?.position==focus.position ? (previous?.slot ?? 0):0
+        if let block=state.blocks.first(where:{$0.path-1==focus.path && $0.position==focus.position && $0.slot==slot}) {rememberSelection(block,in:state)}
+    }
+    func rememberSelection(_ block:SignalBlock,in state:DeviceSnapshot) {
+        guard let key=selectionKey(state),state.blocks.contains(block),let data=try? JSONEncoder().encode(RememberedBlockSelection(block)) else{return}
+        UserDefaults.standard.set(data,forKey:key);selectionRememberedAt=Date()
+    }
+    func rememberedSelection(in state:DeviceSnapshot)->SignalBlock? {
+        guard let key=selectionKey(state),let data=UserDefaults.standard.data(forKey:key),data.count<512,let memory=try? JSONDecoder().decode(RememberedBlockSelection.self,from:data) else{return nil}
+        return memory.resolve(in:state.blocks)
     }
     func selectBlock(context:EditContext)async {
         guard !busy,connected,let current=session else{return}

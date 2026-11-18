@@ -37,8 +37,11 @@ for the official desktop editor.
   and controls; tapping a block on the tablet selects it on the Stadium too.
   External model replacements also bring their block into view. The Follow option
   controls incoming selection; parameter/model edits continue to update both devices.
-  Initial connection currently uses a local initial block until the pedal sends a
-  selection event; reading the pedal's existing selection at startup is unresolved.
+  Each tablet remembers the last selected block per device and preset. On startup
+  it reads the pedal's active preset and restores that preset's local view, without
+  recalling a preset or moving the pedal's selection. Missing history/removed blocks
+  fall back to a valid block; new live events take priority. This is remembered view
+  state, not a query of changes made on the pedal while the app was closed.
 - Bonjour device search, selection and manual address entry, including switching to
   another Stadium. The app uses your device, not a developer-specific address.
 - Read library inventories: Factory/User presets, setlists, IRs, Favorites, Templates,

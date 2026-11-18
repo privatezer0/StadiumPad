@@ -340,3 +340,45 @@ app was closed, and moving the pedal's selection is not equivalent to reading it
 The temporary research proxy/listeners were stopped and the desktop retained its
 direct device connection. App versions/installers remain0.6.5; no extra build or
 preset/settings edits were needed for this investigation.
+
+## 2026-11-18 — 0.6.6 remembered selection per device/preset
+
+Owner explicitly chose remembered block selection as the startup fallback. Both
+clients persist local choices per hashed device serial and actual active preset
+content ID, using address/port when serial is absent. They read the pedal's active
+preset before lookup: if the app last viewed A but the pedal is now on B, restore
+B's own record, not A's block or preset. No record/removed/invalid/ambiguous target
+uses a valid-block fallback. Within-flow moves follow internal identity and retain
+model slot. Restoring is local and sends no selection, preset recall or Save.
+Live events take priority; external focus is persisted after coherent refresh to
+avoid attaching a transitioning preset's event to the previous preset. Preview/
+fallback rendering and ordinary polling do not overwrite the preference.
+
+Verified here:
+
+- 43Swift tests pass, including7new device/preset-key, active-preset lookup,
+  serial/address, moved/removed/ambiguous block, slot and malformed-record cases.
+- 15Java selection +10new memory checks and6Swift/Java socket echo cases pass.
+- Native TCL:27live checks pass, then22cold-launch checks pass. Persisted reverb
+  selection restored after process stop, with the right chain/model/control view.
+  Four viewport renders retained. Different-preset isolation is synthetic coverage;
+  the active production preset was not recalled/switched for this test.
+- Native Pro:4live checks pass; a fresh process independently reports the cached
+  reverb restored on startup. Actual Pro/TCL remembered-block screens inspected.
+  Final preference/focus ordering adjustment also passed Pro cold-launch check.
+- Independent readback confirms the entire live preset graph stayed unchanged.
+  No model/parameter edits, preset Save/recall/allocation or deletion in this task;
+  existing unsaved changes remain unsaved. Selection-only live checks precede the
+  local restoration checks; restoration itself makes no selection request.
+- Signed0.6.6/build15 Release installed/launched/inventoried on Pro. Signed Android
+  0.6.6/code4 installed wirelessly on TCL; normal cold launch/version/process checked.
+  Temporary test package removed. Other apps/tablets and TableSign batch unchanged.
+
+Both complete12product installer inventories/mirrors passed SHA-256 readbacks:
+
+- iPad: `d3966bcd949cbd00b749a85db04efe2a08525000661b282f1597c81364e20ca5`
+- Android: `c19e52e396e299748def3cbfb0cc0d4192973482ff3369a95305a306e0064915`
+
+This does not discover the pedal's selected-block getter. If selection changes
+while the app is closed, its last remembered view can differ until a live event.
+Histories are local to each tablet. No new TestFlight upload/public APK release.

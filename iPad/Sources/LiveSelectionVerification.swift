@@ -24,4 +24,12 @@ import StadiumProtocol
     let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
     try? JSONSerialization.data(withJSONObject:report,options:.prettyPrinted).write(to:folder.appendingPathComponent("live-sync-verification.json"),options:.atomic)
 }
+@MainActor func verifyRememberedSelection(_ monitor:StadiumMonitor,selection:()->BlockSelection?)async {
+    var report:[String:Any]
+    if let state=monitor.snapshot,let remembered=monitor.rememberedSelection(in:state),let visible=selection(),visible.context.presetID==state.presetID,visible.context.path==remembered.path-1,visible.context.blockID==remembered.blockID,visible.context.slot==remembered.slot {
+        report=["passed":true,"restoredAfterColdLaunch":true,"path":remembered.path-1,"position":remembered.position,"slot":remembered.slot,"model":remembered.model]
+    } else {report=["passed":false,"error":"Visible block did not restore from the active preset preference"]}
+    let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+    try? JSONSerialization.data(withJSONObject:report,options:.prettyPrinted).write(to:folder.appendingPathComponent("selection-memory-verification.json"),options:.atomic)
+}
 #endif

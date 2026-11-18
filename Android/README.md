@@ -135,3 +135,19 @@ PYTHON=/path/to/dev-venv/bin/python bash Android/scripts/test-selection.sh
 The script runs15Java selection checks and six Swift/Java loopback cases covering
 matching, missing and wrong-command echoes. Hardware installation/acceptance of this
 update is recorded separately in docs/VALIDATION.md.
+
+## Android0.6.6/code4 — per-preset remembered block
+
+The local preference is scoped to the Stadium's serial and active preset content ID,
+with address/port fallback when serial is unavailable. A different active preset
+restores its own selection; the app never recalls the last app preset automatically.
+A moved block is found by flow/internal identity/model slot. Removed or invalid
+records fall back to a valid block. Startup restoration sends no hardware selection,
+model/parameter change or Save. Live selections override remembered state; ordinary
+polling and preview/fallback selection do not replace history. Preferences remain
+local to each tablet and survive in-place app updates.
+
+43Swift tests and10additional Java memory checks cover device/preset isolation,
+active-preset lookup, address changes, moved/removed blocks, model slots and corrupt
+records. The selection script also retains15selection and six socket echo cases.
+Current physical installation/cold-launch checks are recorded in docs/VALIDATION.md.

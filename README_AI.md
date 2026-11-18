@@ -118,3 +118,20 @@ installed desktop editor's startup also showed no selection query/event; its ini
 selection did not match the last independently observed pedal selection. These
 observations do not prove no other getter exists. Do not simulate a read by sending
 SelectedBlockSet or present cached focus as guaranteed current hardware state.
+
+## Remembered selection (0.6.6)
+
+Each client stores a local preference under a hashed device serial (endpoint/port
+fallback) plus the actual active preset content ID. Never key by display name,
+list position, prior app preset or transient connection UUID. Restoring is entirely
+local: it must not send SelectedBlockSet, LoadPreset or Save. Use the fresh active
+preset's own record; no history means ordinary valid-block fallback. Resolve stored
+flow/internal block ID/model slot against fresh blocks, allowing within-flow moves;
+removed, ambiguous, invalid or missing slots cannot reuse a stale edit context.
+
+Remember explicit tablet choices and accepted external selections. Persist external
+focus after coherent refresh so a pending preset transition cannot overwrite the
+previous preset's preference. Initial fallback/preview renders do not overwrite
+history. Preserve live-event precedence and reject stale focus after a newer local
+selection. iPad and Android have independent local histories; this is not cloud sync
+or a verified read of the pedal selection while the tablet was disconnected.
