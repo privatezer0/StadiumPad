@@ -37,6 +37,8 @@ for the official desktop editor.
   and controls; tapping a block on the tablet selects it on the Stadium too.
   External model replacements also bring their block into view. The Follow option
   controls incoming selection; parameter/model edits continue to update both devices.
+  Initial connection currently uses a local initial block until the pedal sends a
+  selection event; reading the pedal's existing selection at startup is unresolved.
 - Bonjour device search, selection and manual address entry, including switching to
   another Stadium. The app uses your device, not a developer-specific address.
 - Read library inventories: Factory/User presets, setlists, IRs, Favorites, Templates,

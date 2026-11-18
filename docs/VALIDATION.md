@@ -321,3 +321,22 @@ retain all12products and pass complete SHA-256 readbacks. New installer hashes:
 No new TestFlight upload/review submission or public APK release was performed.
 Initial connection still chooses a local initial block until a selection event;
 this update does not invent an unverified selected-block query.
+
+## 2026-11-18 — startup selected-block query investigation
+
+Owner requested matching the block already selected before app connection.
+Read-only discovery did not establish a getter: firmware1.4.2 rejects
+`/SelectedBlockGet` and `/GetSelectedBlock`;478enumerated property values and
+457definitions expose no verified current-block field. Fresh command/subscription
+traces include no initial selection in the normal snapshot handshake. A transparent
+loopback-only trace of the installed desktop editor showed normal product/edit
+buffer/property/library reads, no selection getter or initial selection notification,
+and a local initial block different from the last observed pedal selection.
+
+No startup-match feature was implemented or claimed. An undiscovered request may
+still exist; these findings are bounded evidence, not proof of protocol impossibility.
+Remembering the last block would not reliably reflect pedal changes made while the
+app was closed, and moving the pedal's selection is not equivalent to reading it.
+The temporary research proxy/listeners were stopped and the desktop retained its
+direct device connection. App versions/installers remain0.6.5; no extra build or
+preset/settings edits were needed for this investigation.

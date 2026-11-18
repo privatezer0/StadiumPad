@@ -110,3 +110,11 @@ slots; the event has no slot field, so retain the current slot at the same locat
 Never echo externally applied selection back onto the network. Incoming events apply
 immediately and reconcile against the refreshed snapshot; external model changes
 also select the changed visible slot. Ordinary polling must preserve category browsing.
+
+Startup selection remains unresolved: firmware1.4.2 rejected both SelectedBlockGet
+and GetSelectedBlock. Fresh connection/snapshot replies and enumerated properties
+provided no verified current-block field. A private, loopback-only trace of the
+installed desktop editor's startup also showed no selection query/event; its initial
+selection did not match the last independently observed pedal selection. These
+observations do not prove no other getter exists. Do not simulate a read by sending
+SelectedBlockSet or present cached focus as guaranteed current hardware state.
