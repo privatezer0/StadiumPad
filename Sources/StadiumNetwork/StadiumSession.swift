@@ -267,11 +267,22 @@ public actor StadiumSession {
         guard current.presetID==copy.sourceID,current.activeSnapshot==copy.sourceSnapshot,PresetBackupStore.hash(current.rawEditBuffer)==copy.sourceHash,let id=copy.preset.contentID,try await readUnlocked(.contentData(id)).data.map(PresetBackupStore.hash)==copy.sourceHash else{throw ProtocolError.invalid("The source changed after copying. The copy is saved, but your current preset was left open.")}
         try await loadUnlocked(id);return try await snapshotUnlocked(product:current.product)
     }
-    public func loadPreset(_ id:Int,expectedID:Int)async throws->DeviceSnapshot {
-        await acquire();defer{release()}
+    public func loadPreset(_ id:Int,expectedID:Int,discardingChangesWith backups:PresetBackupStore?=nil)async throws->DeviceSnapshot {
+        await acquire();defer{release()};try Task.checkCancellation()
         let current=try await snapshotUnlocked()
-        guard current.presetID==expectedID,!current.dirty else{throw ProtocolError.invalid("Save the current changes or save a copy before opening another preset.")}
-        try await loadUnlocked(id);return try await snapshotUnlocked(product:current.product)
+        guard current.presetID==expectedID else{throw ProtocolError.invalid("The active preset changed. Select the preset again.")}
+        if let backups {
+            // Explicit user selection means discard. Keep both saved and live
+            // bytes locally, including edits the device dirty flag may omit.
+            try await backup(current,to:backups)
+        } else {
+            guard !current.dirty else{throw ProtocolError.invalid("Save the current changes or save a copy before opening another preset.")}
+        }
+        try await confirmIdentity(current)
+        try await loadUnlocked(id)
+        let after=try await snapshotUnlocked(product:current.product)
+        guard after.presetID==id else{throw ProtocolError.invalid("The selected preset was not confirmed as active.")}
+        return after
     }
     private func loadUnlocked(_ id:Int)async throws {
         let ref=PresetSlot(try await readUnlocked(.contentRef(id)))

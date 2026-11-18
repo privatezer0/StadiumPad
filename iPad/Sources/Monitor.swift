@@ -152,6 +152,10 @@ import StadiumNetwork
         } catch {if generation==token {errorText=error.localizedDescription}}
     }
 #if DEBUG
+    func focusStoredBytesForVerification(_ id:Int)async throws->Data {
+        guard connected,let current=session,let state=snapshot,state.presetID==id,state.presetName=="StadiumPad Focus Test",let bytes=try await current.read(.contentData(id)).data else{throw ProtocolError.invalid("Only the reviewed Focus spare may be inspected.")}
+        return bytes
+    }
     func storedSpareForVerification(_ id:Int)async throws->DeviceSnapshot {
         guard connected,let current=session,let state=snapshot,state.presetID==id,state.presetName=="StadiumPad Move Test",let bytes=try await current.read(.contentData(id)).data else{throw ProtocolError.invalid("Only the reviewed reorder test spare may be inspected.")}
         return DeviceSnapshot(product:state.product,editBuffer:try MessagePack.decode(bytes),preset:state.preset,activeSnapshot:state.activeSnapshot,rawEditBuffer:bytes,origin:state.origin)
@@ -235,7 +239,7 @@ import StadiumNetwork
     func load(_ preset:PresetSlot)async->Bool {
         guard !busy,connected,let current=session,let id=preset.contentID,let expected=snapshot?.presetID else{return false}
         busy=true;defer{busy=false};let token=generation
-        do {let state=try await current.loadPreset(id,expectedID:expected);guard generation==token else{return false};snapshot=state;lastAction="Opened \(preset.label) · \(preset.name)";report();return true}
+        do {let state=try await current.loadPreset(id,expectedID:expected,discardingChangesWith:backups);guard generation==token else{return false};snapshot=state;lastAction="Opened \(preset.label) · \(preset.name)";report();return true}
         catch {if generation==token {errorText=error.localizedDescription};return false}
     }
     private func fail(_ error:Error) {stop();status=error.localizedDescription;report()}

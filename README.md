@@ -69,7 +69,8 @@ switching devices. No credentials, analytics service or cloud account are embedd
 Existing Remote Access restrictions are not bypassed.
 
 Changes reach the pedal immediately. Use **Save** to retain them; Factory presets
-require **Save Copy**. Preset recall refuses to discard unsaved edits. Snapshot
+require **Save Copy**. Selecting another preset discards unsaved edits, as in the desktop workflow;
+the saved source is unchanged and its saved/live bytes are backed up locally first. Snapshot
 switching follows the device's Snapshot Edits behavior. Documents/"Preset Backups"
 contains local backups and can contain personal preset data; keep it out of Git.
 Network failure can leave a write uncertain: check the pedal before retrying.

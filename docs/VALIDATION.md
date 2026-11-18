@@ -163,8 +163,8 @@ positions on Dyhana Drive, full readback, save/switch/reload, restoration and an
 reload, then return to the preserved copy. Unsaved source state was preserved in
 69D, test70A only was edited; no existing saved preset was a write destination.
 Physical Pro and regular landscape/portrait Focus/EQ layouts were rendered and
-inspected. Physical pad-drag acceptance is requested separately; native transaction
-checks do not prove touch feel. Cabinet physical mic placement, VoiceOver and
+inspected. The owner subsequently confirmed named-tone selection and pad dragging change
+the parameter controls on the Pro. Cabinet physical mic placement, VoiceOver and
 all670models on hardware are not claimed tested. Desktop user-default/favorites
 management and vendor photo backgrounds are not part of this implementation.
 
@@ -173,5 +173,27 @@ New69D/70A copies retained, original unsaved source preserved. Final owner Relea
 0.6.0/build10 installed/launched/inventory verified and mirrored to both installer
 folders with full inventory readbacks. Public distribution upload and external
 submission succeeded; Apple visibly confirms Waiting for Review for build10.
-The spare70A remains open for the requested manual pad check; no touch success
-claim is made while that reply is pending.
+The owner confirmed the physical pad check. Independent full graph/settings and
+assignment readback found four Focus parameter changes, confirmed save/reload,
+restored the starting values, confirmed another save/reload and returned to69D.
+
+## 0.6.1 preset selection discards unsaved edits
+
+Owner clarified that selecting another preset means discard the unsaved changes.
+The UI now opts into that behavior without a save/copy prompt. Saved and live native
+bytes are backed up locally first, including state the dirty flag might omit.
+Connection/source identity is rechecked after backup; the target is loaded and
+independently confirmed. No source Save, SetContentData or new allocation is sent.
+Internal/recovery callers keep strict loading unless they explicitly opt in.
+
+Four focused loopback cases cover dirty discard/return with distinct saved/live
+backups, strict-load refusal, backup failure and source change during backup.
+A physical iPad client run passed8checks: edit the reviewed test spare without
+saving, select the preserved copy, return and confirm original saved settings and
+exact saved-byte identity, then leave the clean preserved copy open. No valuable
+source preset was edited. The Focus touch/save/reload result above is now accepted.
+
+Final0.6.1 verification:34Swift and38executable loopback tests pass; the final
+four discard cases were rerun after tightening the source-switch-during-backup
+fixture. Native discard8checks and owner-reported Focus touch plus independent
+4-parameter save/reload/restore checks pass. No UI layout change was made in0.6.1.

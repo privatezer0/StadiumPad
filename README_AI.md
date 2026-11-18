@@ -27,7 +27,10 @@ Retain raw `_sbepgsm` preset bytes for preservation. Normalized FourCC maps are 
 inspection; re-encoding them can corrupt native graphs. Save Copy allocates only an
 empty User slot, verifies it again, records allocated identity, stores exact raw
 bytes only to that allocation, and independently verifies before opening it.
-Do not overwrite occupied slots or silently discard unsaved edits.
+Do not overwrite occupied slots. Owner-directed UI preset selection means discard
+unsaved edits after backing up saved/live bytes; it does not save or create a copy.
+Internal load helpers remain strict by default. Never opt copy/recovery code into
+discard merely to bypass a failed preservation guard.
 
 ACK is necessary but insufficient for parameter/model/save claims. Check actual
 readback, clean state and stored content. No automatic retry after an uncertain

@@ -14,7 +14,18 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
             let trace=try option("--trace").map{try TraceRecorder(path:$0)}
             try await session.connect(host:host,port:UInt16(option("--port") ?? "2001") ?? 2001,trace:trace)
             let state=try await session.snapshot()
-            if args.contains("--reorder-resume"),let catalogue=option("--catalog") {
+            if args.contains("--discard-check") || args.contains("--strict-load-check") {
+                let plan=try JSONDecoder().decode(SparePlan.self,from:Data(contentsOf:URL(fileURLWithPath:path)))
+                guard let first=plan.first.preset.contentID,let second=plan.second.preset.contentID,first != second,first != plan.first.sourceID,second != plan.first.sourceID,state.presetID==first,plan.first.preset.name.hasPrefix("iPad Edit Test"),plan.second.preset.name.hasPrefix("iPad Reload Check"),let saved=try await session.read(.contentData(first)).data else{throw ProtocolError.invalid("Only the reviewed test spares may be used.")}
+                let after:DeviceSnapshot
+                if args.contains("--strict-load-check") {after=try await session.loadPreset(second,expectedID:first)}
+                else {after=try await session.loadPreset(second,expectedID:first,discardingChangesWith:backups)}
+                guard after.presetID==second,try await session.read(.contentData(first)).data==saved else{throw ProtocolError.invalid("Discard changed the saved source.")}
+                let restored=try await session.loadPreset(first,expectedID:second,discardingChangesWith:backups)
+                let stored=DeviceSnapshot(product:state.product,editBuffer:try MessagePack.decode(saved),preset:state.preset,activeSnapshot:state.activeSnapshot)
+                guard restored.blocks==stored.blocks else{throw ProtocolError.invalid("Saved source did not reload after discard.")}
+                print("PASS discard/load/return; saved bytes unchanged");await session.disconnect();return
+            } else if args.contains("--reorder-resume"),let catalogue=option("--catalog") {
                 let plan=try JSONDecoder().decode(ReviewedReorderPlan.self,from:Data(contentsOf:URL(fileURLWithPath:path)))
                 guard let testID=plan.test.preset.contentID,let preserveID=plan.preserved.preset.contentID,plan.test.preset.name=="StadiumPad Move Test",plan.preserved.preset.name=="StadiumPad Move Preserve",plan.test.sourceID==preserveID,testID != preserveID,testID != plan.preserved.sourceID,state.presetID==testID,state.presetName==plan.test.preset.name,let saved=try await session.read(.contentData(testID)).data,PresetBackupStore.hash(saved)==plan.test.sourceHash else{throw ProtocolError.invalid("Only the independently reviewed new test copy may resume. Nothing was retried.")}
                 let models=try JSONDecoder().decode([String:ModelDefinition].self,from:Data(contentsOf:URL(fileURLWithPath:catalogue))),definitions=Dictionary(uniqueKeysWithValues:models.values.map{($0.id,$0)})
