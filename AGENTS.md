@@ -19,3 +19,9 @@ Run appropriate Swift and loopback tests. Inspect native tablet layouts after UI
 changes. Do not claim unfinished desktop features, offline sync, Android, phone
 support or live tuner readings exist. Commit related source/tests/docs together;
 push only to an explicitly authorized repository without force-pushing.
+
+Owner preferences: selecting another preset means discard unsaved edits without a
+save/copy prompt; back up saved/live native bytes locally first and retain strict
+internal copy/recovery guards. Keep Hype pinned beside the selected amp/model name
+whenever its native control is available, independent of parameter paging. Center
+it in the available header space between the model name and ACTIVE.

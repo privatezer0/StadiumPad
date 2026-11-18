@@ -32,6 +32,7 @@ struct InlineBlockEditor:View {
                         Image(systemName:style.symbol).font(.title2).foregroundStyle(style.color)
                         VStack(alignment:.leading,spacing:2) {Text(style.title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(style.color);Text(monitor.blockName(block)).font(.title3.weight(.medium)).lineLimit(1)}
                         if let hype,let value=block.value(hype) {
+                            Spacer(minLength:4)
                             HypeKnob(definition:hype,value:value,enabled:monitor.connected && !monitor.busy,color:style.color) {desired,expected in
                                 Task {await monitor.edit(context:selection.context,definition:hype,value:desired,expected:expected)}
                             }.id(selection.focusIdentity+"-hype")

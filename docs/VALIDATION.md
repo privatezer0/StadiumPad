@@ -217,6 +217,24 @@ the paged grid, preserving the other controls and page navigation.
 portrait renders were inspected using the connected BritSL100; Hype and its3.4
 readout sit next to the name on page1. This phase was read-only on the owner's
 current preset, with no Hype edit, global AutoCab change or preset replacement.
-The existing guarded parameter edit path is reused; physical Hype-knob gesture/
-VoiceOver acceptance is not separately claimed. Prior Focus touch and native
+The existing guarded parameter edit path is reused; the owner subsequently confirmed the physical Hype knob updates both iPad and
+Stadium. VoiceOver acceptance is not separately claimed. Prior Focus touch and native
 preset-discard checks remain passed. No saved source preset was written here.
+
+Final0.6.2owner Release was installed/launched and independent app inventory confirms
+build12. Both permanent installer folders and full10productinventories match.
+Owner Hype-touch acceptance passes; Focus touch/save/reload and native discard
+acceptance are complete. No remaining manual-touch question is pending. Public
+0.6.2archive/upload succeeded; current beta status is tracked in TESTFLIGHT.md.
+
+## 0.6.3 centered Hype header
+
+The Hype knob is centered in the available space between the selected amp/model
+name and ACTIVE. Native read-only Pro and regular landscape renders confirm the
+placement, with the preset sidebar and controls visible. The underlying knob is
+the owner-accepted control from build12; no hardware edit or Save was performed
+for this layout change. Owner Release0.6.3/build13 installed/launched and device
+app inventory independently confirms both version and build. Owner/public builds
+and public upload succeeded. Both installer mirrors and full ten-product SHA-256
+inventories passed. Prior Swift/loopback and physical touch results above apply;
+no additional gesture acceptance is claimed for this spacing-only change.
