@@ -1,15 +1,13 @@
 # Maintainer TestFlight release
 
-Status, November 17, 2026: corrected StadiumPad0.5.2/build9 is uploaded and
+Status, November 17, 2026: StadiumPad0.6.0/build10 (Focus View) is uploaded,
 validated and submitted for external Beta App Review. App Store Connect confirms
-**Waiting for Review** for0.5.2/build9. This build fixes
-the physical touchscreen drag defect reported in0.5.1/build8. Build8 was withdrawn
-from review. Physical Pro drag and independent full-settings/assignments
-save/reload/restore checks passed on the reviewed spare. Beta information, hardware
-setup, feedback/review contact, export compliance and updated What to Test are saved.
-Automatic tester notification is disabled; no testers have been invited. There is
-no approved public beta or live invitation yet. Apple approval is required before
-enabling and publishing a public invitation.
+**Waiting for Review** for0.6.0/build10. Earlier0.5.2/build9 remains Waiting for
+Review; build8 was withdrawn after its touchscreen-drag defect. No beta approval
+or public invitation is live. Updated What to Test includes Focus gestures and
+current limits. Automatic tester notification is disabled; no testers are invited.
+Native iPad Focus transaction/save/reload/restoration checks pass. Physical pad
+feel is requested separately; do not claim acceptance until observed or reported.
 Users' simple installation steps are in INSTALL.md. A public repository does not
 produce a TestFlight invitation automatically.
 

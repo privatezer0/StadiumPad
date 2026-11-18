@@ -167,3 +167,11 @@ inspected. Physical pad-drag acceptance is requested separately; native transact
 checks do not prove touch feel. Cabinet physical mic placement, VoiceOver and
 all670models on hardware are not claimed tested. Desktop user-default/favorites
 management and vendor photo backgrounds are not part of this implementation.
+
+Final audit re-read all275presets present before Focus work:zero SHA-256 changes.
+New69D/70A copies retained, original unsaved source preserved. Final owner Release
+0.6.0/build10 installed/launched/inventory verified and mirrored to both installer
+folders with full inventory readbacks. Public distribution upload and external
+submission succeeded; Apple visibly confirms Waiting for Review for build10.
+The spare70A remains open for the requested manual pad check; no touch success
+claim is made while that reply is pending.

@@ -3,7 +3,7 @@
 ## Simple installation for testers — TestFlight
 
 A public TestFlight invitation is being prepared. **There is no live TestFlight
-link yet.** Version 0.5.2/build9 is submitted to Apple and is **Waiting for Review**
+link yet.** Version 0.6.0/build10 is submitted to Apple and is **Waiting for Review**
 (as of November 17, 2026). The GitHub repository is source code, not a one-tap iPad installer.
 Do not download an arbitrary IPA and expect it to install on any iPad.
 

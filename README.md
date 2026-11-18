@@ -42,7 +42,7 @@ Command Center assignment editing, Global EQ controls, song/Showcase editing and
 transport, IR/clone file import and assignment, preset renaming after creation,
 block insertion/removal, cross-row/path moves, general routing editing, snapshot renaming,
 firmware updates and PIN authentication. Desktop Focus user-default management,
-favorites creation and vendor equipment artwork are not implemented. Their navigation tabs are present, with
+favorites creation and vendor equipment artwork are not implemented. Navigation for Command Center, Global EQ and Songs is present, with
 unfinished sections labeled. Output destination selection is a narrower supported
 operation, not a complete routing editor. Dragging leaves input/output and split/merge
 nodes fixed; branch layouts that cannot be established safely are refused. Amp replacement refuses when Auto Cab
