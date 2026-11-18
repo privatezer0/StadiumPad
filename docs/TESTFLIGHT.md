@@ -1,16 +1,15 @@
 # Maintainer TestFlight release
 
-Status, November 17, 2026: StadiumPad 0.5.1/build8 is uploaded, validated,
-and submitted for external Beta App Review. App Store Connect shows **Waiting for
-Review** in the StadiumPad Public Beta group. Beta information, hardware setup,
-feedback/review contact, export compliance and What to Test are saved. Automatic
-tester notification is disabled; no testers have been invited. There is no approved
-public beta or live invitation yet. Apple approval is the remaining distribution
-step before enabling and publishing a public invitation.
-The owner found a touchscreen drag defect in build8. Corrected0.5.2/build9 passed
-physical Pro drag acceptance and independent save/reload/restore verification.
-Its distribution archive is built and upload is underway; use the corrected build
-for external testing. Do not announce build8 as the validated drag release.
+Status, November 17, 2026: corrected StadiumPad0.5.2/build9 is uploaded and
+validated and submitted for external Beta App Review. App Store Connect confirms
+**Waiting for Review** for0.5.2/build9. This build fixes
+the physical touchscreen drag defect reported in0.5.1/build8. Build8 was withdrawn
+from review. Physical Pro drag and independent full-settings/assignments
+save/reload/restore checks passed on the reviewed spare. Beta information, hardware
+setup, feedback/review contact, export compliance and updated What to Test are saved.
+Automatic tester notification is disabled; no testers have been invited. There is
+no approved public beta or live invitation yet. Apple approval is required before
+enabling and publishing a public invitation.
 Users' simple installation steps are in INSTALL.md. A public repository does not
 produce a TestFlight invitation automatically.
 

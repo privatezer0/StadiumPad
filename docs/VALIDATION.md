@@ -134,3 +134,10 @@ physical touchscreen, VoiceOver and cross-device qualification are not claimed.
 
 The corrected owner Release0.5.2/build9 is signed, packaged and installed on Pro.
 TestFlight upload/review status is tracked separately in docs/TESTFLIGHT.md.
+
+The corrected0.5.2 IPA and both complete installer inventories were read back
+with matching SHA-256 values in the permanent delivery folders. The final owner
+Release was reinstalled/launched after layout inspection and app inventory confirmed
+0.5.2/build9. No DEBUG harness was left installed. Apple accepted the public upload;
+build8 was withdrawn from review. Apple confirmed corrected build9 is
+**Waiting for Review** after external beta submission.
