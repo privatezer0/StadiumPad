@@ -197,3 +197,26 @@ Final0.6.1 verification:34Swift and38executable loopback tests pass; the final
 four discard cases were rerun after tightening the source-switch-during-backup
 fixture. Native discard8checks and owner-reported Focus touch plus independent
 4-parameter save/reload/restore checks pass. No UI layout change was made in0.6.1.
+
+Final owner Release0.6.1/build11 was installed and launched on Pro; independent app
+inventory confirms version/build. Final275-preset saved-byte audit remains zero
+changes. The preserved Focus copy is selected and clean. Both current installer
+mirrors and complete inventories are refreshed/readback verified. Public archive
+is built; TestFlight upload/review status is recorded separately.
+
+## 0.6.2 pinned Hype control
+
+The owner requested Hype beside the amp/model name, available regardless of page.
+The header now resolves the live model's native Hype definition by semantic key,
+not a fixed numeric id;30locally catalogued models expose it. It uses native range/
+display metadata, including Off and0–10display scaling, drag-on-release editing,
+readback updates and adjustable accessibility. The same control is removed from
+the paged grid, preserving the other controls and page navigation.
+
+34Swift checks and signed owner/public builds pass. Native Pro/regularlandscape/
+portrait renders were inspected using the connected BritSL100; Hype and its3.4
+readout sit next to the name on page1. This phase was read-only on the owner's
+current preset, with no Hype edit, global AutoCab change or preset replacement.
+The existing guarded parameter edit path is reused; physical Hype-knob gesture/
+VoiceOver acceptance is not separately claimed. Prior Focus touch and native
+preset-discard checks remain passed. No saved source preset was written here.

@@ -34,6 +34,9 @@ import UIKit
             }
         }
     }
+    if let state=monitor.snapshot,let block=state.blocks.first(where:{monitor.catalog[String($0.model)]?.hypeParameter != nil}),let context=try? state.context(for:block) {
+        for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render("hype-"+name,size,BlockSelection(block:block,context:context))}
+    }
     let report:[String:Any] = ["capturedAt":Date().timeIntervalSince1970,"cases":cases.map{$0.0},"sections":["Librarian","Command Center","Global EQ","Songs"]]
     try? JSONSerialization.data(withJSONObject:report).write(to:folder.appendingPathComponent("layout-report.json"),options:.atomic)
 }

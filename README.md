@@ -13,6 +13,9 @@ for the official desktop editor.
   signal chain, named parameter controls, category/model lists, exact selected-model
   highlighting and automatic scrolling. Drag effects to rearrange occupied or empty
   positions within the same signal row. Includes Looper, FX Loop and Utility models.
+- **Pinned Hype knob:** available beside the selected amp/model name whenever
+  that model exposes Hype. It stays visible on every parameter page, with its
+  native value readout; drag to adjust or use VoiceOver's adjustable action.
 - **Focus View:** tap the aperture beside the model name. Factory named tones and
   X/Y blending for mapped models, precise X/Y controls, Restore starting tone,
   cabinet mic placement, and editable EQ band gain/frequency controls. It occupies

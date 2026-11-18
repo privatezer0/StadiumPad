@@ -87,6 +87,10 @@ public struct ParameterDisplayFormat:Codable,Sendable,Equatable {
 }
 
 extension ModelDefinition {
+    /// Resolve by native semantic key, never by a model-specific numeric id.
+    public var hypeParameter:ParameterDefinition? {
+        parameters.first{!$0.harness && $0.type=="f" && $0.key.caseInsensitiveCompare("Hype") == .orderedSame && $0.minimum.isFinite && $0.maximum.isFinite && $0.minimum<$0.maximum}
+    }
     public var browserCategory:String {
         if ioRole=="outputs" {return "Output"};if ioRole=="inputs" {return "Input"}
         switch category ?? "" {

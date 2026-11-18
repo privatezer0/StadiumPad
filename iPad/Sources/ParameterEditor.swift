@@ -18,7 +18,9 @@ struct InlineBlockEditor:View {
         GeometryReader {geometry in
             if let block=current,let selection {
                 let style=BlockStyle.forBlock(block,monitor:monitor)
-                let definitions=monitor.definitions(block)
+                let allDefinitions=monitor.definitions(block)
+                let hype=monitor.catalog[String(block.model)]?.hypeParameter.flatMap{block.value($0)==nil ? nil:$0}
+                let definitions=allDefinitions.filter{$0.identity != hype?.identity}
                 let rows=max(1,Int((geometry.size.height-108)/76))
                 let capacity=rows*2
                 let pages=max(1,(definitions.count+capacity-1)/capacity)
@@ -29,6 +31,11 @@ struct InlineBlockEditor:View {
                         Button(action:toggleFocus){Image(systemName:"camera.aperture").font(.title2).foregroundStyle(focusShown ? .white:style.color)}.accessibilityLabel(focusShown ? "Close Focus View":"Open Focus View")
                         Image(systemName:style.symbol).font(.title2).foregroundStyle(style.color)
                         VStack(alignment:.leading,spacing:2) {Text(style.title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(style.color);Text(monitor.blockName(block)).font(.title3.weight(.medium)).lineLimit(1)}
+                        if let hype,let value=block.value(hype) {
+                            HypeKnob(definition:hype,value:value,enabled:monitor.connected && !monitor.busy,color:style.color) {desired,expected in
+                                Task {await monitor.edit(context:selection.context,definition:hype,value:desired,expected:expected)}
+                            }.id(selection.focusIdentity+"-hype")
+                        }
                         Spacer(minLength:4)
                         if let state=monitor.snapshot {
                             let siblings=state.blocks.filter{$0.path==block.path && $0.position==block.position}
@@ -48,7 +55,7 @@ struct InlineBlockEditor:View {
                         }.padding(.horizontal,18)
                         Spacer(minLength:0)
                     }
-                    HStack {Button("Change Model",action:browse).font(.caption);Text("Path \(block.path) · \(definitions.count) controls").font(.caption).foregroundStyle(.secondary);Spacer();if monitor.snapshot?.dirty==true {Text("Unsaved changes").font(.caption).foregroundStyle(.orange)};PageButtons(page:$page,count:pages)}.padding(.horizontal,14).frame(height:44).background(.white.opacity(0.035))
+                    HStack {Button("Change Model",action:browse).font(.caption);Text("Path \(block.path) · \(allDefinitions.count) controls").font(.caption).foregroundStyle(.secondary);Spacer();if monitor.snapshot?.dirty==true {Text("Unsaved changes").font(.caption).foregroundStyle(.orange)};PageButtons(page:$page,count:pages)}.padding(.horizontal,14).frame(height:44).background(.white.opacity(0.035))
                 }.onChange(of:pages){_,count in page=min(page,count-1)}.background(.black).overlay(alignment:.top){Rectangle().fill(style.color.opacity(0.45)).frame(height:1)}
             } else {
                 VStack(spacing:10) {Image(systemName:"slider.horizontal.3").font(.largeTitle);Text(selection==nil ? "Select a block in the signal chain":"The block changed. Select it again.").font(.headline)}.foregroundStyle(.gray).frame(maxWidth:.infinity,maxHeight:.infinity).background(.black)
