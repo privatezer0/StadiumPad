@@ -73,3 +73,10 @@ Not exhaustively qualified: every model/firmware/Android device, physical cabine
 mic feel, full TalkBack workflow or acoustic latency. New-catalogue/native response
 limits are fail-closed. Tablet UI renders and tested workflows establish the scope
 above; they do not establish complete desktop editor parity.
+
+Final owner delivery:0.6.3/code1 cold-launched and automatically reconnected to the
+remembered Stadium; installed package version and live process independently
+verified. Signed APK ZIP integrity passes; both permanent installer mirrors and
+all eleven-product SHA-256 inventories match. APK SHA-256:
+`87116a2698ee53e812d6d17d95d0ef36b84a1eb2ccb9044e0d171657b8773f9d`.
+The owner installation is available now; no public APK/store publication is claimed.
