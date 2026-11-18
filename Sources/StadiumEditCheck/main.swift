@@ -21,9 +21,14 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
                 let original=DeviceSnapshot(product:state.product,editBuffer:try MessagePack.decode(saved),preset:state.preset,activeSnapshot:state.activeSnapshot,rawEditBuffer:saved,origin:state.origin)
                 let candidates=original.blocks.filter{$0.slot==0 && (1...12).contains($0.position)}
                 var selected:(SignalBlock,BlockReorderPlan)?
-                for block in candidates {
-                    for destination in candidates where block.path==destination.path && block.position != destination.position {
-                        if let pending=try? BlockReorderPlan(state:original,context:original.context(for:block),to:destination.position,models:definitions) {selected=(block,pending);break}
+                // An independently observed touchscreen move can end in an empty
+                // cell. Explicit positions identify it; never replay the forward move.
+                let requestedSource=option("--source-position").flatMap(Int.init)
+                let requestedDestination=option("--destination").flatMap(Int.init)
+                for block in candidates where requestedSource==nil || block.position==requestedSource {
+                    let destinations=requestedDestination.map{[$0]} ?? candidates.filter{$0.path==block.path}.map(\.position)
+                    for destination in destinations where block.position != destination {
+                        if let pending=try? BlockReorderPlan(state:original,context:original.context(for:block),to:destination,models:definitions),pending.matches(state) {selected=(block,pending);break}
                     }
                     if selected != nil {break}
                 }

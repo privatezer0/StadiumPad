@@ -1,5 +1,5 @@
-"""Loopback-only model replacement and snapshot transaction tests."""
-import json,os,struct,subprocess,tempfile,threading,unittest
+"""Loopback-only block reorder, observed-move and persistence transaction tests."""
+import hashlib,json,os,struct,subprocess,tempfile,threading,unittest
 from pathlib import Path
 import msgpack
 from integration_peer import Peer,exact,receive,ready,frame,osc,message
@@ -8,6 +8,7 @@ class ReorderPeer(Peer):
  def __init__(self,mode):
   self.active=11;self.model=0;self.stored={11:0,12:0};self.snapshot_index=0;self.dirty=False;self.reads=0
   super().__init__(mode)
+  if mode=='manual':self.model=1;self.dirty=True
  def state(self,model):
   def block(i,m,v):return {'id__':i,'enbl':1,'mdls':[{'id__':m,'parm':[{'pid_':1,'valu':v}]}]}
   return {'cg__':{'asnp':0,'entt':{'snps':[{'si__':0,'name':'Clean','vald':True}]}},'sfg_':{'flow':[{'blks':[7 if model==1 else 5,block(3,42 if model!=99 else 99,0.4),5 if model==1 else 6,block(4,43,0.2)]}]}}
@@ -28,7 +29,7 @@ class ReorderPeer(Peer):
     elif address=='/EditBufferStateGet':
      self.reads+=1;model=99 if self.mode=='stale' and self.reads>=2 else self.model
      reply='/getEditBufferState';args=[cid,0,b'_sbepgsm'+msgpack.packb(self.state(model))]
-    elif address=='/GetContentRef':args=[cid,msgpack.packb({'cid_':values[1],'ccid':-2,'type':2,'posi':267 if values[1]==11 else 268,'name':'iPad Edit Test 1117' if values[1]==11 else 'iPad Reload Check 1117'})]
+    elif address=='/GetContentRef':args=[cid,msgpack.packb({'cid_':values[1],'ccid':-2,'type':2,'posi':267 if values[1]==11 else 268,'name':('StadiumPad Move Test' if values[1]==11 else 'StadiumPad Move Preserve') if self.mode=='manual' else ('iPad Edit Test 1117' if values[1]==11 else 'iPad Reload Check 1117')})]
     elif address=='/GetContentData':args=[cid,b'_sbepgsm'+msgpack.packb(self.state(self.stored[values[1]]))]
     elif address=='/ActiveSnapshotIndexGet':reply='/getActiveSnapshotIndex';args=[cid,self.snapshot_index]
     elif address=='/doAgenda':
@@ -48,15 +49,26 @@ class ReorderPeer(Peer):
   except (EOFError,OSError):pass
   except BaseException as error:self.errors.append(repr(error))
 class ReorderTests(unittest.TestCase):
- def run_check(self,mode):
+ def run_check(self,mode,bad_hash=False):
   peer=ReorderPeer(mode)
   with tempfile.TemporaryDirectory(dir=os.environ.get('STADIUM_TEST_ROOT')) as td:
    root=Path(td);plan=root/'plan.json';catalog=root/'catalog.json'
    def copy(cid,pos,name):return {'preset':{'contentID':cid,'container':-2,'position':pos,'name':name,'type':2},'sourceID':9,'sourceSnapshot':0,'sourceHash':'synthetic'}
-   plan.write_text(json.dumps({'first':copy(11,267,'iPad Edit Test 1117'),'second':copy(12,268,'iPad Reload Check 1117')}))
+   if mode=='manual':
+    test=copy(11,267,'StadiumPad Move Test');test['sourceID']=12
+    test['sourceHash']='wrong' if bad_hash else hashlib.sha256(b'_sbepgsm'+msgpack.packb(peer.state(0))).hexdigest()
+    plan.write_text(json.dumps({'test':test,'preserved':copy(12,268,'StadiumPad Move Preserve')}))
+   else:plan.write_text(json.dumps({'first':copy(11,267,'iPad Edit Test 1117'),'second':copy(12,268,'iPad Reload Check 1117')}))
    catalog.write_text(json.dumps({str(i):{'id':i,'name':n,'category':cat,'parameters':[]} for i,n,cat in [(42,'Original Room','reverb'),(43,'Simple Delay','delay')]}))
-   result=subprocess.run([str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',str(plan),'--catalog',str(catalog),'--backups',str(root/'backups'),'--reorder-check'],capture_output=True,text=True,timeout=20)
+   result=subprocess.run([str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',str(plan),'--catalog',str(catalog),'--backups',str(root/'backups'),*(['--reorder-resume','--source-position','5','--destination','7'] if mode=='manual' else ['--reorder-check'])],capture_output=True,text=True,timeout=20)
   peer.close();return result,peer.sent,peer.errors
+ def test_observed_manual_drag_is_saved_without_replaying_forward_move(self):
+  result,sent,errors=self.run_check('manual');self.assertEqual(errors,[]);self.assertEqual(result.returncode,0,result.stderr)
+  self.assertIn('Confirmed previous move',result.stdout)
+  self.assertEqual(sum(a=='/doAgenda' for a,_ in sent),1) # reverse only
+ def test_manual_drag_with_unreviewed_saved_bytes_sends_no_writes(self):
+  result,sent,errors=self.run_check('manual',bad_hash=True);self.assertEqual(errors,[]);self.assertNotEqual(result.returncode,0)
+  self.assertFalse(any(a in ['/doAgenda','/SavePresetWithCID','/LoadPresetWithCID'] for a,_ in sent))
  def test_reorder_save_reload_restore(self):
   result,sent,errors=self.run_check('normal');self.assertEqual(errors,[]);self.assertEqual(result.returncode,0,result.stderr);self.assertIn('PASS reorder/save/reload/restore',result.stdout)
   self.assertEqual(sum(a=='/doAgenda' for a,_ in sent),2)

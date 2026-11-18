@@ -107,3 +107,30 @@ For the final Release touch check, a fresh275-preset saved-content baseline was
 captured privately before testing. The reviewed69C test spare was opened only
 from the clean69B preserved copy. No agenda/save was sent during setup. The
 physical drag result and its subsequent save/reload verification are not yet claimed.
+
+## 0.5.2 touchscreen drag correction
+
+The owner reported that0.5.1's touchscreen drag did not move a block. Independent
+readback confirmed an unchanged chain. The block Button competed with the drag,
+and gesture reset cleanup could clear its captured edit identity before onEnded.
+The block now has an explicit full-cell hit area, separate tap selection and a
+higher-priority drag. Gesture reset clears transient visuals without erasing the
+identity needed by the drop callback. Standard accessibility activation and Move
+left/right actions are retained.
+
+The owner confirmed **“move works now”** on physical Pro Release0.5.2/build9.
+Independent native readback found the expected effect moved from position2 to the
+empty position1 in path1. A reviewed saved-byte hash bound the verification to the
+existing test spare; the forward move was not replayed. Full model/harness values,
+enabled state and assignment configuration matched. Save/switch/reload passed;
+reverse move/save/switch/reload restored original order and settings. The pedal
+returned to the clean preserved copy. Of275 saved presets in the fresh baseline,
+**zero outside the test destination changed**. No new presets were allocated.
+
+31Swift tests and27loopback cases pass, including observed-move save/reload/restore
+with only the reverse agenda sent, and mismatched saved-byte refusal with no writes.
+Native physical Pro and regular landscape/portrait renders were inspected. Regular
+physical touchscreen, VoiceOver and cross-device qualification are not claimed.
+
+The corrected owner Release0.5.2/build9 is signed, packaged and installed on Pro.
+TestFlight upload/review status is tracked separately in docs/TESTFLIGHT.md.
