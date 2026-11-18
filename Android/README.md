@@ -102,3 +102,13 @@ inspection remains pending; no successful final screen check is claimed. No peda
 parameter/preset writes were part of this icon validation. Both installer mirrors
 and complete eleven-product SHA-256 inventories verified. APK SHA-256:
 `d049800d70343fc6d92b959ded4d233aefd189008e9d258d668ee3454380cf2e`.
+
+Follow-up0.6.4 verification on the owner's second TCL9445X Android16 tablet:
+wireless installation, cold launch and independent0.6.4/code2/process checks pass.
+The corrected read-only suite passes20checks, including model browser behavior,
+live connection/inventory and four tablet viewport renders. Native landscape and
+compact portrait screenshots were visually inspected: the aperture and FOCUS label
+are clearly visible. This completes the icon visual check previously interrupted
+on the USB tablet. No pedal parameter, scene activation, tuner or preset-save
+commands were sent during this follow-up. The temporary test package was removed;
+the installed app was relaunched and retains its own settings/data.

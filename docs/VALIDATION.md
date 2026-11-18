@@ -271,3 +271,7 @@ interrupted by another USB disconnect; final visual check remains pending. Nativ
 protocol checks reached18checks on preceding runs; the viewport harness now handles
 compact portrait/no-Hype presets. No new parameter or preset hardware writes.
 Both installer mirrors/full eleven-product inventories verified for the signed APK.
+Follow-up on the paired TCL Android16 tablet completes the pending0.6.4 icon check:
+wireless install/cold launch/version/process pass;20read-only checks pass. Native
+landscape/portrait aperture+FOCUS renders inspected. App relaunched after tests;
+no pedal/preset edits and no other application updates. Same signed APK as above.
