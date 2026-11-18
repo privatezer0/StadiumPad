@@ -38,3 +38,8 @@ integration tests, not the Swift runtime. See [third-party notices](docs/THIRD_P
 AI assisted implementation and the original app icon, with human direction and
 spare-preset verification. [Icon generation notes](docs/ICON.md) record the brief.
 Please contribute reproducible bug reports, improvements or fixes.
+
+Android uses the platform's native Canvas, dialogs, accessibility, sockets and
+[network service discovery](https://developer.android.com/develop/connectivity/wifi/use-nsd).
+Its Java implementation ports this project's original Swift protocol and UI
+behavior; the same upstream MIT research/Focus credits above apply.

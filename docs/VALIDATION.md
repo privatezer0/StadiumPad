@@ -242,3 +242,17 @@ no additional gesture acceptance is claimed for this spacing-only change.
 Public0.6.3/build13 processed successfully and was submitted to the external group.
 App Store Connect visibly confirms Waiting for Review. No approved public download
 or invitation exists; automatic tester notification is disabled.
+
+## Android0.6.3 initial native tablet port
+
+Android validation is detailed in [Android/README.md](../Android/README.md).
+Connected Android16 tablet:13native core checks include60shared Focus vectors;
+synthetic edit/save/discard and five copy fault scenarios pass. Native pedal
+transaction suite31checks and injected on-device touch suite34checks pass on a
+new spare; final25checks cover NSD, output selection and tuner reference/exit.
+Final read-only20checks cover category persistence/model auto-scroll and four
+native viewport renders including compact portrait. All277pre-existing saved
+User presets remain byte-identical. Unsaved source retained in a new preserve
+copy; separate new test copy retained. No original preset Save/Store was sent.
+Physical human finger/TalkBack/all-model qualification is not claimed. iPad source
+and TestFlight review are unchanged by the Android port.

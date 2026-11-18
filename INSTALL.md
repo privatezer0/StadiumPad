@@ -28,6 +28,25 @@ replacement beta builds through TestFlight when available.
 Apple documents [TestFlight](https://developer.apple.com/testflight/) and
 [public external tester invitations](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers).
 
+## Android tablets
+
+The native Android tablet build uses a signed APK, not TestFlight. There is no
+Google Play listing or public APK release asset yet; the public repository contains
+source. Once you have the maintainer's verified APK:
+
+1. Download/copy StadiumPad's APK to the tablet and open it in Files.
+2. If Android asks, allow that Files app to install this APK, then tap Install.
+3. Open StadiumPad, put tablet and Stadium on the same Wi-Fi/LAN, and enable
+   Remote Access on the pedal.
+4. Tap Connect → Search Network and choose your Stadium, or enter its address.
+5. Updates must use the same signing identity; install over the existing app to
+   retain local backups/settings. Do not uninstall just to update.
+
+Requires Android8/API26 or newer; physically tested on an Android16 tablet. Tablet
+landscape retains the model browser; compact portrait opens Change Model in a
+dialog while keeping presets, chain and controls visible. No phone layout.
+[Developer build instructions](Android/README.md).
+
 ## Build it yourself — developers only
 
 This route is available from source now. Nontechnical testers should wait for the

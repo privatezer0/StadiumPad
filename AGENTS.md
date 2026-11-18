@@ -16,8 +16,8 @@ extracted proprietary catalogues/artwork, signing material, builds or installers
 Keep local paths/signing configurable. Retain upstream MIT notices and credit.
 
 Run appropriate Swift and loopback tests. Inspect native tablet layouts after UI
-changes. Do not claim unfinished desktop features, offline sync, Android, phone
-support or live tuner readings exist. Commit related source/tests/docs together;
+changes. Do not claim unfinished desktop features, offline sync, phone
+support or live tuner readings exist. Android qualification is recorded separately. Commit related source/tests/docs together;
 push only to an explicitly authorized repository without force-pushing.
 
 Owner preferences: selecting another preset means discard unsaved edits without a

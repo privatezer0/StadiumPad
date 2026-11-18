@@ -52,15 +52,16 @@ nodes fixed; branch layouts that cannot be established safely are refused. Amp r
 would add unexpected blocks; disable Auto Cab on the device first if appropriate.
 
 **Offline preset editing/creation and reconnect synchronization are planned, not
-shipped.** Android tablet development is planned; this repository currently ships
-Swift/iPad source only. There is no phone UI. A phone version would require a
+shipped.** A native Android tablet port now accompanies the Swift/iPad source; see
+[Android build and validation](Android/README.md). There is no phone UI. A phone version would require a
 substantial interface redesign.
 
 ## Install
 
 For nontechnical users, a TestFlight beta is being prepared; no invitation is live
 yet. [Installation instructions](INSTALL.md) explain the planned tap-to-install
-route and the source-build route currently available to developers.
+route and the source-build route currently available to developers. Android uses
+a signed APK installed through Android Files; there is no Google Play listing.
 
 ## Connect and use
 

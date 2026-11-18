@@ -11,6 +11,11 @@ source before changing behavior. This guide grants no hardware or publishing acc
   transactions, backups, edit/readback/save/copy and scene/controller operations.
 - iPad/Sources: SwiftUI editor, connection monitor, discovery, scrolling folder
   browser, category/model selection, parameter controls and performance/tuner views.
+- Android/app/src/main/java/com/privatezero/stadiumpad: native Java protocol, FIFO
+  session/monitor, original Canvas tablet editor, Android NSD and guarded workflows.
+  Build scripts use external Android SDK/JDK/build/signing paths; bundled catalogues
+  are copied locally from the same generated iPad resources. No WebView or bridge
+  Mac is needed. Shared synthetic Focus vectors verify arithmetic parity.
 - Sources/StadiumProbe: explicitly invoked read-only research CLI.
 - Sources/StadiumEditCheck: explicitly invoked spare-only edit harness.
 - Tests: synthetic data and loopback peers. Hardware data is never a test fixture.
@@ -86,7 +91,8 @@ traces, captures, presets, generated vendor metadata, build caches or installers
 Use configurable paths and local environment variables for signing/builds. Keep the
 MIT upstream notice. Credit research accurately, including controller interpretation.
 
-Current gaps are listed in README. Offline mode and Android are planned; do not
-mistake them for implemented features. No cloud synchronization exists. A future
+Current gaps are listed in README. Offline mode remains planned. Android tablet source is implemented; its current
+qualification and remaining limits are recorded in Android/README.md. Do not
+confuse a view render, an injected gesture and human physical acceptance. No cloud synchronization exists. A future
 sync design needs device identities, conflict handling, explicit destinations,
 backups and preservation of unknown native data before it can safely write.
