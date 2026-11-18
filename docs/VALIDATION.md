@@ -256,3 +256,18 @@ User presets remain byte-identical. Unsaved source retained in a new preserve
 copy; separate new test copy retained. No original preset Save/Store was sent.
 Physical human finger/TalkBack/all-model qualification is not claimed. iPad source
 and TestFlight review are unchanged by the Android port.
+
+## Android0.6.4 Focus icon
+
+Original vector aperture and FOCUS caption replace the tiny Unicode glyph. Signed
+Android build passes. This is a visual/hit-region change; existing Focus gesture,
+batch/readback and restoration behavior is retained. Device/layout delivery evidence
+is recorded in the Android release notes after inspection.
+The read-only check exposed a same-block/category-return scroll edge case; including
+browser category/search in the selection key corrects it without changing hardware
+operations. Presets without a Hype amp use a catalogued block for this UI check.
+0.6.4 installed successfully after owner reconnection. Final read-only rerun was
+interrupted by another USB disconnect; final visual check remains pending. Native
+protocol checks reached18checks on preceding runs; the viewport harness now handles
+compact portrait/no-Hype presets. No new parameter or preset hardware writes.
+Both installer mirrors/full eleven-product inventories verified for the signed APK.

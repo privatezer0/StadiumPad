@@ -80,3 +80,25 @@ verified. Signed APK ZIP integrity passes; both permanent installer mirrors and
 all eleven-product SHA-256 inventories match. APK SHA-256:
 `87116a2698ee53e812d6d17d95d0ef36b84a1eb2ccb9044e0d171657b8773f9d`.
 The owner installation is available now; no public APK/store publication is claimed.
+
+## Android0.6.4/code2 — clearer Focus button
+
+Replaces the font-dependent dot with an original vector six-blade camera aperture
+and a visible FOCUS caption. A larger52×59logical-unit touch target, active color
+and Open/Close Focus View accessibility labels make the toggle easier to identify.
+The adjacent model-slot hit region no longer overlaps the Focus button. Protocol,
+Focus tone maps and parameter behavior are unchanged; iPad remains0.6.3/build13.
+Also fixes a model-browser edge case: returning to the selected block after
+browsing another category/search now scrolls its model back into view even when
+the block identity itself stayed the same. The read-only layout harness now also
+supports presets without a Hype-equipped amp.
+
+0.6.4 delivery: signed APK build/signature/ZIP verification passed and the update
+installed on the new tablet after reconnection. The first read-only runs reached
+18checks before revealing the harness's landscape/Hype assumptions on the owner's
+current preset. Those assumptions are corrected for compact portrait/no-Hype;
+the rerun was interrupted when USB disconnected again. Final on-device visual
+inspection remains pending; no successful final screen check is claimed. No pedal
+parameter/preset writes were part of this icon validation. Both installer mirrors
+and complete eleven-product SHA-256 inventories verified. APK SHA-256:
+`d049800d70343fc6d92b959ded4d233aefd189008e9d258d668ee3454380cf2e`.
