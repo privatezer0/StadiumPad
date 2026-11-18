@@ -238,3 +238,7 @@ app inventory independently confirms both version and build. Owner/public builds
 and public upload succeeded. Both installer mirrors and full ten-product SHA-256
 inventories passed. Prior Swift/loopback and physical touch results above apply;
 no additional gesture acceptance is claimed for this spacing-only change.
+
+Public0.6.3/build13 processed successfully and was submitted to the external group.
+App Store Connect visibly confirms Waiting for Review. No approved public download
+or invitation exists; automatic tester notification is disabled.

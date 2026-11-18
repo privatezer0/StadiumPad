@@ -2,7 +2,7 @@
 
 Template for App Store Connect. The beta description, feedback address and
 owner-approved private Apple review contact are saved there. Contact details are
-intentionally omitted here. Version 0.6.0/build 10 has been uploaded, validated, and submitted for external Beta App Review. As of November 17, 2026, App Store Connect showed Waiting for Review. No public invitation is live; verify current status in App Store Connect before announcing availability.
+intentionally omitted here. Version 0.6.3/build 13 has been uploaded, validated, and submitted for external Beta App Review. As of November 17, 2026, App Store Connect showed Waiting for Review. No public invitation is live; verify current status in App Store Connect before announcing availability.
 
 ## Beta description
 
@@ -26,6 +26,8 @@ unfinished. Offline editing/sync and Android are planned. No phone interface.
 - Select blocks on the iPad/pedal and check model/category/control synchronization.
 - Edit a parameter on a spare preset, save, switch away and reload.
 - Drag effects within a row, save/reload and confirm order/settings/assignments.
+- Check Hype centered between the model name and ACTIVE on every parameter page.
+- Select another preset to discard unsaved edits; no automatic Save occurs.
 - Open Focus with the aperture icon, tap named tones/drag and restore starting tone.
 - Check Focus responsiveness, cabinet placement and EQ handles on physical tablets.
 - Switch existing scenes; create only an empty scene slot when requested.
