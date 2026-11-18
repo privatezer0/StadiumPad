@@ -44,9 +44,11 @@ struct StadiumView:View {
         GeometryReader {geometry in
             VStack(spacing:0) {
                 header
-                presetBar(compact:geometry.size.width<1150)
+                if section == .librarian {
+                    Text("Librarian").font(.system(size:28,weight:.light)).frame(maxWidth:.infinity).frame(height:58).background(EditorTheme.header)
+                } else {presetBar(compact:geometry.size.width<1150)}
                 HStack(spacing:0) {
-                    PresetSidebar(refreshID:libraryRevision).frame(width:max(190,min(290,geometry.size.width*0.245)))
+                    if section != .librarian {PresetSidebar(refreshID:libraryRevision).frame(width:max(190,min(290,geometry.size.width*0.245)))}
                     Group {
                         if section == .home {
                             if let state=monitor.snapshot {
@@ -70,7 +72,7 @@ struct StadiumView:View {
                             } else {
                                 VStack(spacing:18) {Image(systemName:"waveform.path").font(.system(size:42,weight:.ultraLight));Text("Your Stadium, on your iPad").font(.title2);Button("Connect to Stadium"){showConnection=true}.buttonStyle(.borderedProminent)}.foregroundStyle(.secondary).frame(maxWidth:.infinity,maxHeight:.infinity)
                             }
-                        } else if section == .librarian {LibrarianView()}
+                        } else if section == .librarian {LibrarianView(openEditor:{section = .home})}
                         else if section == .songs {LibraryRows(title:"Songs",entries:(monitor.libraryEntries[-7] ?? []).filter{$0.type==4},canOpen:false).overlay(alignment:.bottom){Text("Showcase editing and transport are not connected yet").font(.caption).padding(10).background(.black)}}
                         else {SectionStatusView(section:section)}
                     }.frame(maxWidth:.infinity,maxHeight:.infinity)

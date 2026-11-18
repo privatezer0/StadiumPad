@@ -23,6 +23,7 @@ import UIKit
         try? image.pngData()?.write(to:folder.appendingPathComponent("layout-\(name).png"),options:.atomic)
     }
     for (name,size,currentSelection) in cases {await render(name,size,currentSelection)}
+    for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render("librarian-"+name,size,selection,.librarian)}
     for section in [EditorSection.librarian,.commands,.eq,.songs] {await render("section-"+section.rawValue,CGSize(width:1024,height:724),selection,section)}
     for mode in [EditorMode.scene,.footswitch,.tuner] {
         for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render(mode.rawValue+"-"+name,size,selection,.home,mode)}

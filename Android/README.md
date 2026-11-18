@@ -151,3 +151,16 @@ local to each tablet and survive in-place app updates.
 active-preset lookup, address changes, moved/removed blocks, model slots and corrupt
 records. The selection script also retains15selection and six socket echo cases.
 Current physical installation/cold-launch checks are recorded in docs/VALIDATION.md.
+
+## Librarian layout development checkpoint
+
+The Librarian replaces the Home preset sidebar and preset/scene/save bar with a
+full-width category rail and separate setlist/preset panes. Folder and row lists
+scroll independently; search and preset selection use the existing guarded load
+path. Favorites reads -8 and Templates -4, matching the iPad mapping.
+
+Java compilation, APK packaging and signing pass. No Android tablet was available
+for native interaction/layout qualification in this session. This is not a new
+validated Android release; installer mirrors remain at 0.6.6/code4.
+Clone import/export/folder management remain unavailable pending authenticated
+transfer architecture; disabled toolbar affordances do not implement those actions.

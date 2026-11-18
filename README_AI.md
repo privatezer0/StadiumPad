@@ -135,3 +135,21 @@ previous preset's preference. Initial fallback/preview renders do not overwrite
 history. Preserve live-event precedence and reject stale focus after a newer local
 selection. iPad and Android have independent local histories; this is not cloud sync
 or a verified read of the pedal selection while the tablet was disconnected.
+
+## Librarian work in progress
+
+Librarian uses the full workspace, with no Home preset sidebar or preset mode bar.
+iPad `LibrarianView` and Android `LibrarianView.java` own category/folder/search/
+selection state. Preset folders use resolved backing preset IDs, never reference
+IDs. Favorites uses container -8 and Templates -4; -6 is a folder directory.
+Native iPad layout rendering includes Pro, regular landscape and portrait.
+
+Clone file operations are not implemented. The installed desktop editor browses
+User Clones over authenticated SFTP, with Amp/Amp+Cab/Distortion/Preamp folders,
+column navigation, breadcrumb, and New Folder/Delete/Rename/Export/Import actions.
+GetCloneHierarchy can return an empty list while files exist; do not present that
+as proof of an empty library. Editing-port connectivity does not grant file access.
+Do not embed vendor private SSH credentials in the public source or app. Transfer
+architecture is pending owner choice (Mac companion versus separately supplied
+credentials). Current disabled toolbar buttons are not functioning file operations.
+No clone import or library-write hardware qualification has occurred.

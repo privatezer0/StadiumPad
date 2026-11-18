@@ -29,7 +29,7 @@ for the official desktop editor.
 - **Tuner mode:** requests the Stadium tuner on entry and sends its exit command when
   leaving. Known network messages do **not** expose live note/cents readings; read
   those on the Stadium display. Command acknowledgements are not pitch measurements.
-- The preset browser stays on the left in every mode. Scene/stomp boards fit regular
+- The preset browser stays on the left in every Home mode. Scene/stomp boards fit regular
   iPad and 12.9-inch Pro layouts without workspace scrolling; preset/model lists scroll.
 - Guarded parameter/model/output changes, User Save and verified Save Copy into an
   empty slot. Backups retain native saved/live bytes before editing.
@@ -44,6 +44,11 @@ for the official desktop editor.
   state, not a query of changes made on the pedal while the app was closed.
 - Bonjour device search, selection and manual address entry, including switching to
   another Stadium. The app uses your device, not a developer-specific address.
+- **Librarian layout:** a full-width workspace with Presets, Cab IRs, Favorites,
+  Templates, Songs and Clones categories. Presets has separate setlist and preset
+  panes, folder selection and search. The Home preset sidebar and scene/save bar
+  are hidden here. File-management toolbar actions remain unavailable pending
+  implementation; this layout does not implement clone transfers.
 - Read library inventories: Factory/User presets, setlists, IRs, Favorites, Templates,
   Songs and the clone hierarchy reported by the device. File-based models need files.
 
