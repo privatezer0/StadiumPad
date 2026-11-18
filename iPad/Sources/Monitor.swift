@@ -28,6 +28,23 @@ import StadiumNetwork
     let catalog:[String:ModelDefinition] = {
         guard let url=Bundle.main.url(forResource:"ParameterCatalog",withExtension:"json"),let data=try? Data(contentsOf:url),let catalog=try? JSONDecoder().decode([String:ModelDefinition].self,from:data) else{return [:]};return catalog
     }()
+    let focusCatalog:[String:FocusDefinition] = {
+        guard let url=Bundle.main.url(forResource:"FocusCatalog",withExtension:"json"),let data=try? Data(contentsOf:url) else{return [:]}
+        return (try? JSONDecoder().decode([String:FocusDefinition].self,from:data)) ?? [:]
+    }()
+    func applyFocus(context:EditContext,changes:[FocusChange],expected:[String:Value])async throws {
+        guard !busy,connected,let current=session else{throw ProtocolError.invalid("Finish the current update before adjusting Focus.")}
+        busy=true;defer{busy=false};let token=generation
+        let batch=try changes.map {change -> ParameterChange in
+            guard let old=expected[change.definition.identity] else{throw ProtocolError.invalid("A Focus parameter is unavailable on this device.")}
+            return ParameterChange(definition:change.definition,value:change.value,expected:old)
+        }
+        do {
+            let after=try await current.setParameters(context:context,changes:batch,backups:backups)
+            guard token==generation else{throw CancellationError()}
+            snapshot=after;lastAction="Focus tone updated · unsaved";report()
+        } catch {if token==generation {lastAction=nil};throw error}
+    }
     private var worker:Task<Void,Never>?
     private var subscriber:Task<Void,Never>?
     private var refreshTask:Task<Void,Never>?
@@ -106,7 +123,7 @@ import StadiumNetwork
         if let old=session {Task {if closeTuner {try? await old.setTuner(false)};await old.disconnect()}}
         session=nil;connected=false;connecting=false;status="Disconnected. Last received values remain visible.";report()
     }
-    func definitions(_ block:SignalBlock)->[ParameterDefinition] {catalog[String(block.model)]?.parameters.filter{block.value($0) != nil} ?? []}
+    func definitions(_ block:SignalBlock)->[ParameterDefinition] {catalog[String(block.model)]?.parameters.filter{$0.focusOnly != true && block.value($0) != nil} ?? []}
     func edit(context:EditContext,definition:ParameterDefinition,value:Value,expected:Value) async {
         guard !busy,connected,let current=session else{return};busy=true;defer{busy=false}
         let token=generation

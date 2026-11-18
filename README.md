@@ -13,6 +13,11 @@ for the official desktop editor.
   signal chain, named parameter controls, category/model lists, exact selected-model
   highlighting and automatic scrolling. Drag effects to rearrange occupied or empty
   positions within the same signal row. Includes Looper, FX Loop and Utility models.
+- **Focus View:** tap the aperture beside the model name. Factory named tones and
+  X/Y blending for mapped models, precise X/Y controls, Restore starting tone,
+  cabinet mic placement, and editable EQ band gain/frequency controls. It occupies
+  the signal-chain area while presets and normal controls remain visible. Opening
+  the view preserves the tone; adjustments are live and remain unsaved until Save.
 - **Scene view:** eight large colored scene buttons using the preset's snapshot names.
   Select an existing scene or confirm copying the current scene into an empty slot.
 - **Footswitch view:** virtual Stomp A/B pedalboards using actual controller assignments,
@@ -36,7 +41,8 @@ for the official desktop editor.
 Command Center assignment editing, Global EQ controls, song/Showcase editing and
 transport, IR/clone file import and assignment, preset renaming after creation,
 block insertion/removal, cross-row/path moves, general routing editing, snapshot renaming,
-firmware updates and PIN authentication. Their navigation tabs are present, with
+firmware updates and PIN authentication. Desktop Focus user-default management,
+favorites creation and vendor equipment artwork are not implemented. Their navigation tabs are present, with
 unfinished sections labeled. Output destination selection is a narrower supported
 operation, not a complete routing editor. Dragging leaves input/output and split/merge
 nodes fixed; branch layouts that cannot be established safely are refused. Amp replacement refuses when Auto Cab
@@ -89,7 +95,7 @@ and set `STADIUM_PROBE`, `STADIUM_EDIT_CHECK` to its `debug/` executables and
 ### Local model metadata
 
 Extracted Line 6 metadata/artwork/binaries are **not** included in this repository.
-For named model browsing and editing, prepare functional metadata locally from
+For named model browsing, Focus and editing, prepare functional metadata locally from
 an installed editor you are entitled to use. The reference tools are
 [Vheissu/helix-stadium-tools](https://github.com/Vheissu/helix-stadium-tools), tested
 at `dad97d3a2011290f7f6630d04cc1a819cc58752b`. Its
@@ -135,3 +141,21 @@ research and implementation, Line 6's work, and the Quad Cortex/Tone Master Pro
 workflow inspiration. This project is not affiliated with those manufacturers.
 We hope an official Line 6 iPad editor makes StadiumPad unnecessary one day;
 that hope is not a statement about their roadmap.
+
+### Local Focus metadata
+
+After preparing ParameterCatalog.json, generate the reference `focusModels.json`
+locally using helix-stadium-tools' `scripts/generate_mobile_focus_data.py` and the
+extracted factory Focus definitions. Then run:
+
+```sh
+python3 Scripts/prepare_focus_catalog.py --source /path/to/focusModels.json \
+  --modeldefs /path/to/installed-editor/modeldefs/p35md-1_4_0_0.bin
+```
+
+This validates complete maps against native ids/types/ranges and adds Focus-only
+controls that the normal editor layout omits. Both generated catalogues stay out
+of Git. A missing/incompatible map remains unavailable; no invented tone map is
+substituted. EQ displays control positions, not a live spectrum or a measured DSP
+response. Cabinet coordinates use native Position/Distance with quarter-inch
+Distance steps. Equipment backgrounds are original vector/SF-symbol treatments.

@@ -7,6 +7,8 @@ struct InlineBlockEditor:View {
     let selection:BlockSelection?
     let select:(SignalBlock)->Void
     let browse:()->Void
+    var focusShown=false
+    var toggleFocus:()->Void = {}
     @State private var page=0
     var current:SignalBlock? {
         guard let selection,let state=monitor.snapshot,state.presetID==selection.context.presetID,state.activeSnapshot==selection.context.snapshot else{return nil}
@@ -24,6 +26,7 @@ struct InlineBlockEditor:View {
                 let visible=Array(definitions.dropFirst(safePage*capacity).prefix(capacity))
                 VStack(spacing:0) {
                     HStack(spacing:10) {
+                        Button(action:toggleFocus){Image(systemName:"camera.aperture").font(.title2).foregroundStyle(focusShown ? .white:style.color)}.accessibilityLabel(focusShown ? "Close Focus View":"Open Focus View")
                         Image(systemName:style.symbol).font(.title2).foregroundStyle(style.color)
                         VStack(alignment:.leading,spacing:2) {Text(style.title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(style.color);Text(monitor.blockName(block)).font(.title3.weight(.medium)).lineLimit(1)}
                         Spacer(minLength:4)

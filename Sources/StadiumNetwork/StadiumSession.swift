@@ -81,6 +81,33 @@ public actor StadiumSession {
         guard let received=changed.value(definition),sameParameterValue(received,wire) else{throw ProtocolError.invalid("The Stadium did not confirm the requested value. Check the current value before retrying.")}
         return after
     }
+    /// One FIFO transaction for a Focus gesture. Validate the whole batch before
+    /// any write, preserve starting bytes, apply discrete switches first, and
+    /// stop on any uncertainty. No automatic save or retry.
+    public func setParameters(context:EditContext,changes:[ParameterChange],backups:PresetBackupStore)async throws->DeviceSnapshot {
+        guard !changes.isEmpty,changes.count<=128,Set(changes.map{$0.definition.identity}).count==changes.count else{throw ProtocolError.invalid("Invalid parameter batch.")}
+        let wires=try changes.map{try $0.definition.validated($0.value)}
+        await acquire();defer{release()};try Task.checkCancellation()
+        let before=try await snapshotUnlocked(),block=try verify(context,in:before)
+        for change in changes {
+            guard let old=block.value(change.definition),sameParameterValue(old,change.expected) else{throw ProtocolError.invalid("The tone changed elsewhere. Reopen Focus View before adjusting it.")}
+        }
+        let indices=changes.indices.filter{!sameParameterValue(changes[$0].expected,wires[$0])}.sorted {a,b in
+            let af=changes[a].definition.type=="f",bf=changes[b].definition.type=="f"
+            return af==bf ? a<b:!af
+        }
+        if indices.isEmpty {return before}
+        try await backup(before,to:backups)
+        for (offset,index) in indices.enumerated() {
+            try Task.checkCancellation()
+            if offset%4==0 {_ = try verify(context,in:await snapshotUnlocked(product:before.product))}
+            try await confirmIdentity(before)
+            try EditCommand.acknowledge(await editUnlocked(.parameter(context,changes[index].definition,wires[index])))
+        }
+        let after=try await snapshotUnlocked(product:before.product),actual=try verify(context,in:after)
+        guard changes.indices.allSatisfy({index in actual.value(changes[index].definition).map{sameParameterValue($0,wires[index])}==true}) else{throw ProtocolError.invalid("Not every Focus value was confirmed. Check the current tone before retrying.")}
+        return after
+    }
     public func savePreset(expectedID:Int,backups:PresetBackupStore)async throws->DeviceSnapshot {
         await acquire();defer{release()};try Task.checkCancellation()
         let before=try await snapshotUnlocked()

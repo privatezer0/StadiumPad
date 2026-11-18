@@ -33,12 +33,13 @@ struct StadiumView:View {
     @State private var showInfo=false
     @State private var mode:EditorMode = .preset
     @State private var showAcknowledgments=false
+    @State private var showFocus=false
     @State private var showModels=false
     @State private var pendingModel:ModelDefinition?
     @State private var pendingSelection:BlockSelection?
     @State private var showReplace=false
     let preview:Bool
-    init(initialSelection:BlockSelection?=nil,preview:Bool=false,initialSection:EditorSection = .home,initialMode:EditorMode = .preset) {_mode=State(initialValue:initialMode);_selected=State(initialValue:initialSelection);_section=State(initialValue:initialSection);self.preview=preview}
+    init(initialSelection:BlockSelection?=nil,preview:Bool=false,initialSection:EditorSection = .home,initialMode:EditorMode = .preset,initialFocus:Bool=false) {_showFocus=State(initialValue:initialFocus);_mode=State(initialValue:initialMode);_selected=State(initialValue:initialSelection);_section=State(initialValue:initialSection);self.preview=preview}
     var body:some View {
         GeometryReader {geometry in
             VStack(spacing:0) {
@@ -55,11 +56,14 @@ struct StadiumView:View {
                                 case .footswitch:FootswitchBoard(state:state).id(state.origin)
                                 case .preset:
                                     VStack(spacing:0) {
-                                        SignalChainView(state:state,selected:selected,select:select).frame(height:max(155,min(300,(geometry.size.height-150)*0.37)))
+                                        Group {
+                                            if showFocus,let selected {FocusSurfaceView(selection:selected,close:{showFocus=false}).id(selected.focusIdentity)}
+                                            else {SignalChainView(state:state,selected:selected,select:select)}
+                                        }.frame(height:max(showFocus ? 210:155,min(300,(geometry.size.height-150)*0.37)))
                                         Rectangle().fill(EditorTheme.border).frame(height:1)
                                         HStack(spacing:0) {
                                             if geometry.size.width>=1000 {ModelBrowser(selection:selected,choose:prepareReplacement).frame(width:min(360,(geometry.size.width-max(190,min(290,geometry.size.width*0.245)))*0.35))}
-                                            InlineBlockEditor(selection:selected,select:select,browse:{showModels=true})
+                                            InlineBlockEditor(selection:selected,select:select,browse:{showModels=true},focusShown:showFocus,toggleFocus:{showFocus.toggle()})
                                         }
                                     }
                                 }
@@ -101,7 +105,7 @@ struct StadiumView:View {
             if old == .tuner || new == .tuner {Task {await monitor.setTuner(new == .tuner)}}
         }
         .onChange(of:section){_,new in if new != .home && mode == .tuner {mode = .preset}}
-        .onChange(of:monitor.connectionID){_,_ in mode = .preset;selected=nil;pendingSelection=nil;pendingModel=nil;showSave=false;showCopy=false;showReplace=false;showModels=false;saveID=nil;copySourceID=nil;blocksPresetID=nil}
+        .onChange(of:monitor.connectionID){_,_ in mode = .preset;showFocus=false;selected=nil;pendingSelection=nil;pendingModel=nil;showSave=false;showCopy=false;showReplace=false;showModels=false;saveID=nil;copySourceID=nil;blocksPresetID=nil}
         .onChange(of:monitor.snapshot?.presetID){_,_ in chooseInitialBlock()}
         .onChange(of:monitor.snapshot?.activeSnapshot){_,_ in chooseInitialBlock()}
         .onChange(of:monitor.snapshot?.blocks){old,new in reconcileSelection(old:old ?? [],new:new ?? [])}
@@ -121,12 +125,13 @@ struct StadiumView:View {
             let host=ProcessInfo.processInfo.environment["STADIUM_DEVICE_HOST"] ?? address
             if !host.isEmpty {address=host;monitor.connect(host:host)}
 #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
+            if ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
                 for _ in 0..<70 {if monitor.connected {break};try? await Task.sleep(for:.milliseconds(200))}
                 if ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") {
                     let plan=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("spare-plan.json")
                     await verifySpareEditing(monitor,planURL:plan)
                 }
+                if ProcessInfo.processInfo.arguments.contains("--verify-focus") {await verifyFocus(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-models") {await verifyModelAndSnapshots(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-performance") {await verifyPerformance(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") {await verifyReorder(monitor,resume:true)}

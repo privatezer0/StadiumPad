@@ -12,7 +12,10 @@ or endorsement by Line 6/Yamaha is implied.
 Swift implementation builds on that project's MIT-licensed protocol research and
 reference implementation, including transport behavior, property envelopes, edit
 commands, model metadata extraction, stomp controller/target interpretation and
-native adjacent-swap block-reorder planning.
+native adjacent-swap block-reorder planning, Focus factory-map extraction and
+float32 triangle interpolation/discrete tie handling. Swift Focus arithmetic and
+synthetic reference-vector tests are adapted from that MIT reference; its native
+research remains credited to the original author.
 Reference commit: `dad97d3a2011290f7f6630d04cc1a819cc58752b`.
 The [upstream license](docs/REFERENCE_LICENSE.txt) is retained. Credit belongs to
 the developers who did that foundation work; this is not a claim of discovering

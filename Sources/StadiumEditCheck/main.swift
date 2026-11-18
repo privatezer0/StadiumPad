@@ -46,22 +46,45 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
                 _ = try await session.loadPreset(preserveID,expectedID:testID)
                 print("PASS real-device reorder/save/reload/restore; assignments verified; returned to preserved copy.")
                 await session.disconnect();return
-            } else if args.contains("--prepare") {
+            } else if args.contains("--prepare") || args.contains("--prepare-focus") {
                 guard !FileManager.default.fileExists(atPath:path),let id=state.presetID else{throw ProtocolError.invalid("Choose a new plan filename.")}
-                let first=try await session.copyCurrent(name:"iPad Edit Test 1117",expectedID:id,backups:backups)
+                let first=try await session.copyCurrent(name:args.contains("--prepare-focus") ? "StadiumPad Focus Preserve":"iPad Edit Test 1117",expectedID:id,backups:backups)
                 // Persist each allocation before attempting another; never retry blindly.
                 let partial=URL(fileURLWithPath:path+".first");try JSONEncoder().encode(first).write(to:partial,options:.atomic)
                 try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:partial.path)
-                let second=try await session.copyCurrent(name:"iPad Reload Check 1117",expectedID:id,backups:backups)
+                let second=try await session.copyCurrent(name:args.contains("--prepare-focus") ? "StadiumPad Focus Test":"iPad Reload Check 1117",expectedID:id,backups:backups)
                 let plan=SparePlan(first:first,second:second)
                 try JSONEncoder().encode(plan).write(to:URL(fileURLWithPath:path),options:.atomic)
                 try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:path)
                 _ = try await session.openPreservedCopy(first)
                 print("Independent spare copies verified and opened: \(first.preset.label), \(second.preset.label). Original stored preset was not written.")
-            } else if (args.contains("--exercise") || args.contains("--replace-check") || args.contains("--reorder-check")),let catalogPath=option("--catalog") {
+            } else if (args.contains("--exercise") || args.contains("--replace-check") || args.contains("--reorder-check") || args.contains("--focus-check")),let catalogPath=option("--catalog") {
                 let plan=try JSONDecoder().decode(SparePlan.self,from:Data(contentsOf:URL(fileURLWithPath:path)))
                 guard let firstID=plan.first.preset.contentID,let secondID=plan.second.preset.contentID,firstID != secondID,firstID != plan.first.sourceID,secondID != plan.first.sourceID,state.presetID==firstID,state.presetName==plan.first.preset.name,plan.first.preset.name.hasPrefix("iPad Edit Test"),plan.second.preset.name.hasPrefix("iPad Reload Check") else{throw ProtocolError.invalid("Only the prepared spare presets may be tested.")}
                 let catalog=try JSONDecoder().decode([String:ModelDefinition].self,from:Data(contentsOf:URL(fileURLWithPath:catalogPath)))
+                if args.contains("--focus-check") {
+                    guard let block=state.blocks.first,let model=catalog[String(block.model)] else{throw ProtocolError.invalid("Missing Focus test model.")}
+                    let parameters=model.parameters.filter{!$0.harness && block.value($0) != nil}
+                    guard !parameters.isEmpty,parameters.count<=32 else{throw ProtocolError.invalid("Choose a bounded synthetic Focus test model.")}
+                    let changes=try parameters.map {p -> ParameterChange in
+                        let old=block.value(p)!,next:Value
+                        if p.type=="b" {next = .bool(!(old.boolean ?? false))}
+                        else {let step=p.type=="i" ? 1:(p.maximum-p.minimum)/10,n=old.numeric ?? p.minimum;next = try p.validated(.number(n+step<=p.maximum ? n+step:n-step))}
+                        return ParameterChange(definition:p,value:next,expected:old)
+                    }
+                    let context=try state.context(for:block)
+                    _ = try await session.setParameters(context:context,changes:changes,backups:backups)
+                    _ = try await session.savePreset(expectedID:firstID,backups:backups)
+                    _ = try await session.loadPreset(secondID,expectedID:firstID)
+                    let loaded=try await session.loadPreset(firstID,expectedID:secondID)
+                    guard let actual=loaded.blocks.first(where:{$0.blockID==block.blockID && $0.slot==block.slot}),changes.allSatisfy({sameParameterValue(actual.value($0.definition) ?? .null,$0.value)}) else{throw ProtocolError.invalid("Focus batch did not survive reload.")}
+                    _ = try await session.setParameters(context:loaded.context(for:actual),changes:changes.map{ParameterChange(definition:$0.definition,value:$0.expected,expected:$0.value)},backups:backups)
+                    _ = try await session.savePreset(expectedID:firstID,backups:backups)
+                    _ = try await session.loadPreset(secondID,expectedID:firstID)
+                    let restored=try await session.loadPreset(firstID,expectedID:secondID)
+                    guard restored.blocks==state.blocks else{throw ProtocolError.invalid("Focus restoration failed.")}
+                    print("PASS Focus batch/save/reload/restore");await session.disconnect();return
+                }
                 if args.contains("--reorder-check") {
                     guard let source=state.blocks.first,let target=Int(option("--destination") ?? "7") else{throw ProtocolError.invalid("Missing reorder target.")}
                     let models=Dictionary(uniqueKeysWithValues:catalog.values.map{($0.id,$0)})

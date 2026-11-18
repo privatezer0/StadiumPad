@@ -141,3 +141,29 @@ Release was reinstalled/launched after layout inspection and app inventory confi
 0.5.2/build9. No DEBUG harness was left installed. Apple accepted the public upload;
 build8 was withdrawn from review. Apple confirmed corrected build9 is
 **Waiting for Review** after external beta submission.
+
+## 0.6.0 Focus View
+
+Desktop Focus was inspected through the installed app without changing controls.
+StadiumPad's aperture toggle replaces the chain area; presets/model choices and
+ordinary controls stay visible. Named factory tones, X/Y blend, precise controls,
+start-tone restoration, cabinet placement and EQ frequency/gain handles are
+implemented. Factory maps are generated locally (670complete maps,369supplemental
+native controls); no maps, model binaries or vendor artwork are committed.
+
+34Swift tests pass, including60synthetic native-reference arithmetic vectors,
+coordinate bounds, triangle weights and invalid metadata refusal.34executable
+loopback cases pass, including discrete-before-float batching, save/reload/restore,
+stale model/preset refusal, partial rejection, no retry after timeout and no save
+on unconfirmed values. The 60numeric vectors come from the MIT reference's
+synthetic fixtures, not user presets or native binary bytes.
+
+The native iPad client passed13checks against a new reviewed spare: three Focus
+positions on Dyhana Drive, full readback, save/switch/reload, restoration and another
+reload, then return to the preserved copy. Unsaved source state was preserved in
+69D, test70A only was edited; no existing saved preset was a write destination.
+Physical Pro and regular landscape/portrait Focus/EQ layouts were rendered and
+inspected. Physical pad-drag acceptance is requested separately; native transaction
+checks do not prove touch feel. Cabinet physical mic placement, VoiceOver and
+all670models on hardware are not claimed tested. Desktop user-default/favorites
+management and vendor photo backgrounds are not part of this implementation.

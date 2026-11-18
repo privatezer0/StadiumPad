@@ -13,6 +13,7 @@ public struct ParameterDefinition:Codable,Identifiable,Equatable,Sendable {
     public let displayFormats:[ParameterDisplayFormat]?
     public let options:[String]?
     public let harness:Bool
+    public let focusOnly:Bool?
     public var identity:String {"\(harness ? "h":"m")-\(id)"}
     public var range:ClosedRange<Double> {minimum...max(minimum,maximum)}
     public func containsWireValue(_ n:Double)->Bool {

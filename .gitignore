@@ -24,3 +24,5 @@ __pycache__/
 
 *.xcodeproj/
 Artwork/*.png
+
+iPad/Resources/FocusCatalog.json

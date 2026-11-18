@@ -52,6 +52,18 @@ and runtime byps/togl flags are not configuration edits. Preserve unknown fields
 never ignore actual assignment ranges or block enabled/parameter values. Reject
 cross-row/path moves, IO/routing-node moves and uncertain branch boundaries.
 
+Focus uses locally generated complete maps, float32 triangle interpolation and
+strongest-point discrete choices, credited to helix-stadium-tools. Never drop a
+missing non-excluded parameter and publish a partial tone. Supplemental native
+controls are marked focusOnly and hidden from ordinary parameter browsing.
+
+Batch edits validate every initial expected value before sending, retain native
+backups, apply switches/integers before floats, check identity while running, and
+confirm all final values. No retry/save on error. The view coalesces newer gestures
+and stops queued work on close/target changes. A running batch finishes validation;
+close does not abandon an uncertain write mid-response. Opening the view sends no
+parameter writes. Keep start-tone restoration separate from desktop user defaults.
+
 ## Validation and delivery
 
 Run `swift test` and Python loopback tests as documented in README. Add meaningful
