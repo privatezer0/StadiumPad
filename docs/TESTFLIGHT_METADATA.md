@@ -2,8 +2,7 @@
 
 Template for App Store Connect. The beta description, feedback address and
 owner-approved private Apple review contact are saved there. Contact details are
-intentionally omitted here. Build7 is uploaded; external review/public invitation
-await the updated block-drag build.
+intentionally omitted here. Version 0.5.1/build 8 has been uploaded, validated, and submitted for external Beta App Review. As of November 17, 2026, App Store Connect showed Waiting for Review. No public invitation is live; verify current status in App Store Connect before announcing availability.
 
 ## Beta description
 
@@ -50,8 +49,12 @@ Source/support: https://github.com/privatezer0/StadiumPad
 Installation: https://github.com/privatezer0/StadiumPad/blob/main/INSTALL.md
 Privacy information: https://github.com/privatezer0/StadiumPad/blob/main/SECURITY.md
 
-## Maintainer fields still required
+## Maintainer release status
 
-Feedback email; review contact name, phone and email; App Store Connect app record;
-any required review testing resources; actual export-compliance answers. Do not
-invent these fields or commit personal contact details without authorization.
+The App Store Connect app record, beta description, feedback/review contact,
+export-compliance information and What to Test were saved for the build 8 submission.
+Automatic tester notifications are disabled and no testers were invited at the
+recorded submission time. Apple external beta approval and enabling a verified
+public invitation remain pending as of November 17, 2026. Confirm live status
+in App Store Connect before updating this document. Do not publish private
+reviewer/contact details in this repository.
