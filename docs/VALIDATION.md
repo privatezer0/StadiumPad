@@ -88,15 +88,22 @@ The source-copy byte guard was retained; a conservative automatic-open refusal d
 not discard source edits or cause duplicate allocation.
 
 The iPad source builds with finger drag and accessible Move left/right actions.
-Physical finger-gesture qualification and final installation await reconnection of
-the Pro; protocol/state/save tests are distinct from a touchscreen acceptance test.
+Release0.5.1/build8 was subsequently installed and launched on the connected Pro;
+the device app inventory independently confirmed its version/build. Physical
+finger-gesture qualification remains pending the requested manual drag; protocol/
+state/save tests are distinct from a touchscreen acceptance test.
 
 Final checks for this source:31Swift tests and25executable loopback tests pass.
 All273User presets present before the reorder test were re-read after the real
 save/reload/restore run:zero SHA-256 changes. The two new test copies were the only
 write destinations. The owner Release0.5.1/build8 is signed and packaged externally;
-Pro reconnection is still required for final installation/finger-drag acceptance.
+Installation on the Pro is verified; finger-drag acceptance is still pending.
 
 The 0.5.1 owner IPA and full installer inventories were read back and verified in
 both permanent Latest Version delivery folders. The affected installer was updated;
 unrelated products were preserved. Build outputs and installers remain outside Git.
+
+For the final Release touch check, a fresh275-preset saved-content baseline was
+captured privately before testing. The reviewed69C test spare was opened only
+from the clean69B preserved copy. No agenda/save was sent during setup. The
+physical drag result and its subsequent save/reload verification are not yet claimed.
