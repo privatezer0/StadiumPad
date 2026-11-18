@@ -7,7 +7,7 @@ BINARY=Path(os.environ.get('STADIUM_EDIT_CHECK',str(Path(__file__).resolve().par
 CATALOG={'42':{'id':42,'name':'Dynamic Room','parameters':[{'id':1,'key':'Decay','name':'Decay','type':'f','minimum':0,'maximum':1,'displayMinimum':0,'displayMaximum':10,'unit':'s','harness':False}]}}
 class EditorPeer(Peer):
  def __init__(self,mode):
-  self.active=11;self.dirty=False;self.live=0.4;self.stored={11:0.4,12:0.4};self.edits=0;self.edit_reads=0
+  self.active=11;self.dirty=False;self.live=0.4;self.stored={11:0.4,12:0.4};self.edits=0;self.edit_reads=0;self.selection_echo=None
   super().__init__(mode)
   if mode.startswith('discard'):self.dirty=True;self.live=0.65
  def reference(self,cid):return {'cid_':cid,'ccid':-2,'posi':267 if cid==11 else 268,'name':'iPad Edit Test 1117' if cid==11 else 'iPad Reload Check 1117','type':2}
@@ -18,7 +18,12 @@ class EditorPeer(Peer):
    if index==0:
     receive(c)
     while not self.closed:
-     try:c.sendall(frame(struct.pack('>Q',2**40),1)+frame(osc('/heartbeat',[1,2,3])))
+     try:
+      echo=self.selection_echo
+      if echo is not None:
+       self.selection_echo=None
+       c.sendall(frame(osc('/setSelectedBlock',echo)))
+      c.sendall(frame(struct.pack('>Q',2**40),1)+frame(osc('/heartbeat',[1,2,3])))
      except OSError:break
      threading.Event().wait(.1)
     return
@@ -34,6 +39,10 @@ class EditorPeer(Peer):
     elif address=='/GetContentData':
      args=[cid,b'' if self.mode=='discard-backup-failure' else b'_sbepgsm'+msgpack.packb(self.edit(self.stored[values[1]]))]
      if self.mode=='discard-switch' and sum(a=='/GetContentData' for a,_ in self.sent)>=2:self.active=999
+    elif address=='/SelectedBlockSet':
+     assert values[1:]==[0,7],values
+     if self.mode!='selection-missing':self.selection_echo=[5,cid+(1 if self.mode=='selection-wrong-id' else 0),0,7]
+     continue
     elif address=='/ParamValueSet':
      assert values[1:5]==[0,7,0,1],values
      if self.mode=='edit-rejected':args=[cid,-1,1]

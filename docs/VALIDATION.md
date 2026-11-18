@@ -275,3 +275,49 @@ Follow-up on the paired TCL Android16 tablet completes the pending0.6.4 icon che
 wireless install/cold launch/version/process pass;20read-only checks pass. Native
 landscape/portrait aperture+FOCUS renders inspected. App relaunched after tests;
 no pedal/preset edits and no other application updates. Same signed APK as above.
+
+## 2026-11-18 — 0.6.5 two-way live selection
+
+Implemented typed `/SelectedBlockSet` requests in both native clients. Firmware1.4.2
+confirms them through correlated `/setSelectedBlock` broadcasts, without `/status`.
+Incoming selections apply immediately, retain a model slot at the same location,
+and reconcile with fresh state. Android also follows external model replacements;
+ordinary refresh still preserves model/category browsing. Stale queued external
+selection cannot supersede a newer Android tap. Incoming changes never send another
+selection request, preventing client feedback loops. No automatic Save or retry.
+
+Verified in this session:
+
+- 36Swift tests and15Java selection regressions pass.
+- 44loopback cases pass, including actual Swift and Java socket sessions with
+  correct, missing and wrong-command selection echoes. Missing/wrong echoes send
+  only one selection request, with no parameter/model/load/save commands.
+- The owner's physical pedal amp/reverb selections were independently captured
+  on the live subscription stream before the update.
+- Native iPad Pro DEBUG selection-only check:4checks pass for amp/reverb echo
+  confirmation and actual visible editor selection. Separate client selections
+  also updated the iPad's UI report to the correct amp/reverb model and category.
+  Actual Pro screen inspected: chain outline, selected model highlight/scroll and
+  corresponding parameter controls agree.
+- Native TCL Android16 check:26checks pass, including incoming selections from
+  an independent connection, model category, outgoing tablet requests/echoes,
+  unchanged preset/parameters/dirty state, and four viewport renders. Actual amp
+  and reverb screens inspected. These are native automated checks, not human
+  finger acceptance or fresh physical model-replacement testing on every model.
+- Independent readback confirms the entire preset graph stayed identical across
+  the iPad/Android selection checks. No parameter/model replacement, preset Save,
+  preset recall or allocation was sent. Existing unsaved edits stayed unsaved.
+- Signed iPad0.6.5/build14 Release installed/launched on Pro and independently
+  inventoried. Android0.6.5/code3 installed in place over paired Wi-Fi on TCL;
+  package version, cold launch and live process verified. Test package removed.
+  The iPlay/TableSign batch and other apps were not changed by this update.
+
+IPA/APK signature and package integrity pass. Both permanent installer mirrors
+retain all12products and pass complete SHA-256 readbacks. New installer hashes:
+
+- iPad: `182f94785a010b74f19ee468a23e313e86a24a7762a1289465632af43309bfc2`
+- Android: `265129ac0686eabaeb815c09f4cf65019b4cf7933a7b67a6cb9a3d1856b73ca8`
+
+No new TestFlight upload/review submission or public APK release was performed.
+Initial connection still chooses a local initial block until a selection event;
+this update does not invent an unverified selected-block query.

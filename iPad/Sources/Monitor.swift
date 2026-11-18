@@ -75,7 +75,10 @@ import StadiumNetwork
                             lastEvent=Date()
                             if let update=StadiumLiveUpdate.decode(event) {
                                 liveRevision+=1
-                                if case .selection(let path,let position)=update {pendingFocus=StadiumBlockFocus(path:path,position:position)}
+                                if case .selection(let path,let position)=update {
+                                    let focus=StadiumBlockFocus(path:path,position:position);pendingFocus=focus
+                                    if snapshot?.blocks.contains(where:{$0.path-1==path && $0.position==position})==true {focusedBlock=focus}
+                                }
                                 refreshFromEvent(current,token:token)
                             }
                             report()
@@ -122,6 +125,12 @@ import StadiumNetwork
         let closeTuner=tunerRequested;tunerRequested=false
         if let old=session {Task {if closeTuner {try? await old.setTuner(false)};await old.disconnect()}}
         session=nil;connected=false;connecting=false;status="Disconnected. Last received values remain visible.";report()
+    }
+    func selectBlock(context:EditContext)async {
+        guard !busy,connected,let current=session else{return}
+        busy=true;defer{busy=false};let token=generation
+        do {let after=try await current.selectBlock(context:context);guard generation==token else{return};snapshot=after;lastAction="Block selected on Stadium";report()}
+        catch {if generation==token {errorText=error.localizedDescription;lastAction=nil}}
     }
     func definitions(_ block:SignalBlock)->[ParameterDefinition] {catalog[String(block.model)]?.parameters.filter{$0.focusOnly != true && block.value($0) != nil} ?? []}
     func edit(context:EditContext,definition:ParameterDefinition,value:Value,expected:Value) async {

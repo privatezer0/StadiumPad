@@ -112,3 +112,26 @@ are clearly visible. This completes the icon visual check previously interrupted
 on the USB tablet. No pedal parameter, scene activation, tuner or preset-save
 commands were sent during this follow-up. The temporary test package was removed;
 the installed app was relaunched and retains its own settings/data.
+
+## Android0.6.5/code3 — two-way live selection
+
+Tablet block taps now send the Stadium's transient selection command and confirm
+its correlated broadcast echo. Pedal selections update the chain/model/controls
+immediately. Model replacements received elsewhere select the affected block, even
+when another block was previously selected. Follow Off preserves local browsing;
+ordinary refreshes leave category/search browsing intact. Selection never writes
+preset settings or automatically saves. A local tap cannot be overwritten by an
+older selection already queued for UI delivery; reconnect clears pending selection.
+
+Selection regressions and actual Java socket/session tests can run on a Mac without
+an emulator or tablet (requires the Android35 SDK and the Python test dependencies):
+
+```sh
+STADIUMPAD_ANDROID_BUILD=/external/StadiumPadBuild \
+STADIUM_EDIT_CHECK=/external/swift-build/debug/stadium-edit-check \
+PYTHON=/path/to/dev-venv/bin/python bash Android/scripts/test-selection.sh
+```
+
+The script runs15Java selection checks and six Swift/Java loopback cases covering
+matching, missing and wrong-command echoes. Hardware installation/acceptance of this
+update is recorded separately in docs/VALIDATION.md.

@@ -93,6 +93,21 @@ final class EditingTests:XCTestCase {
         XCTAssertEqual(StadiumLiveUpdate.decode(OSCMessage("/setModelWithMID",[])),.stateChanged)
         XCTAssertNil(StadiumLiveUpdate.decode(OSCMessage("/heartbeat",[])))
     }
+    func testSelectionCommandUsesVisiblePositionWithoutSaveOrModelSlot()throws {
+        let message=try EditCommand.selection(context()).message(id:17)
+        XCTAssertEqual(message,OSCMessage("/SelectedBlockSet",[.int(17),.int(1),.int(11)]))
+        XCTAssertThrowsError(try EditCommand.selection(context(slot:2)).message(id:17))
+    }
+    func testModelFollowUsesVisibleSlotEvenWhenInternalIdentityChanges() {
+        let first=SignalBlock(id:"old",path:1,position:6,blockID:80,slot:0,model:42,enabled:true,values:[:],harnessValues:[:])
+        var replacement=first;replacement.id="new";replacement.blockID=91;replacement.model=43
+        XCTAssertEqual(StadiumSelectionFollow.changedModel(previous:[first],current:[replacement]),replacement)
+        XCTAssertNil(StadiumSelectionFollow.changedModel(previous:[first],current:[first]))
+        var otherSlot=replacement;otherSlot.slot=1
+        XCTAssertNil(StadiumSelectionFollow.changedModel(previous:[first],current:[otherSlot]))
+        var otherPath=replacement;otherPath.path=2
+        XCTAssertNil(StadiumSelectionFollow.changedModel(previous:[first],current:[otherPath]))
+    }
     func testMessagePackAttributesRoundTrip()throws {
         let value:Value = .object(["s":.string(String(repeating:"a",count:40)),"i":.int(-100),"b":.bool(true),"array":.array([.null,.number(0.25)]),"data":.binary(Data([1,2,3]))])
         XCTAssertEqual(try MessagePack.decode(MessagePack.encode(value)),value)

@@ -4,6 +4,7 @@ public enum EditCommand:Sendable {
     case parameter(EditContext,ParameterDefinition,Value)
     case reorder(flow:Int,from:Int,to:Int)
     case tuner(Bool)
+    case selection(EditContext)
     case controller(Int,Int),model(EditContext,Int),snapshot(Int),copySnapshot(Int,Int)
     case save(Int),load(Int),createUser(position:Int,name:String),storeNewPreset(Int,Data)
     public func message(id:Int32)throws->OSCMessage {
@@ -16,6 +17,8 @@ public enum EditCommand:Sendable {
             } else {
                 address="/ParamValueSet";values += [.int(Int64(context.path)),.int(Int64(context.position)),.int(Int64(context.slot)),.int(Int64(definition.id)),wire,.int(-1)]
             }
+        case .selection(let context):
+            try context.validate();address="/SelectedBlockSet";values += [.int(Int64(context.path)),.int(Int64(context.position))]
         case .reorder(let flow,let from,let to):
             guard (0...1).contains(flow),(1...12).contains(from%14),(1...12).contains(to%14),(0...27).contains(from),(0...27).contains(to),from/14==to/14,from != to else{throw ProtocolError.invalid("Reorder within one effect row.")}
             let step=from<to ? 1:-1

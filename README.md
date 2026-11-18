@@ -33,7 +33,10 @@ for the official desktop editor.
   iPad and 12.9-inch Pro layouts without workspace scrolling; preset/model lists scroll.
 - Guarded parameter/model/output changes, User Save and verified Save Copy into an
   empty slot. Backups retain native saved/live bytes before editing.
-- Follow selected blocks on the pedal, receive device updates, and refresh current state.
+- Two-way block selection: selecting on the pedal updates the chain, model browser
+  and controls; tapping a block on the tablet selects it on the Stadium too.
+  External model replacements also bring their block into view. The Follow option
+  controls incoming selection; parameter/model edits continue to update both devices.
 - Bonjour device search, selection and manual address entry, including switching to
   another Stadium. The app uses your device, not a developer-specific address.
 - Read library inventories: Factory/User presets, setlists, IRs, Favorites, Templates,

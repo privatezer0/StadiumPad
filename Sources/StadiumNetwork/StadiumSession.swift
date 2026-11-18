@@ -6,6 +6,7 @@ public actor StadiumSession {
     private var occupied=false;private var waiters:[CheckedContinuation<Void,Never>]=[]
     private var allocated:Set<Int>=[]
     private var connectionID=UUID()
+    private var selectionReceipts:[Int32:StadiumBlockFocus]=[:]
     public init() {}
     private func acquire()async {if !occupied {occupied=true;return};await withCheckedContinuation{waiters.append($0)}}
     private func release() {if waiters.isEmpty {occupied=false}else{waiters.removeFirst().resume()}}
@@ -18,7 +19,7 @@ public actor StadiumSession {
             updates=sub;commands=command
         } catch {await sub.close();await command.close();throw error}
     }
-    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;allocated=[]}
+    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;allocated=[];selectionReceipts=[:]}
     private func exchange(_ make:(Int32)throws->OSCMessage,reply:String)async throws->OSCMessage {
         try Task.checkCancellation();guard let socket=commands else{throw ProtocolError.closed}
         let id=nextID;nextID = nextID==Int32.max ? 1:nextID+1
@@ -37,12 +38,36 @@ public actor StadiumSession {
     private func editUnlocked(_ command:EditCommand)async throws->OSCMessage {try await exchange(command.message,reply:"/status")}
     public func read(_ command:ReadCommand)async throws->Value {await acquire();defer{release()};return try await readUnlocked(command)}
     public func event(timeout:Double=5)async throws->OSCMessage {
-        guard let socket=updates else{throw ProtocolError.closed};let deadline=Date().addingTimeInterval(timeout)
+        guard let socket=updates else{throw ProtocolError.closed};let origin=connectionID;let deadline=Date().addingTimeInterval(timeout)
         while deadline.timeIntervalSinceNow>0 {
             let frame=try await socket.frame(timeout:deadline.timeIntervalSinceNow)
             if frame.flags&4 != 0 || frame.more || frame.payload.isEmpty {continue}
-            return try OSCMessage.decode(frame.payload)
+            guard origin==connectionID else{throw ProtocolError.closed}
+            let message=try OSCMessage.decode(frame.payload)
+            if case .selection(let path,let position)=StadiumLiveUpdate.decode(message),let id=message.values[1].integer,let key=Int32(exactly:id) {
+                if selectionReceipts.count>=64 {selectionReceipts.removeAll()}
+                selectionReceipts[key]=StadiumBlockFocus(path:path,position:position)
+            }
+            return message
         };throw ProtocolError.timeout
+    }
+    /// Selection is transient UI state. Firmware emits /setSelectedBlock instead of /status.
+    /// The live event reader remains active while this FIFO transaction awaits its echo.
+    public func selectBlock(context:EditContext)async throws->DeviceSnapshot {
+        await acquire();defer{release()};try Task.checkCancellation()
+        let origin=connectionID,before=try await snapshotUnlocked();_ = try verify(context,in:before)
+        guard let socket=commands else{throw ProtocolError.closed}
+        let id=nextID;nextID = nextID==Int32.max ? 1:nextID+1;selectionReceipts[id]=nil
+        try await socket.send(Frame(payload:try EditCommand.selection(context).message(id:id).encode()).encode())
+        let deadline=Date().addingTimeInterval(3)
+        while Date()<deadline {
+            try Task.checkCancellation();guard connectionID==origin,commands != nil else{throw ProtocolError.closed}
+            if let receipt=selectionReceipts.removeValue(forKey:id),receipt.path==context.path,receipt.position==context.position {
+                let after=try await snapshotUnlocked(product:before.product);_ = try verify(context,in:after);return after
+            }
+            try await Task.sleep(for:.milliseconds(20))
+        }
+        throw ProtocolError.invalid("Block selection was not confirmed. Nothing was retried or saved.")
     }
     public func snapshot(product:Value?=nil)async throws->DeviceSnapshot {await acquire();defer{release()};return try await snapshotUnlocked(product:product)}
     private func snapshotUnlocked(product:Value?=nil)async throws->DeviceSnapshot {

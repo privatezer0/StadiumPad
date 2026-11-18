@@ -114,7 +114,8 @@ struct StadiumView:View {
             Task {@MainActor in
                 await Task.yield()
                 guard followExternal,monitor.focusedBlock?.id==focus.id,focus.receivedAt>localSelectionAt,let state=monitor.snapshot else{return}
-                let block=state.blocks.first{$0.path-1==focus.path && $0.position==focus.position && $0.slot==0}
+                let slot=selected?.context.path==focus.path && selected?.context.position==focus.position ? (selected?.context.slot ?? 0):0
+                let block=state.blocks.first{$0.path-1==focus.path && $0.position==focus.position && $0.slot==slot}
                 if let block {applySelection(block)}
             }
         }
@@ -125,12 +126,13 @@ struct StadiumView:View {
             let host=ProcessInfo.processInfo.environment["STADIUM_DEVICE_HOST"] ?? address
             if !host.isEmpty {address=host;monitor.connect(host:host)}
 #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
+            if ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
                 for _ in 0..<70 {if monitor.connected {break};try? await Task.sleep(for:.milliseconds(200))}
                 if ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") {
                     let plan=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("spare-plan.json")
                     await verifySpareEditing(monitor,planURL:plan)
                 }
+                if ProcessInfo.processInfo.arguments.contains("--verify-live-sync") {await verifyLiveSelection(monitor,selection:{selected})}
                 if ProcessInfo.processInfo.arguments.contains("--verify-discard") {await verifyDiscard(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-focus") {await verifyFocus(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-models") {await verifyModelAndSnapshots(monitor)}
@@ -146,7 +148,7 @@ struct StadiumView:View {
                     let url=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("tuner-verification.json")
                     try? JSONSerialization.data(withJSONObject:report).write(to:url,options:.atomic)
                 }
-                chooseInitialBlock()
+                if !ProcessInfo.processInfo.arguments.contains("--verify-live-sync") {chooseInitialBlock()}
                 try? await Task.sleep(for:.seconds(1))
                 await captureEditorLayouts(monitor:monitor,discovery:discovery,selection:selected)
             }
@@ -218,7 +220,11 @@ struct StadiumView:View {
     private func canStep(_ step:Int)->Bool {guard monitor.connected,!monitor.busy,monitor.snapshot?.dirty==false,let index=monitor.presets.firstIndex(where:{$0.contentID==monitor.snapshot?.presetID}) else{return false};return monitor.presets.indices.contains(index+step)}
     private func stepPreset(_ step:Int) {guard canStep(step),let index=monitor.presets.firstIndex(where:{$0.contentID==monitor.snapshot?.presetID}) else{return};let preset=monitor.presets[index+step];Task {_ = await monitor.load(preset)}}
     private func prepareReplacement(_ model:ModelDefinition) {guard let selected,selected.context.modelID != model.id else{return};pendingSelection=selected;pendingModel=model;showReplace=true}
-    private func select(_ block:SignalBlock) {localSelectionAt=Date();applySelection(block)}
+    private func select(_ block:SignalBlock) {
+        guard preview || !monitor.busy else{return}
+        localSelectionAt=Date();applySelection(block)
+        if !preview,let context=selected?.context {Task {await monitor.selectBlock(context:context)}}
+    }
     private func applySelection(_ block:SignalBlock) {
         guard let state=monitor.snapshot,let context=try? state.context(for:block) else{return}
         let selection=BlockSelection(block:block,context:context);selected=selection
@@ -240,7 +246,7 @@ struct StadiumView:View {
         let id=monitor.snapshot?.presetID
         defer {blocksPresetID=id}
         guard blocksPresetID==id else{return}
-        if followExternal,let changed=new.first(where:{block in old.contains(where:{$0.id==block.id && $0.model != block.model})}) {applySelection(changed);return}
+        if followExternal,let changed=StadiumSelectionFollow.changedModel(previous:old,current:new) {applySelection(changed);return}
         guard let selection=selected else{return}
         if let fresh=new.first(where:{$0.path==selection.block.path && $0.position==selection.block.position && $0.slot==selection.block.slot}) {
             if fresh.model != selection.context.modelID || fresh.blockID != selection.context.blockID {applySelection(fresh)}

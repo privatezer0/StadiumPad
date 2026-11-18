@@ -18,3 +18,13 @@ public struct StadiumBlockFocus:Equatable,Sendable {
     public let id:UUID;public let path:Int;public let position:Int;public let receivedAt:Date
     public init(path:Int,position:Int) {id=UUID();self.path=path;self.position=position;receivedAt=Date()}
 }
+
+/// Fallback when the device broadcasts a model change without a selection event.
+/// Match the visible slot; replacement can allocate a different internal block ID.
+public enum StadiumSelectionFollow {
+    public static func changedModel(previous:[SignalBlock],current:[SignalBlock])->SignalBlock? {
+        current.first {block in previous.contains {old in
+            old.path==block.path && old.position==block.position && old.slot==block.slot && old.model != block.model
+        }}
+    }
+}

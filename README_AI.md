@@ -96,3 +96,17 @@ qualification and remaining limits are recorded in Android/README.md. Do not
 confuse a view render, an injected gesture and human physical acceptance. No cloud synchronization exists. A future
 sync design needs device identities, conflict handling, explicit destinations,
 backups and preservation of unknown native data before it can safely write.
+
+## Live selection (0.6.5)
+
+`/SelectedBlockSet ,iii [commandID, zeroBasedFlow, visiblePosition]` changes the
+pedal's transient selection. It emits `/setSelectedBlock ,iiii
+[source, commandID, flow, position]` on the subscription stream, with no ordinary
+`/status` ACK. Keep the event reader running while the FIFO transaction waits for
+the matching command ID and location, then revalidate context. A missing/wrong echo
+fails without retry, Save, parameter writes or a disconnect. Do not send the incoming
+`/setSelectedBlock` notification as a command. A block may contain multiple model
+slots; the event has no slot field, so retain the current slot at the same location.
+Never echo externally applied selection back onto the network. Incoming events apply
+immediately and reconcile against the refreshed snapshot; external model changes
+also select the changed visible slot. Ordinary polling must preserve category browsing.

@@ -14,6 +14,15 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
             let trace=try option("--trace").map{try TraceRecorder(path:$0)}
             try await session.connect(host:host,port:UInt16(option("--port") ?? "2001") ?? 2001,trace:trace)
             let state=try await session.snapshot()
+            if args.contains("--selection-check") {
+                let listener=Task {while !Task.isCancelled {_ = try await session.event(timeout:5)}}
+                defer {listener.cancel()}
+                guard let block=state.blocks.first else{throw ProtocolError.invalid("No selectable block.")}
+                let after=try await session.selectBlock(context:state.context(for:block))
+                guard after.rawEditBuffer==state.rawEditBuffer,after.presetID==state.presetID,after.activeSnapshot==state.activeSnapshot,after.dirty==state.dirty else{throw ProtocolError.invalid("Preset changed during selection check.")}
+                print("PASS selection echo correlated; preset bytes and dirty state unchanged")
+                await session.disconnect();return
+            }
             if args.contains("--discard-check") || args.contains("--strict-load-check") {
                 let plan=try JSONDecoder().decode(SparePlan.self,from:Data(contentsOf:URL(fileURLWithPath:path)))
                 guard let first=plan.first.preset.contentID,let second=plan.second.preset.contentID,first != second,first != plan.first.sourceID,second != plan.first.sourceID,state.presetID==first,plan.first.preset.name.hasPrefix("iPad Edit Test"),plan.second.preset.name.hasPrefix("iPad Reload Check"),let saved=try await session.read(.contentData(first)).data else{throw ProtocolError.invalid("Only the reviewed test spares may be used.")}
