@@ -547,3 +547,18 @@ SHA256 readbacks of all13products in each mirror. Unrelated installers were kept
 Android remains0.6.6/code4 and Mac companion remains0.7.0. No new TestFlight binary
 was uploaded. Simulator-only test data was copied to Alian and the temporary app
 was uninstalled from that Simulator afterward.
+
+### November19 — physical iPad Pro unlock check
+
+The owner unlocked the Pro. The current source Debug18 build compiled, installed
+and foreground-launched successfully. Its native Global EQ Monitor harness passed
+all17checks against the pedal, restored the original EQ, and preserved preset
+state. Before/after independent reads matched the complete edit buffer, preset
+reference and snapshot; independent EQ reads matched this session's starting
+settings. No preset save/recall or new allocation occurred.
+
+The actual Pro screen capture and on-Pro UIKit renders for Pro/regular-landscape/
+portrait were inspected; band controls and level fit without workspace scrolling.
+Physical touch-drag confirmation was requested from the owner after the harness;
+that direct interaction remains pending, separate from the passed on-device API
+and screen checks. No implementation changes or new TestFlight upload were made.
