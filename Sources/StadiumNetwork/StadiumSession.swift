@@ -6,6 +6,7 @@ public actor StadiumSession {
     private var occupied=false;private var waiters:[CheckedContinuation<Void,Never>]=[]
     private var allocated:Set<Int>=[]
     private var connectionID=UUID()
+    private var eqShadow:GlobalEQState?;private var eqLastRead:GlobalEQState?;private var eqPending:[GlobalEQUpdate]=[];private var eqRevision:UInt64=0
     private var selectionReceipts:[Int32:StadiumBlockFocus]=[:]
     public init() {}
     private func acquire()async {if !occupied {occupied=true;return};await withCheckedContinuation{waiters.append($0)}}
@@ -19,7 +20,7 @@ public actor StadiumSession {
             updates=sub;commands=command
         } catch {await sub.close();await command.close();throw error}
     }
-    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;allocated=[];selectionReceipts=[:]}
+    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0}
     private func exchange(_ make:(Int32)throws->OSCMessage,reply:String)async throws->OSCMessage {
         try Task.checkCancellation();guard let socket=commands else{throw ProtocolError.closed}
         let id=nextID;nextID = nextID==Int32.max ? 1:nextID+1
@@ -44,6 +45,18 @@ public actor StadiumSession {
             if frame.flags&4 != 0 || frame.more || frame.payload.isEmpty {continue}
             guard origin==connectionID else{throw ProtocolError.closed}
             let message=try OSCMessage.decode(frame.payload)
+            if let update=GlobalEQUpdate.decode(message) {
+                eqRevision &+= 1
+                if case .sync(let value)=update {eqLastRead=try GlobalEQState(value:value,origin:connectionID)}
+                if let current=eqShadow {eqShadow=try update.applying(to:current)}
+                else {
+                    // EQ can change while Home is open, before its first full read.
+                    // Coalesce the finite typed property set instead of accumulating gestures.
+                    if case .sync=update {eqPending=[]}
+                    if case .output(let output,.replace)=update {eqPending.removeAll{if case .output(let prior,_ )=$0 {return prior==output};return false}}
+                    eqPending.removeAll{$0.pendingKey==update.pendingKey};eqPending.append(update)
+                }
+            }
             if case .selection(let path,let position)=StadiumLiveUpdate.decode(message),let id=message.values[1].integer,let key=Int32(exactly:id) {
                 if selectionReceipts.count>=64 {selectionReceipts.removeAll()}
                 selectionReceipts[key]=StadiumBlockFocus(path:path,position:position)
@@ -519,6 +532,41 @@ extension StadiumSession {
         let after=try await snapshotUnlocked(product:before.product),properties=try await readUnlocked(.stompProperties)
         guard after.presetID==before.presetID,after.activeSnapshot==before.activeSnapshot,after.editBuffer["sfg_"]==before.editBuffer["sfg_"],after.editBuffer["cg__"]==before.editBuffer["cg__"],properties["vals"].items.first(where:{$0["key_"].text==key})?["val_"]==value else{throw ProtocolError.invalid("Stomp appearance was not independently confirmed. Nothing was retried or saved.")}
         for row in prior["vals"].items where row["key_"].text != key {guard properties["vals"].items.contains(row) else{throw ProtocolError.invalid("Another switch property changed. Review before saving.")}}
+        return after
+    }
+}
+
+extension StadiumSession {
+    private func globalEQUnlocked()async throws->GlobalEQState {
+        let revision=eqRevision
+        guard let raw=try await readUnlocked(.globalEQBytes).data else{throw ProtocolError.invalid("Missing Global EQ reply.")}
+        let envelope=try MessagePack.decode(raw)
+        guard envelope["key_"].text=="global.eq.sync",envelope["type"].text=="v" else{throw ProtocolError.invalid("Wrong Global EQ property reply.")}
+        let read=try GlobalEQState(value:envelope["val_"],origin:connectionID,raw:raw)
+        if eqShadow==nil || (revision==eqRevision && eqLastRead?.sameSettings(read)==false) {eqShadow=read}
+        if revision==eqRevision {eqLastRead=read}
+        for update in eqPending {eqShadow=try update.applying(to:eqShadow ?? read)};eqPending=[]
+        guard let shadow=eqShadow else{return read}
+        return try GlobalEQState(value:shadow.value,origin:connectionID,raw:raw)
+    }
+    public func globalEQ()async throws->GlobalEQState {await acquire();defer{release()};return try await globalEQUnlocked()}
+    public func editGlobalEQ(expected:GlobalEQState,output:EQOutput,operation:GlobalEQOperation,backups:PresetBackupStore)async throws->GlobalEQState {
+        await acquire();defer{release()};try Task.checkCancellation()
+        let before=try await globalEQUnlocked()
+        guard expected.origin==connectionID,before.sameSettings(expected) else{throw ProtocolError.invalid("Global EQ changed. Review its current values before editing.")}
+        let desired=try operation.applying(to:before,output:output)
+        _ = try await backups.retain(contentID:-100,name:"Global EQ native settings",data:before.raw)
+        let effective=try GlobalEQOperation.propertyMessage(key:"global.eq.sync",value:before.value,id:0).values[2].data!
+        _ = try await backups.retain(contentID:-100,name:"Global EQ live settings",data:effective)
+        let live=try await exchange({try GlobalEQOperation.propertyMessage(key:"dsp.globaleq."+output.wire,value:desired.output(output),id:$0)},reply:"/status");try EditCommand.acknowledge(live)
+        // Publish the registered device state separately from live DSP. Firmware 1.4.2
+        // accepts native editor globals.eq writes but does not expose/read them back.
+        // global.eq.sync is the registered full-state property, qualified on hardware.
+        let intermediate=try await globalEQUnlocked()
+        guard (GlobalEQState.sameOutput(intermediate.output(output),before.output(output)) || GlobalEQState.sameOutput(intermediate.output(output),desired.output(output))),EQOutput.allCases.filter({$0 != output}).allSatisfy({GlobalEQState.sameOutput(before.output($0),intermediate.output($0))}),before.value["anyl"]==intermediate.value["anyl"],before.value["post"]==intermediate.value["post"] else{throw ProtocolError.invalid("Another EQ output changed during the update. No persistence or retry was sent.")}
+        let saved=try await exchange({try GlobalEQOperation.propertyMessage(key:"global.eq.sync",value:desired.value,id:$0)},reply:"/status");try EditCommand.acknowledge(saved)
+        let after=try await globalEQUnlocked()
+        guard after.sameSettings(desired) else{throw ProtocolError.invalid("Global EQ readback did not match. Nothing was retried.")}
         return after
     }
 }

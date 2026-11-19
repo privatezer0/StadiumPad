@@ -14,6 +14,57 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
             let trace=try option("--trace").map{try TraceRecorder(path:$0)}
             try await session.connect(host:host,port:UInt16(option("--port") ?? "2001") ?? 2001,trace:trace)
             let state=try await session.snapshot()
+            if args.contains("--global-eq-follow-check") {
+                guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic EQ follow checks are loopback-only.")}
+                let before=try await session.globalEQ()
+                while true {if GlobalEQUpdate.decode(try await session.event()) != nil {break}}
+                let after=try await session.globalEQ()
+                guard after.parameter(.quarter,.mid,.gain).numeric==0.125,!before.sameSettings(after) else{throw ProtocolError.invalid("EQ live broadcast was lost behind a stale property read.")}
+                print("PASS Global EQ live broadcast follow.");await session.disconnect();return
+            }
+            if args.contains("--global-eq-transaction-check") {
+                guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic EQ checks are loopback-only.")}
+                let eq=try await session.globalEQ()
+                _ = try await session.editGlobalEQ(expected:eq,output:.quarter,operation:.parameter(.mid,.gain,.number(0.125)),backups:backups)
+                print("PASS Global EQ transaction and independent readback.");await session.disconnect();return
+            }
+            if args.contains("--global-eq-check") {
+                let marker=path+".eq-started"
+                guard !FileManager.default.fileExists(atPath:marker),state.presetName=="StadiumPad Commands Test" else{throw ProtocolError.invalid("Use the reviewed spare and a fresh EQ test intent. Do not replay a partial run.")}
+                let initial=try await session.globalEQ()
+                try initial.raw.write(to:URL(fileURLWithPath:path+".eq-original"),options:.atomic)
+                try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:path+".eq-original")
+                try Data("started".utf8).write(to:URL(fileURLWithPath:marker),options:.atomic)
+                var current=initial,checks=0
+                func update(_ out:EQOutput,_ operation:GlobalEQOperation)async throws {current=try await session.editGlobalEQ(expected:current,output:out,operation:operation,backups:backups);checks+=1}
+                for output in EQOutput.allCases {
+                    // Keep global bypass in its original state throughout tone tests.
+                    for band in EQBand.allCases {
+                        var changes=[GlobalEQChange(band,.frequency,.number([30,90,175,2100,5200,8500,18000][band.rawValue])),GlobalEQChange(band,.enable,.bool(false))]
+                        if band.parameters.contains(.gain){changes.append(GlobalEQChange(band,.gain,.number(-0.125)))}
+                        if band.parameters.contains(.q){changes.append(GlobalEQChange(band,.q,.number(0.8)))}
+                        if band.parameters.contains(.slope){changes.append(GlobalEQChange(band,.slope,.int(2)))}
+                        try await update(output,.parameters(changes))
+                    }
+                    try await update(output,.parameter(.mid,.level,.number(-0.25)))
+                    try await update(output,.enabled(true))
+                    try await update(output,.enabled(false))
+                    try await update(output,.replace(initial.output(output)))
+                    try await update(output,.reset)
+                    try await update(output,.replace(initial.output(output)))
+                }
+                try await update(.xlr,.replace(current.output(.quarter)))
+                try await update(.xlr,.replace(initial.output(.xlr)))
+                guard current.sameSettings(initial) else{throw ProtocolError.invalid("Global EQ originals not restored.")}
+                let after=try await session.snapshot()
+                guard after.presetID==state.presetID,after.activeSnapshot==state.activeSnapshot,after.editBuffer==state.editBuffer,after.dirty==state.dirty else{throw ProtocolError.invalid("Preset state changed during EQ checks.")}
+                await session.disconnect();try await session.connect(host:host)
+                let fresh=try await session.globalEQ()
+                guard fresh.sameSettings(initial) else{throw ProtocolError.invalid("EQ restoration failed fresh-session readback.")}
+                let report:[String:Any] = ["passed":true,"checks":checks,"restored":true,"freshSessionReadback":true,"presetUnchanged":true]
+                try JSONSerialization.data(withJSONObject:report,options:.prettyPrinted).write(to:URL(fileURLWithPath:path+".eq-result.json"),options:.atomic)
+                print("PASS \(checks) Global EQ hardware operations, originals restored and preset unchanged.");await session.disconnect();return
+            }
             if args.contains("--command-transaction-check") {
                 guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic command checks are loopback-only.")}
                 let context=try CommandContext(state:state,source:CommandSource(.stomp,number:1,bank:1),slot:0)

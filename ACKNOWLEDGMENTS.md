@@ -54,3 +54,9 @@ Its controls are newly drawn SwiftUI vectors. Functional names/ranges/options ar
 prepared locally from the owner's installed editor; extracted catalogues and vendor
 interface artwork are not included in this source repository. Credit belongs to
 Line 6 for the original controller design and the underlying Stadium implementation.
+
+
+Global EQ layout/workflow and control ranges were checked against the installed
+Line 6 Helix Stadium editor and the [official Global EQ manual](https://manuals.line6.com/en/helix-stadium/live/global-eq).
+The SwiftUI graph and filter-response preview are original implementations; no
+Line 6 artwork, DSP implementation or extracted factory data is distributed.

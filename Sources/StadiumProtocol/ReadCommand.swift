@@ -2,10 +2,11 @@ import Foundation
 
 /// Typed read-only requests; edits use a separate, guarded API.
 public enum ReadCommand:Equatable,Sendable {
-    case tunerProperties,stompProperties,commandProperties,cloneHierarchy,autoCab,snapshotCount,product,editBuffer,editBufferBytes,activePreset,activeSnapshot,dirty,contentRef(Int),contentPath(Int),contentData(Int),container(Int)
+    case globalEQ,globalEQBytes,tunerProperties,stompProperties,commandProperties,cloneHierarchy,autoCab,snapshotCount,product,editBuffer,editBufferBytes,activePreset,activeSnapshot,dirty,contentRef(Int),contentPath(Int),contentData(Int),container(Int)
     public func message(id:Int32)throws->OSCMessage {
         let address:String;var values:[Value]=[.int(Int64(id))]
         switch self {
+        case .globalEQ,.globalEQBytes:address="/PropertyValueGet";values.append(.string("global.eq.sync"))
         case .tunerProperties:address="/MatchingPropertyValuesGet";values.append(.string("global.tuner.*"))
         case .commandProperties:address="/MatchingPropertyValuesGet";values.append(.string("global.assign.control.*"))
         case .stompProperties:address="/MatchingPropertyValuesGet";values.append(.string("preset.floorboard.stomp.*"))
@@ -24,13 +25,14 @@ public enum ReadCommand:Equatable,Sendable {
         }
         return OSCMessage(address,values)
     }
-    public var replyAddress:String {switch self {case .tunerProperties,.stompProperties,.commandProperties:return "/getMatchingPropertyValues";case .cloneHierarchy:return "/GetCloneHierarchy";case .snapshotCount:return "/getSnapshotCount";case .autoCab:return "/getPropertyValue";case .product:return "/getProductInfo";case .editBuffer,.editBufferBytes:return "/getEditBufferState";case .activePreset,.dirty:return "/getPropertyValue";case .activeSnapshot:return "/getActiveSnapshotIndex";case .contentRef:return "/GetContentRef";case .contentPath:return "/GetContentPath";case .contentData:return "/GetContentData";case .container:return "/GetContainerContents"}}
+    public var replyAddress:String {switch self {case .tunerProperties,.stompProperties,.commandProperties:return "/getMatchingPropertyValues";case .cloneHierarchy:return "/GetCloneHierarchy";case .snapshotCount:return "/getSnapshotCount";case .globalEQ,.globalEQBytes,.autoCab:return "/getPropertyValue";case .product:return "/getProductInfo";case .editBuffer,.editBufferBytes:return "/getEditBufferState";case .activePreset,.dirty:return "/getPropertyValue";case .activeSnapshot:return "/getActiveSnapshotIndex";case .contentRef:return "/GetContentRef";case .contentPath:return "/GetContentPath";case .contentData:return "/GetContentData";case .container:return "/GetContainerContents"}}
     public func decode(_ message:OSCMessage)throws->Value {
+        if self == .globalEQ || self == .globalEQBytes {guard message.values.count==4,message.values[1].text=="global.eq.sync",message.values[3].integer==0 else{throw ProtocolError.invalid("Global EQ property read was not confirmed.")}}
         if case .contentPath=self {guard message.values.count==3,message.values[2].integer==0,let path=message.values[1].text,!path.isEmpty else{throw ProtocolError.invalid("Invalid library file path.")};return .string(path)}
         let position:Int
-        switch self {case .product,.contentRef,.contentPath,.contentData,.container,.cloneHierarchy:position=1;case .editBuffer,.editBufferBytes,.activePreset,.dirty,.autoCab,.stompProperties,.tunerProperties,.commandProperties:position=2;case .activeSnapshot,.snapshotCount:guard message.values.count>=2,case .int=message.values[1] else{throw ProtocolError.invalid("Invalid snapshot reply.")};return message.values[1]}
+        switch self {case .product,.contentRef,.contentPath,.contentData,.container,.cloneHierarchy:position=1;case .editBuffer,.editBufferBytes,.activePreset,.dirty,.autoCab,.stompProperties,.tunerProperties,.commandProperties,.globalEQ,.globalEQBytes:position=2;case .activeSnapshot,.snapshotCount:guard message.values.count>=2,case .int=message.values[1] else{throw ProtocolError.invalid("Invalid snapshot reply.")};return message.values[1]}
         guard message.values.count>position,case .binary(let data)=message.values[position] else{throw ProtocolError.invalid("Missing Stadium reply data.")}
-        if self == .editBufferBytes {return .binary(data)}
+        if self == .editBufferBytes || self == .globalEQBytes {return .binary(data)}
         if case .contentData=self {return .binary(data)}
         let value=try MessagePack.decode(data)
         if self == .cloneHierarchy {return value}

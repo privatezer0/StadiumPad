@@ -137,3 +137,37 @@ remain part of the comparison. No uncertain agenda is automatically retried/save
 Native hardware checks on new spares confirm movement through occupied positions,
 save/switch/reload, restoration and assignment preservation. IO/split/merge stay
 fixed. Cross-row/path moves and uncertain branch layouts are not implemented.
+
+## Global EQ (iPad 0.9.0)
+
+Read `global.eq.sync` using `/PropertyValueGet`. The observed reply is
+`/getPropertyValue [requestID, "global.eq.sync", lavppgsm+map, 0]`;
+the second argument is the property key and the last is status. Validate the
+matching envelope key/type and complete three-output state before enabling edits.
+The output keys are `_qtr`, `_xlr`, `_pho`; each has `out_`, `enab`, `drty`,
+seven `eqbs` and `olvl`. Band `para` IDs are enable1, frequency2, gain3, Q4,
+slope5. Output-level `olvl` uses parm3. Do not infer array order from the desktop's
+serialization. `anyl` and `post` remain unchanged.
+
+Observed whole-output DSP properties are `dsp.globaleq.qtr`, `.xlr`, `.phones`.
+Native Copy/Paste and Reset send the complete selected output; Paste includes the
+source bypass state, while Reset keeps the destination bypass. Native properties
+use numeric FourCC map keys. The typed encoder refuses arbitrary keys and schemas.
+
+On tested firmware1.4.2, desktop1.4.0.20's subsequent `globals.eq` write received an
+ACK but remained unregistered/unreadable and left fresh sync reads unchanged.
+The registered `global.eq.sync` property was qualified with reversible settings
+and fresh-session readback. StadiumPad sends the selected-output DSP update,
+checks other outputs for races, then publishes the full validated sync state and
+verifies independent readback. Native bytes and effective live settings are backed
+up first. Uncertain writes stop without automatic retries. No preset Save occurs.
+Flash persistence through a pedal power cycle has not been qualified.
+
+DSP property broadcasts are applied to a connection-local shadow because native
+editor changes can arrive without a changed sync-property read. Pending updates
+before the initial full read are coalesced by typed output/band/parameter identity;
+full-output/root updates supersede preceding partial updates. A revision guard
+prevents an in-flight older read from replacing a newly received live update.
+Unknown future schemas refuse writes. `EQResponse` is only a calculated visual
+preview, not vendor DSP code, an audio measurement or an acoustically qualified
+model of the Stadium filters.

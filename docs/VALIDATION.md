@@ -494,3 +494,56 @@ Regular-iPad sizing is native UIKit rendering on the Pro, not separate physical
 regular-iPad touch qualification. External Switch/Trigger modes and all command
 execution destinations are not physically qualified. Assignment editing is verified;
 no complete desktop parity, new TestFlight upload or Android Command Center claim.
+
+## November18 — iPad Global EQ 0.9.0/build18
+
+Implemented the full-width desktop-style Global EQ workspace with the Home preset
+sidebar hidden, seven colored graph handles, output tabs, band switches, frequency,
+gain/Q, cut slopes, level, bypass, Copy/Paste and Reset. Controls fit Pro,
+regular-landscape and portrait viewports without workspace scrolling. EQ settings
+are global and apply immediately, independently of preset Save.
+
+Validation in this session:
+
+- Compared layout, numeric limits, enable, copy/paste and reset behavior against
+  installed desktop1.4.0.20 and the official manual. Copy includes source bypass;
+  Reset preserves bypass. Original global settings were captured privately first.
+- 71 Swift tests passed, covering complete-schema validation, bounds, band/control
+  identity, output isolation, FourCC property framing, exact reply key/status,
+  batched changes, clipboard/reset semantics, live events and finite response curves.
+- Full loopback suite:61 tests,58 passed/3 existing catalogue-dependent skips.
+  Eight EQ scenarios cover ordered live/sync/readback, stale state, unknown fields,
+  concurrent other-output edits, negative ACK, uncertain write without retries,
+  ACK without matching readback and live broadcasts against stale sync reads.
+-41 hardware operations passed on firmware1.4.2, across all bands/outputs, level,
+  band enable, slopes, bypass, Copy/Paste, Reset and restoration. A repeated protocol
+  check passed, original settings matched the private baseline, and a fresh
+  connection confirmed restoration. The existing allocated spare's complete edit
+  buffer, preset ID, snapshot and dirty state stayed unchanged; no preset save,
+  recall or allocation was performed for EQ.
+- The native iPad app running in iOS26.5 Simulator passed17 monitor/API checks
+  against the real pedal, with EQ restoration and unchanged spare preset state.
+  Manual app UI checks confirmed band selection, precise -0.125dB entry, stepping,
+  output clipboard/paste and Reset. Independent hardware reads confirmed values.
+  A desktop gain change appeared as0.1dB in the running app's actual controls;
+  the test was reset afterward. Six Pro/regular/portrait low-cut/mid-band layout
+  renders were inspected. The app's graph hit targets select bands; automated
+  Simulator drag input did not produce movement, so physical touch-drag remains
+  an explicit outstanding check rather than a claimed test pass.
+- All279original saved User preset hashes still matched. Private captures/backups,
+  builds and logs remained on Alian. Research proxy/discovery were stopped and the
+  desktop was restored to its real device connection.
+
+Limits: the curve is our calculated preview, not Line6 DSP or an audio measurement.
+Pedal power-cycle persistence is not qualified. The physical iPad Pro was locked;
+its final on-device launch/touch check requires the owner to unlock it. Android EQ
+and a new TestFlight upload are outside this iPad delivery.
+
+Release delivery:0.9.0/build18 compiled for device, passed signing and packaged-ZIP
+readbacks, and installed on the Pro; device inventory confirmed that version/build.
+Its final foreground launch is still blocked by the lock state described above.
+The signed local IPA is present in both owner installer folders, with complete
+SHA256 readbacks of all13products in each mirror. Unrelated installers were kept;
+Android remains0.6.6/code4 and Mac companion remains0.7.0. No new TestFlight binary
+was uploaded. Simulator-only test data was copied to Alian and the temporary app
+was uninstalled from that Simulator afterward.

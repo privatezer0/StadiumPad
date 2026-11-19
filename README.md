@@ -44,6 +44,12 @@ for the official desktop editor.
   state, not a query of changes made on the pedal while the app was closed.
 - Bonjour device search, selection and manual address entry, including switching to
   another Stadium. The app uses your device, not a developer-specific address.
+- **iPad Global EQ:** full-width desktop-style graph with seven draggable colored
+  bands, independent 1/4-inch/XLR/Phones EQs, band enable, frequency, gain, Q,
+  6/12/18/24 dB/octave cuts, output level and bypass. Includes Copy/Paste between
+  outputs, Reset, sliders, value entry and live desktop/pedal broadcasts. Settings
+  apply immediately, separately from preset Save; the preset sidebar is hidden.
+  The graph is a calculated preview, not an audio measurement.
 - **iPad Command Center:** full-width controller map and desktop-style assignment
   inspector, with the Home preset sidebar hidden. Select Stomp A/B, 16 Instants,
   X/Y, onboard EXP1/EXP2/toe, or configured external controls. Edit Command1/2,
@@ -73,12 +79,11 @@ for the official desktop editor.
 
 ## What is not implemented yet
 
-Android Command Center assignment editing, Global EQ controls, song/Showcase editing and
+Android Command Center and Global EQ editing, song/Showcase editing and
 transport, IR file import/assignment and clone-to-block assignment, preset renaming after creation,
 block insertion/removal, cross-row/path moves, general routing editing, snapshot renaming,
 firmware updates and PIN authentication. Desktop Focus user-default management,
-favorites creation and vendor equipment artwork are not implemented. Navigation for Global EQ and Songs is present, with
-unfinished sections labeled. Output destination selection is a narrower supported
+favorites creation and vendor equipment artwork are not implemented. Songs navigation remains a labeled unfinished section. Output destination selection is a narrower supported
 operation, not a complete routing editor. Dragging leaves input/output and split/merge
 nodes fixed; branch layouts that cannot be established safely are refused. Amp replacement refuses when Auto Cab
 would add unexpected blocks; disable Auto Cab on the device first if appropriate.

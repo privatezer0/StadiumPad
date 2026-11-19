@@ -212,3 +212,37 @@ Instant commands can execute on preset recall: remove transport-affecting Instan
 before Save/reload tests. Physical tests allocate/preserve spares and journal intent
 before writes. Never remove a test intent marker to replay an uncertain batch.
 Android still has its previous Command Center placeholder; do not claim parity.
+
+
+## iPad Global EQ (0.9.0)
+
+`GlobalEQState` validates the entire seven-band/three-output schema. Unknown keys,
+missing/duplicate band or parameter IDs, invalid values and wrong output IDs refuse
+writes. Native values include boolean enables, float32 controls and integer slopes.
+`GlobalEQOperation` is restricted to registered `global.eq.sync` and the three known
+`dsp.globaleq.<output>` whole-output properties; native FourCC key encoding is limited
+to this validated settings schema. Do not use it to rewrite arbitrary native presets.
+
+`StadiumSession.editGlobalEQ` serializes a fresh state comparison, private settings
+backup, selected-output DSP write/ACK, other-output race check, full sync write/ACK
+and independent readback. An uncertain write is never retried automatically. Do not
+save/recall a preset for Global EQ. Copy includes source bypass; Reset preserves
+selected-output bypass. Original settings must be backed up/restored for hardware
+checks because EQ is inherently global. The qualification harness also proves the
+spare's preset bytes, ID, snapshot and dirty state stayed unchanged.
+
+Firmware1.4.2 observations: native desktop1.4.0.20 sends DSP changes followed by
+`globals.eq`, which is not registered/readable and did not update `global.eq.sync`
+in our tests, even after reopening the editor. The registered `global.eq.sync`
+property was separately tested and supports full-state write/readback and fresh
+session reads. StadiumPad uses it after DSP acknowledgement. Power-cycle flash
+persistence and acoustic filter matching have not been qualified; do not claim them.
+
+Desktop DSP broadcasts can precede an unchanged/stale sync-property read. The
+connection-scoped EQ shadow applies validated live broadcasts, while changed full
+sync reads replace it. Reset on disconnect. Tests cover stale reads versus live
+updates; never discard this behavior by polling the property alone. The view polls
+while open, coalesces gestures and refuses stale/disconnected edits. Switching away
+discards unsent gesture updates; a sent transaction finishes and is read back.
+`EQResponse` is our calculated visual approximation; Stadium performs the actual
+DSP. No vendor DSP code or art is included. Android EQ is not implemented here.

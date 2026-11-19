@@ -22,6 +22,7 @@ import StadiumNetwork
     @Published var cloneHierarchy:Value = .null
     @Published var libraryEntries:[Int:[LibraryEntry]]=[:]
     @Published var presetContainer = -2
+    @Published var globalEQ:GlobalEQState?
     @Published var commandProperties:[String:Value]=[:]
     let commandCatalog:[String:[CommandParameter]] = {
         guard let url=Bundle.main.url(forResource:"CommandCatalog",withExtension:"json"),let data=try? Data(contentsOf:url) else{return [:]}
@@ -66,7 +67,7 @@ import StadiumNetwork
     func blockName(_ block:SignalBlock)->String {catalog[String(block.model)]?.name ?? names[String(block.model)] ?? "Effect block \(block.position)"}
     func connect(host:String,port:UInt16=2001) {
         guard !busy else{return}
-        stop();connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];commandProperties=[:];lastCopy=nil;lastAction=nil
+        stop();connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];commandProperties=[:];globalEQ=nil;lastCopy=nil;lastAction=nil
         let token=UUID();generation=token
         lastEvent=nil;let current=StadiumSession();session=current;connecting=true;status="Connecting…"
         worker=Task {
@@ -231,6 +232,23 @@ import StadiumNetwork
                 tunerReference=values["vals"].items.first{$0["key_"].text=="global.tuner.reference.pitch"}?["val_"].numeric
             }
         } catch {if generation==token {errorText=error.localizedDescription}}
+    }
+    func refreshGlobalEQ()async {
+        guard !busy,connected,let current=session else{return};let token=generation
+        do {let value=try await current.globalEQ();guard token==generation else{return};globalEQ=value
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--observe-global-eq") {
+                let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+                let report:[String:Any] = ["receivedAt":Date().timeIntervalSince1970,"settings":value.value.json]
+                try JSONSerialization.data(withJSONObject:report).write(to:folder.appendingPathComponent("global-eq-observed.json"),options:.atomic)
+            }
+            #endif
+        }catch is CancellationError {}catch {if token==generation && !Task.isCancelled {errorText=error.localizedDescription}}
+    }
+    func editGlobalEQ(_ expected:GlobalEQState,_ output:EQOutput,_ operation:GlobalEQOperation)async->Bool {
+        guard !busy,connected,let current=session else{return false};busy=true;defer{busy=false};let token=generation
+        do {let value=try await current.editGlobalEQ(expected:expected,output:output,operation:operation,backups:backups);guard token==generation else{return false};globalEQ=value;lastAction="Global EQ \(output.name) updated";return true}
+        catch {if token==generation {errorText=error.localizedDescription};return false}
     }
     func editCommand(_ context:CommandContext,_ operation:CommandCenterOperation)async->Bool {
         guard !busy,connected,let current=session else{return false};busy=true;defer{busy=false};let token=generation
