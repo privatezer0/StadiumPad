@@ -49,9 +49,9 @@ struct StadiumView:View {
                 header
                 if section == .librarian {
                     Text("Librarian").font(.system(size:28,weight:.light)).frame(maxWidth:.infinity).frame(height:58).background(EditorTheme.header)
-                } else {presetBar(compact:geometry.size.width<1150)}
+                } else if section != .commands {presetBar(compact:geometry.size.width<1150)}
                 HStack(spacing:0) {
-                    if section != .librarian {PresetSidebar(refreshID:libraryRevision).frame(width:max(190,min(290,geometry.size.width*0.245)))}
+                    if section != .librarian && section != .commands {PresetSidebar(refreshID:libraryRevision).frame(width:max(190,min(290,geometry.size.width*0.245)))}
                     Group {
                         if section == .home {
                             if let state=monitor.snapshot {
@@ -76,6 +76,7 @@ struct StadiumView:View {
                                 VStack(spacing:18) {Image(systemName:"waveform.path").font(.system(size:42,weight:.ultraLight));Text("Your Stadium, on your iPad").font(.title2);Button("Connect to Stadium"){showConnection=true}.buttonStyle(.borderedProminent)}.foregroundStyle(.secondary).frame(maxWidth:.infinity,maxHeight:.infinity)
                             }
                         } else if section == .librarian {LibrarianView(openEditor:{section = .home},pairingLink:pendingCompanionLink,initialCategory:libraryCategory).id(libraryLinkRevision).onAppear{pendingCompanionLink=nil}}
+                        else if section == .commands {CommandCenterView(preview:preview)}
                         else if section == .songs {LibraryRows(title:"Songs",entries:(monitor.libraryEntries[-7] ?? []).filter{$0.type==4},canOpen:false).overlay(alignment:.bottom){Text("Showcase editing and transport are not connected yet").font(.caption).padding(10).background(.black)}}
                         else {SectionStatusView(section:section)}
                     }.frame(maxWidth:.infinity,maxHeight:.infinity)
@@ -135,12 +136,13 @@ struct StadiumView:View {
             let host=ProcessInfo.processInfo.environment["STADIUM_DEVICE_HOST"] ?? address
             if !host.isEmpty {address=host;monitor.connect(host:host)}
 #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--verify-library-backup") || ProcessInfo.processInfo.arguments.contains("--verify-clones") || ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") || ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
+            if ProcessInfo.processInfo.arguments.contains("--verify-command-center") || ProcessInfo.processInfo.arguments.contains("--verify-library-backup") || ProcessInfo.processInfo.arguments.contains("--verify-clones") || ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") || ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
                 for _ in 0..<70 {if monitor.connected {break};try? await Task.sleep(for:.milliseconds(200))}
                 if ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") {
                     let plan=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("spare-plan.json")
                     await verifySpareEditing(monitor,planURL:plan)
                 }
+                if ProcessInfo.processInfo.arguments.contains("--verify-command-center") {section = .commands;await verifyCommandCenter(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-clones") {await verifyCloneLibrary(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-library-backup") {await verifyLibraryBackup(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") {try? await Task.sleep(for:.milliseconds(400));await verifyRememberedSelection(monitor,selection:{selected})}

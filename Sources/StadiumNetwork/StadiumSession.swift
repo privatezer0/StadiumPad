@@ -406,3 +406,119 @@ extension StadiumSession {
         return after
     }
 }
+
+extension StadiumSession {
+    /// One FIFO command assignment transaction: fresh identity/config, backup, one write,
+    /// independent full-state readback. No command is executed and no preset is saved.
+    public func editCommand(context:CommandContext,operation:CommandCenterOperation,backups:PresetBackupStore)async throws->DeviceSnapshot {
+        await acquire();defer{release()};try Task.checkCancellation()
+        let before=try await snapshotUnlocked(),fresh=try CommandContext(state:before,source:context.source,slot:context.slot)
+        guard context.origin==connectionID,fresh==context else{let changed=context.origin != connectionID ? "connection":fresh.presetID != context.presetID ? "preset":fresh.snapshot != context.snapshot ? "snapshot":fresh.sourceRow != context.sourceRow ? "source":fresh.command != context.command ? "command":"context";throw ProtocolError.invalid("The \(changed) changed. Refresh Command Center before editing.")}
+        if let config=context.source.externalConfiguration {
+            let properties=try await readUnlocked(.commandProperties)
+            guard properties["vals"].items.first(where:{$0["key_"].text==config.key})?["val_"].integer==config.value else{throw ProtocolError.invalid("This external jack is configured differently. Refresh its source before editing.")}
+        }
+        _ = try operation.message(context:context,id:1)
+        try await backup(before,to:backups);try await confirmIdentity(before)
+        let address:String
+        switch operation {case .family(.none):address="/removeCommand";case .family where context.commandID==nil:address="/attachCommandWithType";case .paste:address="/attachCommandWithType";default:address="/status"}
+        let response=try await exchange({try operation.message(context:context,id:$0)},reply:address)
+        var allocated:Int?
+        if address=="/attachCommandWithType" {
+            guard response.values.count==3,let command=response.values[1].integer,command>0,command<=Int(Int32.max),let echoed=response.values[2].integer,echoed==command else{throw ProtocolError.invalid("Command allocation was not confirmed. Nothing was retried.")};allocated=command
+        }else if address=="/removeCommand" {
+            guard response.values.count==3,response.values[1].integer==context.commandID,response.values[2].integer==0 else{throw ProtocolError.invalid("Command removal was not confirmed.")}
+        }else {try EditCommand.acknowledge(response)}
+        let after=try await snapshotUnlocked(product:before.product),result=try CommandContext(state:after,source:context.source,slot:context.slot)
+        guard after.presetID==before.presetID,after.activeSnapshot==before.activeSnapshot else{throw ProtocolError.invalid("The active preset or snapshot changed during command editing.")}
+        guard before.editBuffer["sfg_"]==after.editBuffer["sfg_"],before.editBuffer["dvcp"]==after.editBuffer["dvcp"],before.editBuffer["pm__"]==after.editBuffer["pm__"] else{throw ProtocolError.invalid("Other preset settings changed during command editing. Review the pedal; no retry or Save was sent.")}
+        let oldEntities=before.editBuffer["cg__"]["entt"],newEntities=after.editBuffer["cg__"]["entt"]
+        guard oldEntities["ctrl"]==newEntities["ctrl"] else{throw ProtocolError.invalid("Effect controller assignments changed during command editing.")}
+        let changedIDs=Set([context.commandID,result.commandID].compactMap{$0}),oldTarget=context.command["tid_"].integer
+        for old in oldEntities["cmnd"].items where !changedIDs.contains(old["cid_"].integer ?? -1) {guard newEntities["cmnd"].items.contains(where:{$0.object.filter{$0.key != "togl"}==old.object.filter{$0.key != "togl"} || operation.permitsPairedToggle(old:old,new:$0,context:context)}) else{throw ProtocolError.invalid("Another command changed. Review the pedal before continuing.")}}
+        for old in oldEntities["srcs"].items {
+            if old["id__"]==context.sourceRow["id__"] {
+                if result.sourceRow == .null {
+                    guard case .family(.none)=operation,old["cmds"].items.enumerated().allSatisfy({$0.offset==context.slot || $0.element.integer == -1}),!oldEntities["ctrl"].items.contains(where:{$0["trig"]==old["id__"]}) else{throw ProtocolError.invalid("An assigned source disappeared unexpectedly.")};continue
+                }
+                let a=old.object.filter{$0.key != "cmds"},b=result.sourceRow.object.filter{$0.key != "cmds"}
+                guard a==b else{throw ProtocolError.invalid("The source configuration changed unexpectedly.")}
+                for index in 0..<2 where index != context.slot {guard old["cmds"].items[index]==result.sourceRow["cmds"].items[index] else{throw ProtocolError.invalid("The other command slot changed.")}}
+            }else {guard newEntities["srcs"].items.contains(old) else{throw ProtocolError.invalid("Another source changed during command editing.")}}
+        }
+        for old in oldEntities["trgs"].items where old["id__"].integer != oldTarget {guard newEntities["trgs"].items.contains(old) else{throw ProtocolError.invalid("An unrelated assignment target changed.")}}
+        switch operation {
+        case .family(let family):guard result.family==family,(allocated==nil || result.commandID==allocated) else{throw ProtocolError.invalid("The command type was not independently confirmed.")}
+        case .paste(let family,let definitions,let copied):
+            guard result.family==family,result.commandID==allocated,definitions.allSatisfy({sameParameterValue(result.command[$0.valueKey],copied[$0.valueKey])}) else{throw ProtocolError.invalid("The pasted command did not match its original values.")}
+        case .parameter(let p,let value):
+            guard result.commandID==context.commandID,result.family==context.family,sameParameterValue(result.command[p.valueKey],try p.validated(value)) else{throw ProtocolError.invalid("The command parameter was not confirmed.")}
+            let derived:Set<String>=[p.valueKey,p.name=="Action" ? "behv":p.name=="Command" ? "func":p.name=="Curve" ? "curv":p.valueKey]
+            guard context.command.object.filter({!derived.contains($0.key) && $0.key != "togl"})==result.command.object.filter({!derived.contains($0.key) && $0.key != "togl"}) else{throw ProtocolError.invalid("Other command values changed. Refresh before editing again.")}
+        case .snapshot(let p,let enabled):
+            guard result.commandID==context.commandID,result.command[p.snapshotKey].boolean==enabled,context.command.object.filter({$0.key != p.snapshotKey})==result.command.object.filter({$0.key != p.snapshotKey}) else{throw ProtocolError.invalid("Snapshot control was not independently confirmed.")}
+        }
+        return after
+    }
+}
+
+extension StadiumSession {
+    /// Native Copy All/Paste first clears commands, then attaches each copied source.
+    /// Effect controllers remain untouched. A partial/uncertain batch is never replayed.
+    public func replaceCommands(expected:DeviceSnapshot,copies:[CommandCopy],backups:PresetBackupStore)async throws->DeviceSnapshot {
+        guard copies.count<=96 else{throw ProtocolError.invalid("Too many commands in this layout.")}
+        await acquire();defer{release()};try Task.checkCancellation()
+        let before=try await snapshotUnlocked()
+        guard before.origin==expected.origin,before.presetID==expected.presetID,before.activeSnapshot==expected.activeSnapshot,before.editBuffer["cg__"]==expected.editBuffer["cg__"] else{throw ProtocolError.invalid("The command layout changed. Copy or review it again.")}
+        var unique:Set<String>=[]
+        for copy in copies {
+            let c=try CommandContext(state:before,source:copy.source,slot:copy.slot)
+            guard unique.insert(copy.source.id+"-\(copy.slot)").inserted else{throw ProtocolError.invalid("Duplicate copied command slot.")}
+            _ = try CommandCenterOperation.paste(copy.family,copy.parameters,copy.command).message(context:c,id:1)
+        }
+        if copies.contains(where:{$0.source.externalConfiguration != nil}) {
+            let properties=try await readUnlocked(.commandProperties)
+            for copy in copies {if let config=copy.source.externalConfiguration {guard properties["vals"].items.first(where:{$0["key_"].text==config.key})?["val_"].integer==config.value else{throw ProtocolError.invalid("A copied external control is no longer configured for that source. Nothing was cleared.")}}}
+        }
+        try await backup(before,to:backups);try await confirmIdentity(before)
+        let response=try await exchange({OSCMessage("/removeAllCommands",[.int(Int64($0))])},reply:"/removeAllCommands")
+        guard response.values.count==2,response.values[1].integer==0 else{throw ProtocolError.invalid("Command reset was not confirmed. Nothing was retried.")}
+        var current=try await snapshotUnlocked(product:before.product)
+        guard current.editBuffer["cg__"]["entt"]["cmnd"].items.isEmpty else{throw ProtocolError.invalid("Commands were not cleared. No paste was attempted.")}
+        for copy in copies {
+            if let config=copy.source.externalConfiguration {
+                let properties=try await readUnlocked(.commandProperties)
+                guard properties["vals"].items.first(where:{$0["key_"].text==config.key})?["val_"].integer==config.value else{throw ProtocolError.invalid("An external jack changed during paste. The batch stopped; no retry was sent.")}
+            }
+            try await confirmIdentity(current)
+            let c=try CommandContext(state:current,source:copy.source,slot:copy.slot),operation=CommandCenterOperation.paste(copy.family,copy.parameters,copy.command)
+            let reply=try await exchange({try operation.message(context:c,id:$0)},reply:"/attachCommandWithType")
+            guard reply.values.count==3,let commandID=reply.values[2].integer,commandID>0 else{throw ProtocolError.invalid("Command paste stopped before completion. Review the layout; do not blindly retry.")}
+            current=try await snapshotUnlocked(product:before.product)
+            let result=try CommandContext(state:current,source:copy.source,slot:copy.slot)
+            guard result.commandID==commandID,result.family==copy.family,copy.parameters.allSatisfy({sameParameterValue(copy.command[$0.valueKey],result.command[$0.valueKey])}) else{throw ProtocolError.invalid("A pasted command did not match. No further commands were sent.")}
+        }
+        let old=before.editBuffer,new=current.editBuffer
+        guard before.presetID==current.presetID,before.activeSnapshot==current.activeSnapshot,old["sfg_"]==new["sfg_"],old["dvcp"]==new["dvcp"],old["cg__"]["entt"]["ctrl"]==new["cg__"]["entt"]["ctrl"],new["cg__"]["entt"]["cmnd"].items.count==copies.count else{throw ProtocolError.invalid("Command layout readback changed other settings. Nothing was retried or saved.")}
+        return current
+    }
+}
+
+extension StadiumSession {
+    public func setStompAppearance(context:CommandContext,appearance:StompAppearance,backups:PresetBackupStore)async throws->DeviceSnapshot {
+        await acquire();defer{release()};try Task.checkCancellation()
+        let before=try await snapshotUnlocked()
+        guard context.origin==connectionID,try CommandContext(state:before,source:context.source,slot:context.slot)==context else{throw ProtocolError.invalid("The command selection changed. Refresh before changing its label or color.")}
+        let (key,value)=try appearance.property(source:context.source)
+        if case .label=appearance {
+            for slot in 0..<context.source.slots {guard try CommandContext(state:before,source:context.source,slot:slot).family != .presetSnapshot else{throw ProtocolError.invalid("Preset/Snapshot commands label their switch automatically.")}}
+        }
+        let prior=try await readUnlocked(.stompProperties)
+        try await backup(before,to:backups);try await confirmIdentity(before)
+        let reply=try await exchange({try appearance.message(source:context.source,id:$0)},reply:"/status");try EditCommand.acknowledge(reply)
+        let after=try await snapshotUnlocked(product:before.product),properties=try await readUnlocked(.stompProperties)
+        guard after.presetID==before.presetID,after.activeSnapshot==before.activeSnapshot,after.editBuffer["sfg_"]==before.editBuffer["sfg_"],after.editBuffer["cg__"]==before.editBuffer["cg__"],properties["vals"].items.first(where:{$0["key_"].text==key})?["val_"]==value else{throw ProtocolError.invalid("Stomp appearance was not independently confirmed. Nothing was retried or saved.")}
+        for row in prior["vals"].items where row["key_"].text != key {guard properties["vals"].items.contains(row) else{throw ProtocolError.invalid("Another switch property changed. Review before saving.")}}
+        return after
+    }
+}

@@ -44,6 +44,16 @@ for the official desktop editor.
   state, not a query of changes made on the pedal while the app was closed.
 - Bonjour device search, selection and manual address entry, including switching to
   another Stadium. The app uses your device, not a developer-specific address.
+- **iPad Command Center:** full-width controller map and desktop-style assignment
+  inspector, with the Home preset sidebar hidden. Select Stomp A/B, 16 Instants,
+  X/Y, onboard EXP1/EXP2/toe, or configured external controls. Edit Command1/2,
+  Preset/Snapshot, Song, Looper, Utility, ExtAmp, MIDI and HotKey assignments using
+  named choices, value sliders and numeric entry. Includes snapshot-controlled
+  parameters, Copy/Paste, Copy All/Paste All, Clear/Reset All, custom stomp labels
+  and LED colors. Changes remain unsaved until Save Preset. External controls are
+  disabled when their jack is configured for another input type.
+  This assignment editor does not extend Gig View to execute MIDI/HotKey commands;
+  those commands run from the Stadium's configured physical controls.
 - **Librarian layout:** a full-width workspace with Presets, Cab IRs, Favorites,
   Templates, Songs and Clones categories. Presets has separate setlist and preset
   panes, folder selection and search. The Home preset sidebar and scene/save bar
@@ -63,11 +73,11 @@ for the official desktop editor.
 
 ## What is not implemented yet
 
-Command Center assignment editing, Global EQ controls, song/Showcase editing and
+Android Command Center assignment editing, Global EQ controls, song/Showcase editing and
 transport, IR file import/assignment and clone-to-block assignment, preset renaming after creation,
 block insertion/removal, cross-row/path moves, general routing editing, snapshot renaming,
 firmware updates and PIN authentication. Desktop Focus user-default management,
-favorites creation and vendor equipment artwork are not implemented. Navigation for Command Center, Global EQ and Songs is present, with
+favorites creation and vendor equipment artwork are not implemented. Navigation for Global EQ and Songs is present, with
 unfinished sections labeled. Output destination selection is a narrower supported
 operation, not a complete routing editor. Dragging leaves input/output and split/merge
 nodes fixed; branch layouts that cannot be established safely are refused. Amp replacement refuses when Auto Cab

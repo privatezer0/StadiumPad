@@ -14,6 +14,110 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
             let trace=try option("--trace").map{try TraceRecorder(path:$0)}
             try await session.connect(host:host,port:UInt16(option("--port") ?? "2001") ?? 2001,trace:trace)
             let state=try await session.snapshot()
+            if args.contains("--command-transaction-check") {
+                guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic command checks are loopback-only.")}
+                let context=try CommandContext(state:state,source:CommandSource(.stomp,number:1,bank:1),slot:0)
+                let created=try await session.editCommand(context:context,operation:.family(.midi),backups:backups)
+                let next=try CommandContext(state:created,source:context.source,slot:0)
+                _ = try await session.editCommand(context:next,operation:.parameter(CommandParameter(id:1,name:"Command",minimum:0,maximum:3),.int(1)),backups:backups)
+                print("PASS command transaction and independent readback.");await session.disconnect();return
+            }
+            if args.contains("--command-appearance-check"),let catalogue=option("--catalog") {
+                let plan=try JSONDecoder().decode(SparePlan.self,from:Data(contentsOf:URL(fileURLWithPath:path)))
+                let marker=path+".appearance-started"
+                guard !FileManager.default.fileExists(atPath:marker),plan.first.preset.name=="StadiumPad Commands Preserve",plan.second.preset.name=="StadiumPad Commands Test",let testID=plan.second.preset.contentID,let preserveID=plan.first.preset.contentID,testID != preserveID,testID != plan.first.sourceID,preserveID != plan.first.sourceID,[testID,preserveID].contains(state.presetID ?? -1) else{throw ProtocolError.invalid("Review the allocated spares and test intent. Never replay a partial appearance check.")}
+                try Data("started".utf8).write(to:URL(fileURLWithPath:marker),options:.atomic)
+                var current=state
+                if state.presetID != testID {current=try await session.loadPreset(testID,expectedID:preserveID,discardingChangesWith:backups)}
+                try await Task.sleep(for:.milliseconds(300));current=try await session.snapshot()
+                let initial=current,source=CommandSource(.stomp,number:1,bank:1)
+                let definitions=try JSONDecoder().decode([String:[CommandParameter]].self,from:Data(contentsOf:URL(fileURLWithPath:catalogue)))
+                for action in [3,0] {
+                    let c=try CommandContext(state:current,source:source,slot:0)
+                    guard let p=definitions[source.catalogueKey(c.family)]?.first(where:{$0.name=="Action"}) else{throw ProtocolError.invalid("Missing Action metadata.")}
+                    current=try await session.editCommand(context:c,operation:.parameter(p,.int(Int64(action))),backups:backups)
+                }
+                let peer=try CommandContext(state:current,source:source,slot:1)
+                if peer.command["pvla"].integer != 0,let action=definitions[source.catalogueKey(peer.family)]?.first(where:{$0.name=="Action"}) {current=try await session.editCommand(context:peer,operation:.parameter(action,.int(0)),backups:backups)}
+                for appearance in [StompAppearance.label("Tablet Commands"),.color(8)] {
+                    current=try await session.setStompAppearance(context:CommandContext(state:current,source:source,slot:0),appearance:appearance,backups:backups)
+                }
+                current=try await session.savePreset(expectedID:testID,backups:backups)
+                _ = try await session.loadPreset(preserveID,expectedID:testID)
+                current=try await session.loadPreset(testID,expectedID:preserveID)
+                let props=try await session.read(.stompProperties)
+                guard props["vals"].items.first(where:{$0["key_"].text=="preset.floorboard.stomp.a.1.label"})?["val_"].text=="Tablet Commands",props["vals"].items.first(where:{$0["key_"].text=="preset.floorboard.stomp.a.1.color"})?["val_"].integer==8,current.blocks==initial.blocks else{throw ProtocolError.invalid("Appearance persistence or tone preservation failed.")}
+                _ = try await session.loadPreset(preserveID,expectedID:testID)
+                try Data("passed".utf8).write(to:URL(fileURLWithPath:path+".appearance-passed"),options:.atomic)
+                print("PASS paired toggle, label/color save/reload and unchanged tone; returned to preserved copy.");await session.disconnect();return
+            }
+            if args.contains("--command-center-check"),let catalogue=option("--catalog") {
+                let plan=try JSONDecoder().decode(SparePlan.self,from:Data(contentsOf:URL(fileURLWithPath:path)))
+                let marker=path+".commands-started"
+                guard !FileManager.default.fileExists(atPath:marker),plan.first.preset.name=="StadiumPad Commands Preserve",plan.second.preset.name=="StadiumPad Commands Test",let preserveID=plan.first.preset.contentID,let testID=plan.second.preset.contentID,state.presetID==testID,let saved=try await session.read(.contentData(testID)).data,PresetBackupStore.hash(saved)==plan.second.sourceHash else{throw ProtocolError.invalid("Only fresh reviewed Command Center spares may be tested. Do not replay a partial run.")}
+                let definitions=try JSONDecoder().decode([String:[CommandParameter]].self,from:Data(contentsOf:URL(fileURLWithPath:catalogue)))
+                try Data("started".utf8).write(to:URL(fileURLWithPath:marker),options:.atomic)
+                var current=state
+                _ = try await session.loadPreset(preserveID,expectedID:testID,discardingChangesWith:backups)
+                current=try await session.loadPreset(testID,expectedID:preserveID)
+                try await Task.sleep(for:.milliseconds(250))
+                current=try await session.snapshot()
+                let initial=current
+                let source=CommandSource(.stomp,number:1,bank:1)
+                func update(_ operation:CommandCenterOperation,_ target:CommandSource?=nil,_ slot:Int=0)async throws {
+                    print("Checking command operation at source \((target ?? source).name), slot \(slot+1)")
+                    let context=try CommandContext(state:current,source:target ?? source,slot:slot)
+                    current=try await session.editCommand(context:context,operation:operation,backups:backups)
+                }
+                func definition(_ name:String,_ target:CommandSource?=nil,_ slot:Int=0)throws->CommandParameter {
+                    let context=try CommandContext(state:current,source:target ?? source,slot:slot)
+                    guard let p=definitions[context.source.catalogueKey(context.family)]?.first(where:{$0.name==name}) else{throw ProtocolError.invalid("Missing command metadata for \(name).")};return p
+                }
+                var checks=0
+                for family in CommandFamily.allCases where family != .none {
+                    try await update(.family(family));checks+=1
+                }
+                try await update(.family(.midi));try await update(.parameter(definition("Command"),.int(1)));checks+=2
+                try await update(.parameter(definition("CC#"),.int(73)));try await update(.parameter(definition("Value"),.int(45)));checks+=2
+                try await update(.snapshot(definition("Value"),true));try await update(.snapshot(definition("Value"),false));checks+=2
+                let copy=try CommandCopy(context:CommandContext(state:current,source:source,slot:0),catalog:definitions)
+                try await update(.paste(copy.family,copy.parameters,copy.command),nil,1);checks+=1
+                let axis=CommandSource(.axis,number:0)
+                try await update(.family(.midi),axis);try await update(.parameter(definition("CC#",axis),.int(14)),axis);checks+=2
+                try await update(.family(.none),axis);checks+=1
+                let instant=CommandSource(.instant,number:15)
+                try await update(.family(.midi),instant);try await update(.parameter(definition("Wait",instant),.int(5)),instant);try await update(.family(.none),instant);checks+=3
+                let properties=try await session.read(.commandProperties)
+                let propertyMap=Dictionary(uniqueKeysWithValues:properties["vals"].items.compactMap{r in r["key_"].text.map{($0,r["val_"])}})
+                let all=try CommandCopy.all(state:current,catalog:definitions,properties:propertyMap)
+                current=try await session.replaceCommands(expected:current,copies:[],backups:backups);checks+=1
+                current=try await session.replaceCommands(expected:current,copies:all,backups:backups);checks+=1
+                let intended=try CommandCopy.all(state:current,catalog:definitions,properties:propertyMap)
+                current=try await session.savePreset(expectedID:testID,backups:backups)
+                _ = try await session.loadPreset(preserveID,expectedID:testID)
+                current=try await session.loadPreset(testID,expectedID:preserveID)
+                let stored=try CommandCopy.all(state:current,catalog:definitions,properties:propertyMap)
+                guard intended.count==stored.count,zip(intended,stored).allSatisfy({a,b in a.source==b.source && a.slot==b.slot && a.family==b.family && a.parameters.allSatisfy({sameParameterValue(a.command[$0.valueKey],b.command[$0.valueKey])})}),current.blocks==initial.blocks else{throw ProtocolError.invalid("Command assignments did not survive save/reload, or tone settings changed.")};checks+=1
+                _ = try await session.loadPreset(preserveID,expectedID:testID)
+                let result:[String:Any]=["checks":checks,"savedReloaded":true,"tonePreserved":true,"returnedToPreservedCopy":true]
+                try JSONSerialization.data(withJSONObject:result,options:.prettyPrinted).write(to:URL(fileURLWithPath:path+".commands-result.json"),options:.atomic)
+                print("PASS \(checks) Command Center checks; save/reload and unchanged tone; returned to preserved copy.")
+                await session.disconnect();return
+            }
+            if args.contains("--prepare-command-center") {
+                guard !FileManager.default.fileExists(atPath:path),!FileManager.default.fileExists(atPath:path+".first"),let id=state.presetID else{throw ProtocolError.invalid("Choose a fresh command-center plan; never repeat a partial allocation.")}
+                let preserved=try await session.copyCurrent(name:"StadiumPad Commands Preserve",expectedID:id,backups:backups)
+                try JSONEncoder().encode(preserved).write(to:URL(fileURLWithPath:path+".first"),options:.atomic)
+                try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:path+".first")
+                let test=try await session.copyCurrent(name:"StadiumPad Commands Test",expectedID:id,backups:backups)
+                try JSONEncoder().encode(SparePlan(first:preserved,second:test)).write(to:URL(fileURLWithPath:path),options:.atomic)
+                try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:path)
+                _ = try await session.openPreservedCopy(preserved)
+                guard let preserveID=preserved.preset.contentID,let testID=test.preset.contentID else{throw ProtocolError.invalid("The spare IDs were not confirmed.")}
+                _ = try await session.loadPreset(testID,expectedID:preserveID)
+                print("Preserved current live tone in a new copy; opened a separate Command Center test copy.")
+                await session.disconnect();return
+            }
             if args.contains("--selection-check") {
                 let listener=Task {while !Task.isCancelled {_ = try await session.event(timeout:5)}}
                 defer {listener.cancel()}

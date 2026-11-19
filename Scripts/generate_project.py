@@ -3,6 +3,7 @@ import hashlib,json,os
 root=Path(__file__).resolve().parent.parent
 resources=root/'iPad/Resources';resources.mkdir(exist_ok=True)
 if not (resources/'ModelNames.json').exists():(resources/'ModelNames.json').write_text('{}')
+if not (resources/'CommandCatalog.json').exists():(resources/'CommandCatalog.json').write_text('{}')
 if not (resources/'ParameterCatalog.json').exists():(resources/'ParameterCatalog.json').write_text('{}')
 objects={}
 def obj(key,body):

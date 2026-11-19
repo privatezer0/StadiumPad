@@ -179,3 +179,36 @@ not a notarized public release.
 Explicit DEBUG/instrumentation harnesses are not normal startup behavior. Strip
 pairing links from private test plans after use. Keep all real archives/IRs, device
 IDs, tokens, host keys, captures and installers out of source and test fixtures.
+
+## iPad Command Center (0.8.0)
+
+`CommandCenter.swift` defines source descriptors, category restrictions, validated
+parameters, exact command contexts and clipboard values. `CommandCenterView` uses
+original vector controls; do not copy vendor artwork/XML. Generate the ignored
+functional `CommandCatalog.json` with `Scripts/prepare_command_catalog.py` from an
+installed official editor. Missing metadata disables controls instead of guessing.
+
+`attachCommandWithType` replies with the new command ID twice, not a source ID.
+Stored XY sources have local=-1 even though attach uses local=0; Instant local=0,
+context=instant index. Onboard EXP2 uses local42/context1; EXP1 context0. Physical
+switch contexts are bank1/2. Never equate a command/source ID to its visual index.
+`func` is the continuous flag, not the visible Command subtype: switches use pvlb,
+Instants pvla. Snapshot removal is lowercase `/removeSnapshotCommandParam`.
+Only Action and MIDI Command exclude snapshot control. Continuous runtime Value
+is excluded from clipboard data. Clipboard All rejects unrecognized sources rather
+than copying a partial layout. Clear All removes commands, retaining effect controllers.
+
+Setlist destinations are indices (Factory0, User1, custom folder position+2),
+preset destinations are positions within that list, never content IDs. Selecting a
+setlist also resets its preset position to0 using separately checked FIFO writes.
+The two onboard expression selector colors choose separate assignment contexts.
+If Command1 uses Toggle, Command2 Action is displayed/disabled as Toggle like the
+desktop editor. Appearance writes allow only the selected stomp's label/color keys;
+labels max24 characters, colors0...11. Preset/Snapshot labels are automatic.
+
+Assignments use backup, exact context revalidation and independent graph readback.
+An uncertain write is not retried. Editing assignments does not execute them, but
+Instant commands can execute on preset recall: remove transport-affecting Instants
+before Save/reload tests. Physical tests allocate/preserve spares and journal intent
+before writes. Never remove a test intent marker to replay an uncertain batch.
+Android still has its previous Command Center placeholder; do not claim parity.

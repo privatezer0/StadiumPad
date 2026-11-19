@@ -22,6 +22,11 @@ import StadiumNetwork
     @Published var cloneHierarchy:Value = .null
     @Published var libraryEntries:[Int:[LibraryEntry]]=[:]
     @Published var presetContainer = -2
+    @Published var commandProperties:[String:Value]=[:]
+    let commandCatalog:[String:[CommandParameter]] = {
+        guard let url=Bundle.main.url(forResource:"CommandCatalog",withExtension:"json"),let data=try? Data(contentsOf:url) else{return [:]}
+        return (try? JSONDecoder().decode([String:[CommandParameter]].self,from:data)) ?? [:]
+    }()
     @Published var stompProperties:[String:Value]=[:]
     @Published var busy=false
     @Published var errorText:String?
@@ -61,7 +66,7 @@ import StadiumNetwork
     func blockName(_ block:SignalBlock)->String {catalog[String(block.model)]?.name ?? names[String(block.model)] ?? "Effect block \(block.position)"}
     func connect(host:String,port:UInt16=2001) {
         guard !busy else{return}
-        stop();connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];lastCopy=nil;lastAction=nil
+        stop();connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];commandProperties=[:];lastCopy=nil;lastAction=nil
         let token=UUID();generation=token
         lastEvent=nil;let current=StadiumSession();session=current;connecting=true;status="Connecting…"
         worker=Task {
@@ -227,6 +232,25 @@ import StadiumNetwork
             }
         } catch {if generation==token {errorText=error.localizedDescription}}
     }
+    func editCommand(_ context:CommandContext,_ operation:CommandCenterOperation)async->Bool {
+        guard !busy,connected,let current=session else{return false};busy=true;defer{busy=false};let token=generation
+        do {let state=try await current.editCommand(context:context,operation:operation,backups:backups);guard token==generation else{return false};snapshot=state;lastAction="Command assignment updated · unsaved";report();return true}
+        catch {if token==generation {errorText=error.localizedDescription};return false}
+    }
+    func replaceCommands(expected:DeviceSnapshot,copies:[CommandCopy])async->Bool {
+        guard !busy,connected,let current=session else{return false};busy=true;defer{busy=false};let token=generation
+        do {let state=try await current.replaceCommands(expected:expected,copies:copies,backups:backups);guard token==generation else{return false};snapshot=state;lastAction="Command layout updated · unsaved";report();return true}
+        catch {if token==generation {errorText=error.localizedDescription};return false}
+    }
+    func setStompAppearance(_ context:CommandContext,_ appearance:StompAppearance)async->Bool {
+        guard !busy,connected,let current=session else{return false};busy=true;defer{busy=false};let token=generation
+        do {let state=try await current.setStompAppearance(context:context,appearance:appearance,backups:backups);guard token==generation else{return false};snapshot=state;await refreshStompProperties();lastAction="Stomp appearance updated · unsaved";return true}
+        catch {if token==generation {errorText=error.localizedDescription};return false}
+    }
+    func refreshCommandProperties()async {
+        guard connected,let current=session else{return};let token=generation
+        do {let values=try await current.read(.commandProperties);guard token==generation else{return};commandProperties=Dictionary(uniqueKeysWithValues:values["vals"].items.compactMap{row in row["key_"].text.map{($0,row["val_"])}})}catch {if token==generation {commandProperties=[:]}}
+    }
     func refreshStompProperties()async {
         guard connected,let session,let id=snapshot?.presetID else{return};let token=generation
         do {let response=try await session.read(.stompProperties);guard generation==token,snapshot?.presetID==id else{return};var properties:[String:Value]=[:];for item in response["vals"].items {if let key=item["key_"].text {properties[key]=item["val_"]}};stompProperties=properties}
@@ -256,7 +280,7 @@ import StadiumNetwork
         var folders:[PresetFolder]=[]
         for entry in libraryEntries[-5] ?? [] {
             let contents=try await session.read(.container(entry.id));guard generation==token else{throw ProtocolError.closed}
-            let reference:Value = .object(["cid_":.int(Int64(entry.id)),"type":.int(1003),"name":.string(entry.name)])
+            let reference:Value = .object(["cid_":.int(Int64(entry.id)),"type":.int(1003),"posi":.int(Int64(entry.position)),"name":.string(entry.name)])
             if let folder=PresetFolder(reference:reference,contents:contents) {folders.append(folder)}
         }
         presetFolders=folders

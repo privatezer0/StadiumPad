@@ -69,6 +69,7 @@ that is separate from public TestFlight distribution.
    python3 ../helix-stadium-tools/scripts/generate_mobile_block_types_json.py --output ../stadium-blocks.json
    python3 ../helix-stadium-tools/scripts/generate_io_models_json.py --output ../stadium-io.json
    python3 Scripts/prepare_parameter_catalog.py --blocks ../stadium-blocks.json --io ../stadium-io.json
+   python3 Scripts/prepare_command_catalog.py
    python3 Scripts/generate_project.py
    open StadiumPad.xcodeproj
    ```

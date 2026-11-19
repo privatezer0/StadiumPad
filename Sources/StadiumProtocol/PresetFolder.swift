@@ -5,11 +5,12 @@ import Foundation
 /// the folder slot or treating its reference ID as a preset ID.
 public struct PresetFolder:Identifiable,Equatable,Sendable {
     public let id:Int
+    public let position:Int
     public let name:String
     public let presets:[PresetSlot]
     public init?(reference:Value,contents:Value) {
         guard reference["type"].integer==1003,let id=reference["cid_"].integer,id>0 else{return nil}
-        self.id=id;name=reference["name"].text ?? "Setlist"
+        self.id=id;position=reference["posi"].integer ?? 0;name=reference["name"].text ?? "Setlist"
         presets=contents.items.compactMap {row in
             guard let type=row["type"].integer,[1,2].contains(type),let target=type==1 ? row["rcid"].integer:row["cid_"].integer,target>0,target<=Int(Int32.max) else{return nil}
             var values=row.object;values["cid_"] = .int(Int64(target));values["type"] = .int(2)

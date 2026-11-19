@@ -47,3 +47,10 @@ Android uses the platform's native Canvas, dialogs, accessibility, sockets and
 [network service discovery](https://developer.android.com/develop/connectivity/wifi/use-nsd).
 Its Java implementation ports this project's original Swift protocol and UI
 behavior; the same upstream MIT research/Focus credits above apply.
+
+The iPad Command Center layout and assignment workflow reference the installed
+Helix Stadium editor and Line 6's [Command Center manual](https://manuals.line6.com/en/helix-stadium/live/command-center).
+Its controls are newly drawn SwiftUI vectors. Functional names/ranges/options are
+prepared locally from the owner's installed editor; extracted catalogues and vendor
+interface artwork are not included in this source repository. Credit belongs to
+Line 6 for the original controller design and the underlying Stadium implementation.

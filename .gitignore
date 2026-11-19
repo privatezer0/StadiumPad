@@ -26,3 +26,5 @@ __pycache__/
 Artwork/*.png
 
 iPad/Resources/FocusCatalog.json
+
+iPad/Resources/CommandCatalog.json

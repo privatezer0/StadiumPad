@@ -25,6 +25,7 @@ import UIKit
     for (name,size,currentSelection) in cases {await render(name,size,currentSelection)}
     for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render("librarian-"+name,size,selection,.librarian)}
     for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render("clones-"+name,size,selection,.librarian,.preset,false,.clones)}
+    for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render("commands-"+name,size,selection,.commands)}
     for section in [EditorSection.librarian,.commands,.eq,.songs] {await render("section-"+section.rawValue,CGSize(width:1024,height:724),selection,section)}
     for mode in [EditorMode.scene,.footswitch,.tuner] {
         for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render(mode.rawValue+"-"+name,size,selection,.home,mode)}

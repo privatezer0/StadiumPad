@@ -427,3 +427,51 @@ Mac helper is Apple Development signed, not Developer ID/notarized for general
 public installation. No new TestFlight upload or public invitation is claimed.
 IR import/assignment, clone-to-block assignment and other Librarian write functions
 remain unimplemented. Complete desktop parity is not claimed.
+
+## November18 — iPad Command Center 0.8.0/build17 candidate
+
+Implemented full-width iPad Command Center, controller map, both stomp banks,
+16Instants, X/Y, onboard EXP1/2/toe, configured external inputs, two command slots,
+seven assignment families plus None, native parameter choices/ranges, snapshot
+control, command/layout clipboard, reset and stomp Label/Color. Home preset/sidebar
+controls are hidden in this section. Android is unchanged.
+
+Observed reference: official desktop editor1.4.0.20 and Stadium XL firmware1.4.2.
+The owner-provided screenshot and installed editor were inspected; functional
+metadata is generated locally and excluded from Git. New SwiftUI vector artwork
+is original. External Switch/Trigger jack modes were not changed for testing.
+Their configuration gating is implemented, but those physical inputs remain
+unqualified. This is assignment editing, not Gig View command execution.
+
+- 61Swift tests pass, including source/slot restrictions, stored/wire descriptor
+  differences, subtype visibility, snapshot removal casing, parameter bounds,
+  property scope and narrowly permitted Toggle pairing. Five new loopback checks
+  cover actual transactions, stale source rejection, command-ID ACK echoes,
+  missing readback and no retry after an uncertain attachment. The complete
+  integration suite passes57checks with3pre-existing Java-environment skips.
+- A new preserved copy retained the initial live tone, then a second new copy was
+  allocated for all edit tests. No pre-existing saved preset was a write target.
+  The23-step protocol check created/switched all seven command families, edited
+  MIDI CC/value, enabled/disabled snapshot control, pasted Command1 intoCommand2,
+  edited/removed XY and Instant commands, cleared/pasted the full layout and
+  verified Save/switch-away/reload with unchanged projected signal blocks.
+- Additional hardware checks verified Command1 Toggle sets Command2 Toggle,
+  leaving Toggle resets Command2 toPress, and custom label/blue LED persistence
+  through Save/reload. Only the paired Action field and runtime toggle state are
+  permitted to change; other command values remain protected by readback checks.
+- Early checks stopped after incorrect ACK/source interpretation, snapshot-removal
+  casing, stored XY/Instant descriptors and Toggle coupling. Each resulting state
+  was independently read before explicitly resuming at the next confirmed step.
+  No uncertain allocation/edit was blindly repeated. These fixes have regressions.
+- All279User presets existing before this task were read independently afterward;
+  all original SHA-256 hashes match. The pedal was returned to the preserved new
+  copy. Research observer/discovery advertising stopped; desktop reconnected
+  directly to the physical Stadium over Wi-Fi.
+
+**Native iPad qualification pending:** Debug0.8.0/build17 compiles and installs on
+Pro, but iPadOS refuses launch while passcode-locked. The owner has been asked to
+unlock it. The prepared explicit Debug harness will test actual Monitor assignment,
+EXP2, snapshot control, Label/Color and persistence, then capture Command Center at
+Pro/regular-landscape/portrait sizes. No native layout/touch qualification, Release
+installer promotion, TestFlight upload or complete desktop parity is claimed yet.
+Validated installer mirrors remain at iPad0.7.0/build16 until this gate passes.

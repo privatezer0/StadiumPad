@@ -10,7 +10,7 @@ public enum StadiumLiveUpdate:Equatable,Sendable {
             guard message.values.count==4,message.values.allSatisfy({$0.integer != nil}),let path=message.values[2].integer,let position=message.values[3].integer,(0...1).contains(path),(0...27).contains(position) else{return nil}
             return .selection(path:path,position:position)
         }
-        if ["/setControllerValue","/setTargetValue","/setModelWithMID","/setParamValue","/setParamWithPID","/setHarnessParamValue","/setBlockEnable","/activateSnapshot","/loadPresetWithCID","/setEditBuffer","/setPropertyValue"].contains(message.address) {return .stateChanged}
+        if ["/attachCommandWithType","/attachCommandWithBlob","/setCommandParamVal","/setCommandType","/removeCommand","/assignSnapshotCommandParam","/removeSnapshotCommandParam","/pasteAllCommands","/removeAllCommands","/setControllerValue","/setTargetValue","/setModelWithMID","/setParamValue","/setParamWithPID","/setHarnessParamValue","/setBlockEnable","/activateSnapshot","/loadPresetWithCID","/setEditBuffer","/setPropertyValue"].contains(message.address) {return .stateChanged}
         return nil
     }
 }

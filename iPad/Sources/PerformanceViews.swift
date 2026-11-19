@@ -5,7 +5,7 @@ enum EditorMode:String,CaseIterable {case preset="Preset",scene="Scene",footswit
 enum PerformanceColors {
     static let palette:[Color]=[.cyan,.purple,.pink,.green,.orange,.blue,.red,.yellow]
     static func color(_ value:Int,fallback:Int)->Color {
-        switch value {case 2:return .red;case 3:return Color(red:0.8,green:0.3,blue:0.05);case 4:return .orange;case 5:return .yellow;case 6:return .green;case 7:return .teal;case 8:return .blue;case 9:return .purple;case 10:return .pink;default:return palette[fallback%palette.count]}
+        switch value {case 11:return .white;case 2:return .red;case 3:return Color(red:0.8,green:0.3,blue:0.05);case 4:return .orange;case 5:return .yellow;case 6:return .green;case 7:return .teal;case 8:return .blue;case 9:return .purple;case 10:return .pink;default:return palette[fallback%palette.count]}
     }
 }
 struct SceneBoard:View {
