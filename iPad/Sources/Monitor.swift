@@ -242,9 +242,14 @@ import StadiumNetwork
         do {let state=try await current.pressStomp(plan,backups:backups);guard generation==token else{return false};snapshot=state;lastAction="Stomp \(plan.bank.uppercased())\(plan.number) · assigned effects updated";report();return true}
         catch {if generation==token {errorText=error.localizedDescription;lastAction=nil;stop()};return false}
     }
+    func readLibraryFolder(_ id:Int)async throws {
+        guard connected,let session else{throw ProtocolError.closed};let token=generation
+        let value=try await session.read(.container(id));guard generation==token else{throw CancellationError()}
+        libraryEntries[id]=value.items.compactMap(LibraryEntry.init)
+    }
     func refreshInventory()async throws {
         guard let session else{throw ProtocolError.closed};let token=generation
-        for container in [-1,-2,-3,-4,-5,-6,-7,-8] {
+        for container in [-1,-2,-3,-4,-5,-6,-7,-8,-10,-11,-13,-14,-22,-23,-24,-25] {
             let value=try await session.read(.container(container));guard generation==token else{throw ProtocolError.closed};libraryEntries[container]=value.items.compactMap(LibraryEntry.init)
             if container == -1 {factoryPresets=value.items.map(PresetSlot.init).filter{($0.contentID ?? 0)>0}}
         }

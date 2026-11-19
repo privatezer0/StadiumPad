@@ -15,7 +15,7 @@ source before changing behavior. This guide grants no hardware or publishing acc
   session/monitor, original Canvas tablet editor, Android NSD and guarded workflows.
   Build scripts use external Android SDK/JDK/build/signing paths; bundled catalogues
   are copied locally from the same generated iPad resources. No WebView or bridge
-  Mac is needed. Shared synthetic Focus vectors verify arithmetic parity.
+  Mac is needed for editing. File transfers use the optional companion. Shared synthetic Focus vectors verify arithmetic parity.
 - Sources/StadiumProbe: explicitly invoked read-only research CLI.
 - Sources/StadiumEditCheck: explicitly invoked spare-only edit harness.
 - Tests: synthetic data and loopback peers. Hardware data is never a test fixture.
@@ -136,20 +136,46 @@ history. Preserve live-event precedence and reject stale focus after a newer loc
 selection. iPad and Android have independent local histories; this is not cloud sync
 or a verified read of the pedal selection while the tablet was disconnected.
 
-## Librarian work in progress
+## Librarian and Mac file companion (0.7.0)
 
 Librarian uses the full workspace, with no Home preset sidebar or preset mode bar.
-iPad `LibrarianView` and Android `LibrarianView.java` own category/folder/search/
-selection state. Preset folders use resolved backing preset IDs, never reference
-IDs. Favorites uses container -8 and Templates -4; -6 is a folder directory.
-Native iPad layout rendering includes Pro, regular landscape and portrait.
+The native category rail and independently scrolling folder/content panes exist on
+both platforms. Containers: Templates -3, Favorites -8, Factory/User IRs -10/-11,
+Factory/User Clones -13/-14. User clone category folders -22...-25 are real negative
+IDs; retain type1002 and owner validation. GetCloneHierarchy may be empty despite
+real clones. Enumerate actual GetContainerContents folders instead.
 
-Clone file operations are not implemented. The installed desktop editor browses
-User Clones over authenticated SFTP, with Amp/Amp+Cab/Distortion/Preamp folders,
-column navigation, breadcrumb, and New Folder/Delete/Rename/Export/Import actions.
-GetCloneHierarchy can return an empty list while files exist; do not present that
-as proof of an empty library. Editing-port connectivity does not grant file access.
-Do not embed vendor private SSH credentials in the public source or app. Transfer
-architecture is pending owner choice (Mac companion versus separately supplied
-credentials). Current disabled toolbar buttons are not functioning file operations.
-No clone import or library-write hardware qualification has occurred.
+Companion/ is the optional macOS14+ HTTPS/SFTP file service. It requires the user's
+installed supported official editor; no vendor identity is bundled or persisted.
+The local runtime decoder is credited to former upstream MIT research. New editor
+hashes fail closed: do not relax the fingerprint check or distribute extracted keys.
+The tablet stores only its own pairing token/certificate pin in Keychain/Android
+Keystore-encrypted preferences. No arbitrary command/path/host proxy API exists.
+
+Sources/StadiumLibrary is a bounded local JSON agent with a typed whitelist, using
+existing serialized StadiumSession transactions. Require exact device serial hash,
+CID/UUID/name/owner/category and independently confirmed readback for mutations.
+AddContentsToContainer's last flags 0,1 mean verified move; 0,0 copies and cannot
+confirm a move. New folders require ownr1. Exports wait for cloneArchiveExportReady,
+not an ordinary status ACK. GetContentPath replies include trailing zero status.
+
+Clone uploads use exclusive unique staging, byte readback and one atomic rename
+into the native ingest folder followed by a non-truncating close-write notification. Refuse logical AND physical UUID collisions before
+commit. Journal intent first; never replay uncertain jobs. Preserve opaque/encrypted
+clone members exactly. Never decrypt/rewrite protected DSP assets or overwrite an
+existing identity. Delete/rename retains a Mac archive backup; built-ins and protected
+content are refused. Do not test deletion on valued user content.
+
+Download Library is read-only apart from native export-cache generation. ZIP entries
+contain original User clone archives, User IR WAV files, and Library.json with
+metadata/checksums. Validate actual IR paths and normalized symlinks remain in the
+IR subtree, WAV headers, size bounds and before/after library consistency. Clients
+verify the entire ZIP hash before retaining a durable backup; do not expose partial
+success. IR upload/assignment, clone-to-model assignment, other Librarian writes and
+complete desktop parity remain unimplemented. The Mac must be open for file
+operations, not routine editing. The current Mac owner build is development-signed,
+not a notarized public release.
+
+Explicit DEBUG/instrumentation harnesses are not normal startup behavior. Strip
+pairing links from private test plans after use. Keep all real archives/IRs, device
+IDs, tokens, host keys, captures and installers out of source and test fixtures.

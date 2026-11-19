@@ -14,8 +14,8 @@ import UIKit
             if let block,let context=try? state.context(for:block) {cases.append((name,CGSize(width:1024,height:724),BlockSelection(block:block,context:context)))}
         }
     }
-    func render(_ name:String,_ size:CGSize,_ currentSelection:BlockSelection?,_ section:EditorSection = .home,_ mode:EditorMode = .preset,_ focus:Bool=false)async {
-        let root=StadiumView(initialSelection:currentSelection,preview:true,initialSection:section,initialMode:mode,initialFocus:focus).environmentObject(monitor).environmentObject(discovery).preferredColorScheme(.dark)
+    func render(_ name:String,_ size:CGSize,_ currentSelection:BlockSelection?,_ section:EditorSection = .home,_ mode:EditorMode = .preset,_ focus:Bool=false,_ libraryCategory:LibraryCategory = .presets)async {
+        let root=StadiumView(initialSelection:currentSelection,preview:true,initialSection:section,initialMode:mode,initialFocus:focus,initialLibraryCategory:libraryCategory).environmentObject(monitor).environmentObject(discovery).preferredColorScheme(.dark)
         let host=UIHostingController(rootView:root);host.view.frame=CGRect(origin:.zero,size:size);host.view.backgroundColor = .black
         host.view.setNeedsLayout();host.view.layoutIfNeeded()
         try? await Task.sleep(for:.milliseconds(250))
@@ -24,6 +24,7 @@ import UIKit
     }
     for (name,size,currentSelection) in cases {await render(name,size,currentSelection)}
     for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render("librarian-"+name,size,selection,.librarian)}
+    for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render("clones-"+name,size,selection,.librarian,.preset,false,.clones)}
     for section in [EditorSection.librarian,.commands,.eq,.songs] {await render("section-"+section.rawValue,CGSize(width:1024,height:724),selection,section)}
     for mode in [EditorMode.scene,.footswitch,.tuner] {
         for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render(mode.rawValue+"-"+name,size,selection,.home,mode)}

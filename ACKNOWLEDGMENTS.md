@@ -17,6 +17,10 @@ float32 triangle interpolation/discrete tie handling. Swift Focus arithmetic and
 synthetic reference-vector tests are adapted from that MIT reference; its native
 research remains credited to the original author.
 Reference commit: `dad97d3a2011290f7f6630d04cc1a819cc58752b`.
+The Mac companion's local editor identity preparation is adapted from the same
+project's earlier MIT history (`01c278a` / `b4a20e0`, removed upstream in `af0b6eb`).
+No extracted key, vendor binary or protected model payload is distributed in this
+repository. User-owned library files stay on the user's devices.
 The [upstream license](docs/REFERENCE_LICENSE.txt) is retained. Credit belongs to
 the developers who did that foundation work; this is not a claim of discovering
 the entire protocol independently.

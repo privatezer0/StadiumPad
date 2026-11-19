@@ -21,8 +21,8 @@ Once the invitation is published:
 
 Testers do **not** need a Mac, Xcode, an Apple Developer membership, USB connection
 or Developer Mode for a TestFlight build. They need a compatible iPad (iPadOS18+),
-TestFlight and their own Stadium on the local network. The app works directly
-with the pedal after installation. TestFlight builds expire after 90 days; install
+TestFlight and their own Stadium on the local network. Preset editing works directly
+with the pedal after installation. Optional file transfers require the Mac companion. TestFlight builds expire after 90 days; install
 replacement beta builds through TestFlight when available.
 
 Apple documents [TestFlight](https://developer.apple.com/testflight/) and
@@ -98,3 +98,21 @@ use the same signing identity/bundle ID and install an update.
 Apple references: [account/Personal Team](https://developer.apple.com/help/account/basics/about-your-developer-account/),
 [run on a device](https://developer.apple.com/documentation/xcode/building-and-running-an-app),
 [Developer Mode](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device).
+
+## Copying User Clones and IRs to your tablet
+
+1. Open StadiumPad Companion on a Mac with the supported official Helix Stadium
+   editor installed. Keep Mac, tablet and Stadium on the same LAN.
+2. Search/select your Stadium and connect. Verify the file-connection identity on
+   first use. Allow the Mac's Local Network request when prompted.
+3. Scan the pairing QR with the tablet camera, open its StadiumPad link, then
+   confirm Pair in Librarian; alternatively paste Copy Pairing Link there.
+4. In StadiumPad Librarian, choose **Download Library** and wait for completion.
+5. **Open Tablet Backup** shares/saves the ZIP, including Clones, IRs and Library.json.
+   The verified copy remains on the tablet after disconnecting. The Stadium originals
+   remain intact. Keep the Mac companion open for transfers.
+
+This does not install Stadium amp/effect processing on the tablet. Library files
+are backups; offline preset editing/synchronization remains planned. See
+[Mac companion requirements and developer build](Companion/README.md). The current
+Mac owner build is development-signed, not yet notarized for general distribution.

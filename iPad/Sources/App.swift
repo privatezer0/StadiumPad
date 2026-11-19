@@ -29,6 +29,8 @@ struct StadiumView:View {
     @State private var copyName=""
     @State private var copySourceID:Int?
     @State private var libraryRevision=0
+    @State private var pendingCompanionLink:String?
+    @State private var libraryLinkRevision=UUID()
     @State private var section:EditorSection = .home
     @State private var showInfo=false
     @State private var mode:EditorMode = .preset
@@ -39,7 +41,8 @@ struct StadiumView:View {
     @State private var pendingSelection:BlockSelection?
     @State private var showReplace=false
     let preview:Bool
-    init(initialSelection:BlockSelection?=nil,preview:Bool=false,initialSection:EditorSection = .home,initialMode:EditorMode = .preset,initialFocus:Bool=false) {_showFocus=State(initialValue:initialFocus);_mode=State(initialValue:initialMode);_selected=State(initialValue:initialSelection);_section=State(initialValue:initialSection);self.preview=preview}
+    let libraryCategory:LibraryCategory
+    init(initialSelection:BlockSelection?=nil,preview:Bool=false,initialSection:EditorSection = .home,initialMode:EditorMode = .preset,initialFocus:Bool=false,initialLibraryCategory:LibraryCategory = .presets) {_showFocus=State(initialValue:initialFocus);_mode=State(initialValue:initialMode);_selected=State(initialValue:initialSelection);_section=State(initialValue:initialSection);self.preview=preview;self.libraryCategory=initialLibraryCategory}
     var body:some View {
         GeometryReader {geometry in
             VStack(spacing:0) {
@@ -72,7 +75,7 @@ struct StadiumView:View {
                             } else {
                                 VStack(spacing:18) {Image(systemName:"waveform.path").font(.system(size:42,weight:.ultraLight));Text("Your Stadium, on your iPad").font(.title2);Button("Connect to Stadium"){showConnection=true}.buttonStyle(.borderedProminent)}.foregroundStyle(.secondary).frame(maxWidth:.infinity,maxHeight:.infinity)
                             }
-                        } else if section == .librarian {LibrarianView(openEditor:{section = .home})}
+                        } else if section == .librarian {LibrarianView(openEditor:{section = .home},pairingLink:pendingCompanionLink,initialCategory:libraryCategory).id(libraryLinkRevision).onAppear{pendingCompanionLink=nil}}
                         else if section == .songs {LibraryRows(title:"Songs",entries:(monitor.libraryEntries[-7] ?? []).filter{$0.type==4},canOpen:false).overlay(alignment:.bottom){Text("Showcase editing and transport are not connected yet").font(.caption).padding(10).background(.black)}}
                         else {SectionStatusView(section:section)}
                     }.frame(maxWidth:.infinity,maxHeight:.infinity)
@@ -85,6 +88,10 @@ struct StadiumView:View {
                     Text("STADIUMPAD").tracking(1).foregroundStyle(.gray)
                 }.font(.system(size:10)).padding(.horizontal,12).frame(height:22).background(Color(white:0.08))
             }.background(.black).foregroundStyle(.white)
+        }
+        .onOpenURL {url in
+            guard url.scheme=="stadiumpad",url.host=="companion" else{return}
+            pendingCompanionLink=url.absoluteString;libraryLinkRevision=UUID();section = .librarian
         }
         .sheet(isPresented:$showAcknowledgments){AcknowledgmentsView()}
         .sheet(isPresented:$showModels){ModelBrowser(selection:selected,choose:{model in showModels=false;prepareReplacement(model)}).preferredColorScheme(.dark)}
@@ -128,12 +135,14 @@ struct StadiumView:View {
             let host=ProcessInfo.processInfo.environment["STADIUM_DEVICE_HOST"] ?? address
             if !host.isEmpty {address=host;monitor.connect(host:host)}
 #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") || ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
+            if ProcessInfo.processInfo.arguments.contains("--verify-library-backup") || ProcessInfo.processInfo.arguments.contains("--verify-clones") || ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") || ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
                 for _ in 0..<70 {if monitor.connected {break};try? await Task.sleep(for:.milliseconds(200))}
                 if ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") {
                     let plan=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("spare-plan.json")
                     await verifySpareEditing(monitor,planURL:plan)
                 }
+                if ProcessInfo.processInfo.arguments.contains("--verify-clones") {await verifyCloneLibrary(monitor)}
+                if ProcessInfo.processInfo.arguments.contains("--verify-library-backup") {await verifyLibraryBackup(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") {try? await Task.sleep(for:.milliseconds(400));await verifyRememberedSelection(monitor,selection:{selected})}
                 if ProcessInfo.processInfo.arguments.contains("--verify-live-sync") {await verifyLiveSelection(monitor,selection:{selected})}
                 if ProcessInfo.processInfo.arguments.contains("--verify-discard") {await verifyDiscard(monitor)}

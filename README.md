@@ -1,8 +1,8 @@
 # StadiumPad
 
 An unofficial, open-source **iPad/tablet editor for Line 6 Helix Stadium**.
-Connect directly over your local Wi-Fi network; no Mac relay is needed while using
-the app. This is an early community proof of concept, not a complete replacement
+Connect directly over your local Wi-Fi network for editing and browsing. Clone
+file transfers and library backups use the optional Mac companion. This is an early community proof of concept, not a complete replacement
 for the official desktop editor.
 
 <p align="center"><img src="iPad/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.jpg" width="220" alt="StadiumPad metallic blue app icon"></p>
@@ -47,15 +47,24 @@ for the official desktop editor.
 - **Librarian layout:** a full-width workspace with Presets, Cab IRs, Favorites,
   Templates, Songs and Clones categories. Presets has separate setlist and preset
   panes, folder selection and search. The Home preset sidebar and scene/save bar
-  are hidden here. File-management toolbar actions remain unavailable pending
-  implementation; this layout does not implement clone transfers.
+  are hidden here. Clones has category folders, nested folder navigation and search.
+- **Clone files:** pair with StadiumPad Companion on your Mac to import `.clone`
+  files, export originals, and create/rename/delete compatible User clone folders
+  and entries. Imports preserve file bytes and refuse duplicate identities, including
+  files present on the pedal but absent from its visible index. Uncertain writes
+  are never automatically retried. Factory/protected content is excluded.
+- **Download Library:** copy User Clones and User IR WAVs into a durable ZIP on the
+  tablet, with folder metadata and per-file SHA-256 checksums. Open/share the latest
+  backup from Librarian. Originals remain on Stadium; this is file storage, not
+  tablet DSP or offline preset editing. Current backup limit: 256 MB.
+  [Mac companion setup and limits](Companion/README.md).
 - Read library inventories: Factory/User presets, setlists, IRs, Favorites, Templates,
   Songs and the clone hierarchy reported by the device. File-based models need files.
 
 ## What is not implemented yet
 
 Command Center assignment editing, Global EQ controls, song/Showcase editing and
-transport, IR/clone file import and assignment, preset renaming after creation,
+transport, IR file import/assignment and clone-to-block assignment, preset renaming after creation,
 block insertion/removal, cross-row/path moves, general routing editing, snapshot renaming,
 firmware updates and PIN authentication. Desktop Focus user-default management,
 favorites creation and vendor equipment artwork are not implemented. Navigation for Command Center, Global EQ and Songs is present, with

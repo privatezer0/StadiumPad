@@ -1,10 +1,11 @@
 # StadiumPad for Android tablets
 
-Native Java/Android port of StadiumPad0.6.3's iPad feature set. Original dark editor
+Native Java/Android tablet port of StadiumPad. Original dark editor
 layout: persistent scrolling preset folders at left, signal chain above categories/
 models and parameter controls, centered mode selector, info/save header, category
 colors and blue app icon. Compact portrait uses a model chooser. Native input,
-dialogs, inertial lists, accessibility nodes and Android NSD; no WebView or Mac bridge.
+dialogs, inertial lists, accessibility nodes and Android NSD. Editing is direct;
+optional clone-file transfers/library backups use the Mac companion.
 
 Implemented: LAN discovery/manual connection, Factory/User folders and inventory,
 model/original-inspiration search, outputs/model selection, live-follow, typed
@@ -152,15 +153,17 @@ active-preset lookup, address changes, moved/removed blocks, model slots and cor
 records. The selection script also retains15selection and six socket echo cases.
 Current physical installation/cold-launch checks are recorded in docs/VALIDATION.md.
 
-## Librarian layout development checkpoint
+## 0.7.0/code5 — Librarian and file companion
 
-The Librarian replaces the Home preset sidebar and preset/scene/save bar with a
-full-width category rail and separate setlist/preset panes. Folder and row lists
-scroll independently; search and preset selection use the existing guarded load
-path. Favorites reads -8 and Templates -4, matching the iPad mapping.
+The full-width Librarian hides the Home preset sidebar and mode bar. Native clone
+category/folder navigation, search, import/export and guarded User folder/entry
+management match the iPad workflow. Pair using the Mac companion's QR/link. Pairing
+is protected with Android Keystore-backed encryption; HTTPS pins its certificate.
+Download Library retains an original-file ZIP of User Clones and User IR WAVs in
+private tablet storage; Open Tablet Backup exports it through Android's file picker.
+Checksums are verified before retention. No pedal originals are removed.
 
-Java compilation, APK packaging and signing pass. No Android tablet was available
-for native interaction/layout qualification in this session. This is not a new
-validated Android release; installer mirrors remain at 0.6.6/code4.
-Clone import/export/folder management remain unavailable pending authenticated
-transfer architecture; disabled toolbar affordances do not implement those actions.
+Templates is container -3, Favorites -8, User IRs -11. Other Librarian write actions,
+IR import/assignment and clone-to-block assignment remain unavailable. See
+[companion setup](../Companion/README.md). Current physical qualification is recorded
+in docs/VALIDATION.md; compilation alone is not physical tablet acceptance.

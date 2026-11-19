@@ -317,3 +317,92 @@ public actor StadiumSession {
         throw ProtocolError.invalid("The new preset was not confirmed as active.")
     }
 }
+
+extension StadiumSession {
+    /// Ascend the real folder records; a positive number alone never grants access.
+    @discardableResult private func verifyUserCloneFolder(_ id:Int)async throws->Int {
+        var current=id;var visited:Set<Int>=[]
+        for _ in 0..<8 {
+            if [-22,-23,-24,-25].contains(current) {return current}
+            guard current>0,visited.insert(current).inserted else{break}
+            let row=try await readUnlocked(.contentRef(current))
+            guard row["type"].integer==1002,CloneLibraryCommand.userEditable(row),let parent=row["ccid"].integer else{break}
+            current=parent
+        }
+        throw ProtocolError.invalid("Choose a folder inside User Clones.")
+    }
+    public func createCloneFolder(parent:Int,name:String)async throws->Value {
+        await acquire();defer{release()};try await verifyUserCloneFolder(parent)
+        let clean=try CloneLibraryCommand.name(name),before=try await readUnlocked(.container(parent))
+        guard !before.items.contains(where:{$0["name"].text?.localizedCaseInsensitiveCompare(clean) == .orderedSame}) else{throw ProtocolError.invalid("This clone folder already contains that name.")}
+        let position=(before.items.compactMap{$0["posi"].integer}.max() ?? -1)+1
+        let response=try await exchange(CloneLibraryCommand.createFolder(parent:parent,position:position,name:clean).message,reply:"/status")
+        let id=try EditCommand.allocatedID(response)
+        let after=try await readUnlocked(.container(parent))
+        guard let created=after.items.first(where:{$0["cid_"].integer==id}),created["type"].integer==1002,created["ownr"].integer==1,created["name"].text==clean,created["ccid"].integer==parent else{throw ProtocolError.invalid("Folder creation was not confirmed. Refresh before trying again.")}
+        return created
+    }
+    public func changeClone(id:Int,parent:Int,uuid:String?,expectedName:String,newName:String?=nil,remove:Bool=false)async throws->Value {
+        guard id>0 else{throw ProtocolError.invalid("Built-in clone folders cannot be modified.")}
+        await acquire();defer{release()};try await verifyUserCloneFolder(parent)
+        let before=try await readUnlocked(.contentRef(id))
+        guard before["ccid"].integer==parent,CloneLibraryCommand.userEditable(before),before["name"].text==expectedName,let type=before["type"].integer,[11,1002].contains(type),type != 11 || before["cluid"].text==uuid else{throw ProtocolError.invalid("The selected clone or folder changed. Refresh before continuing.")}
+        if remove {
+            if type==1002 {guard try await readUnlocked(.container(id)).items.isEmpty else{throw ProtocolError.invalid("Only empty clone folders can be deleted.")}}
+            try EditCommand.acknowledge(await exchange(CloneLibraryCommand.remove(parent:parent,id:id).message,reply:"/status"))
+            let after=try await readUnlocked(.container(parent))
+            guard !after.items.contains(where:{$0["cid_"].integer==id}) else{throw ProtocolError.invalid("Deletion was not confirmed. Nothing was retried.")}
+            return .object(["removed":.int(Int64(id))])
+        }
+        guard let newName else{throw ProtocolError.invalid("Enter the clone name.")}
+        let clean=try CloneLibraryCommand.name(newName),siblings=try await readUnlocked(.container(parent))
+        guard !siblings.items.contains(where:{$0["cid_"].integer != id && $0["name"].text?.localizedCaseInsensitiveCompare(clean) == .orderedSame}) else{throw ProtocolError.invalid("This folder already contains that name.")}
+        try EditCommand.acknowledge(await exchange(CloneLibraryCommand.rename(id:id,attributes:before,name:clean).message,reply:"/status"))
+        let after=try await readUnlocked(.contentRef(id))
+        var intended=before.object;intended["name"] = .string(clean)
+        guard after == .object(intended) else{throw ProtocolError.invalid("The renamed clone/folder was not fully confirmed. Check the library before continuing.")}
+        return after
+    }
+}
+
+extension StadiumSession {
+    public func prepareCloneExport(id:Int,uuid:String,expectedName:String)async throws->Value {
+        guard id>0,UUID(uuidString:uuid)?.uuidString.lowercased()==uuid else{throw ProtocolError.invalid("Invalid clone export identity.")}
+        await acquire();defer{release()};let origin=connectionID
+        let before=try await readUnlocked(.contentRef(id))
+        guard before["type"].integer==11,CloneLibraryCommand.userEditable(before),before["cluid"].text==uuid,before["name"].text==expectedName,let parent=before["ccid"].integer else{throw ProtocolError.invalid("The clone changed before export.")}
+        try await verifyUserCloneFolder(parent)
+        guard let socket=commands else{throw ProtocolError.closed}
+        let commandID=nextID;nextID = nextID==Int32.max ? 1:nextID+1
+        try await socket.send(Frame(payload:try OSCMessage("/ExportCloneArchive",[.int(Int64(commandID)),.int(Int64(id))]).encode()).encode())
+        let deadline=Date().addingTimeInterval(15)
+        while Date()<deadline {
+            let event=try await self.event(timeout:max(0.1,deadline.timeIntervalSinceNow))
+            guard origin==connectionID else{throw ProtocolError.closed}
+            guard event.address=="/cloneArchiveExportReady",event.values.count==6,event.values[2].integer==id else{continue}
+            let path="/data/stadium-family-fw/proxy/exports/"+uuid+".clone"
+            guard event.values[3].text==path,event.values[4].text==uuid+".clone",let size=event.values[5].integer,size>24,size<=8*1024*1024,try await readUnlocked(.contentRef(id))==before else{throw ProtocolError.invalid("The Stadium did not confirm the requested clone archive.")}
+            return .object(["path":.string(path),"size":.int(Int64(size))])
+        }
+        throw ProtocolError.invalid("Clone export was not confirmed. Nothing was retried.")
+    }
+}
+
+
+extension StadiumSession {
+    public func moveClone(id:Int,parent:Int,uuid:String,expectedName:String,destination:Int)async throws->Value {
+        await acquire();defer{release()}
+        guard id>0,parent != destination else{throw ProtocolError.invalid("Choose a different clone folder.")}
+        let sourceCategory=try await verifyUserCloneFolder(parent),targetCategory=try await verifyUserCloneFolder(destination)
+        guard sourceCategory==targetCategory else{throw ProtocolError.invalid("Clones can only move within their own Amp, Amp+Cab, Preamp or Distortion category.")}
+        let before=try await readUnlocked(.contentRef(id)),contents=try await readUnlocked(.container(destination))
+        guard before["type"].integer==11,CloneLibraryCommand.userEditable(before),before["ccid"].integer==parent,before["cluid"].text==uuid,before["name"].text==expectedName else{throw ProtocolError.invalid("The selected clone changed before moving.")}
+        guard !contents.items.contains(where:{$0["name"].text?.localizedCaseInsensitiveCompare(expectedName) == .orderedSame}) else{throw ProtocolError.invalid("The destination already has a clone with this name.")}
+        let position=(contents.items.compactMap{$0["posi"].integer}.max() ?? -1)+1
+        try EditCommand.acknowledge(await exchange(CloneLibraryCommand.move(id:id,parent:destination,position:position).message,reply:"/status"))
+        let after=try await readUnlocked(.contentRef(id)),remaining=try await readUnlocked(.container(parent))
+        var intended=before.object;intended["ccid"] = .int(Int64(destination));intended["posi"] = .int(Int64(position))
+        guard after == .object(intended),!remaining.items.contains(where:{$0["cid_"].integer==id}) else{throw ProtocolError.invalid("The clone move was not confirmed. Refresh before trying again.")}
+        return after
+    }
+}

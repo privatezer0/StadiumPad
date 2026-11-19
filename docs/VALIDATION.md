@@ -382,3 +382,48 @@ Both complete12product installer inventories/mirrors passed SHA-256 readbacks:
 This does not discover the pedal's selected-block getter. If selection changes
 while the app is closed, its last remembered view can differ until a live event.
 Histories are local to each tablet. No new TestFlight upload/public APK release.
+
+
+## November18 — 0.7.0 Librarian / Mac companion / tablet library backup
+
+Implemented native full-width clone category/folder/search navigation on both tablet
+platforms, paired file import/export and guarded folder/entry management, and
+Download Library for User Clones plus IR WAVs. Correct actual mappings: Templates
+-3, Favorites -8, User IRs -11, User Clones -14 with categories -22...-25.
+
+- 50 Swift tests pass; 52 integration tests pass with three pre-existing skips;
+  25 synthetic companion archive/auth/transaction/backup checks pass. Android app
+  and instrumentation compile/sign. These are distinct from physical qualification.
+- Installed packaged development-signed Mac companion connects to the actual pedal
+  using the supported local editor. HTTPS pairing/certificate pinning works on Pro;
+  wrong Stadium and wrong certificate are rejected. No vendor key is distributed.
+- Native iPad exported the test clone byte-identically, imported a fresh unused
+  identity into a custom spare folder and independently verified the result/job.
+  Current preset, snapshot, dirty flag and complete projected blocks stayed equal.
+- First upload revealed that atomic rename alone does not notify the native importer.
+  The task-owned exact-hash pending file was independently reconciled once, with no
+  re-upload, then placed in its spare folder. Corrected new uploads issue one
+  non-truncating close-write after rename; the subsequent native Pro test passed.
+  Jobs still never retry uncertain writes. Physical UUID checks also protect
+  unindexed deployed assets. Earlier physical files were not all hashed before the
+  first desktop import; do not claim that stronger preservation test occurred.
+- Folder create/rename and same-category move were verified using task-created
+  folders/clones. Incorrect copy flags were caught by readback; only the two
+  resulting task-created incomplete metadata rows were independently identified and
+  removed. The verified move uses last flags0,1. Existing user clones were not deleted.
+- Pro Download Library saved178clones and100IRs, 7,781,278bytes. Every archive member
+  matched its manifest size/SHA-256 and an independent Mac/SFTP read byte for byte.
+  Original pedal files were retained; this backup predates subsequent test imports.
+- Pro rendered clone Librarian at Pro, regular landscape and portrait sizes; visual
+  inspection confirmed category rail, independent lists and backup buttons. Regular
+  landscape fits without workspace scrolling. Portrait can abbreviate rail labels.
+- Release0.7.0/build16 installed/launched on Pro after Debug verification. No preset
+  recall/save/parameter/tuner/scene writes were used for this library task.
+
+Android0.7.0/code5 is built but physical installation/HTTPS/backup/UI checks are
+pending: the supplied wireless debugging endpoint closed and no USB target is
+connected. Keep validated Android installer mirrors at0.6.6/code4 until qualified.
+Mac helper is Apple Development signed, not Developer ID/notarized for general
+public installation. No new TestFlight upload or public invitation is claimed.
+IR import/assignment, clone-to-block assignment and other Librarian write functions
+remain unimplemented. Complete desktop parity is not claimed.

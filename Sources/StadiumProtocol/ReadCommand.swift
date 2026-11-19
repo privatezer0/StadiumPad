@@ -2,7 +2,7 @@ import Foundation
 
 /// Typed read-only requests; edits use a separate, guarded API.
 public enum ReadCommand:Equatable,Sendable {
-    case tunerProperties,stompProperties,cloneHierarchy,autoCab,snapshotCount,product,editBuffer,editBufferBytes,activePreset,activeSnapshot,dirty,contentRef(Int),contentData(Int),container(Int)
+    case tunerProperties,stompProperties,cloneHierarchy,autoCab,snapshotCount,product,editBuffer,editBufferBytes,activePreset,activeSnapshot,dirty,contentRef(Int),contentPath(Int),contentData(Int),container(Int)
     public func message(id:Int32)throws->OSCMessage {
         let address:String;var values:[Value]=[.int(Int64(id))]
         switch self {
@@ -15,17 +15,19 @@ public enum ReadCommand:Equatable,Sendable {
         case .editBuffer,.editBufferBytes:address="/EditBufferStateGet"
         case .activePreset:address="/PropertyValueGet";values.append(.string("server.active.preset.id"))
         case .dirty:address="/PropertyValueGet";values.append(.string("volatile.preset.edited"))
+        case .contentPath(let n):guard n>0,Int32(exactly:n) != nil else{throw ProtocolError.invalid("Invalid library file reference.")};address="/GetContentPath";values.append(.int(Int64(n)))
         case .contentData(let n):guard n>0,Int32(exactly:n) != nil else{throw ProtocolError.invalid("Invalid preset reference.")};address="/GetContentData";values.append(.int(Int64(n)))
-        case .container(let n):guard [-1,-2,-3,-4,-5,-6,-7,-8].contains(n) || (n>0 && n<=Int(Int32.max)) else{throw ProtocolError.invalid("Unsupported preset library.")};address="/GetContainerContents";values.append(.int(Int64(n)))
+        case .container(let n):guard (-25 ... -1).contains(n) || (n>0 && n<=Int(Int32.max)) else{throw ProtocolError.invalid("Unsupported preset library.")};address="/GetContainerContents";values.append(.int(Int64(n)))
         case .activeSnapshot:address="/ActiveSnapshotIndexGet"
         case .contentRef(let n):guard Int32(exactly:n) != nil else{throw ProtocolError.invalid("Invalid preset reference.")};address="/GetContentRef";values.append(.int(Int64(n)))
         }
         return OSCMessage(address,values)
     }
-    public var replyAddress:String {switch self {case .tunerProperties,.stompProperties:return "/getMatchingPropertyValues";case .cloneHierarchy:return "/GetCloneHierarchy";case .snapshotCount:return "/getSnapshotCount";case .autoCab:return "/getPropertyValue";case .product:return "/getProductInfo";case .editBuffer,.editBufferBytes:return "/getEditBufferState";case .activePreset,.dirty:return "/getPropertyValue";case .activeSnapshot:return "/getActiveSnapshotIndex";case .contentRef:return "/GetContentRef";case .contentData:return "/GetContentData";case .container:return "/GetContainerContents"}}
+    public var replyAddress:String {switch self {case .tunerProperties,.stompProperties:return "/getMatchingPropertyValues";case .cloneHierarchy:return "/GetCloneHierarchy";case .snapshotCount:return "/getSnapshotCount";case .autoCab:return "/getPropertyValue";case .product:return "/getProductInfo";case .editBuffer,.editBufferBytes:return "/getEditBufferState";case .activePreset,.dirty:return "/getPropertyValue";case .activeSnapshot:return "/getActiveSnapshotIndex";case .contentRef:return "/GetContentRef";case .contentPath:return "/GetContentPath";case .contentData:return "/GetContentData";case .container:return "/GetContainerContents"}}
     public func decode(_ message:OSCMessage)throws->Value {
+        if case .contentPath=self {guard message.values.count==3,message.values[2].integer==0,let path=message.values[1].text,!path.isEmpty else{throw ProtocolError.invalid("Invalid library file path.")};return .string(path)}
         let position:Int
-        switch self {case .product,.contentRef,.contentData,.container,.cloneHierarchy:position=1;case .editBuffer,.editBufferBytes,.activePreset,.dirty,.autoCab,.stompProperties,.tunerProperties:position=2;case .activeSnapshot,.snapshotCount:guard message.values.count>=2,case .int=message.values[1] else{throw ProtocolError.invalid("Invalid snapshot reply.")};return message.values[1]}
+        switch self {case .product,.contentRef,.contentPath,.contentData,.container,.cloneHierarchy:position=1;case .editBuffer,.editBufferBytes,.activePreset,.dirty,.autoCab,.stompProperties,.tunerProperties:position=2;case .activeSnapshot,.snapshotCount:guard message.values.count>=2,case .int=message.values[1] else{throw ProtocolError.invalid("Invalid snapshot reply.")};return message.values[1]}
         guard message.values.count>position,case .binary(let data)=message.values[position] else{throw ProtocolError.invalid("Missing Stadium reply data.")}
         if self == .editBufferBytes {return .binary(data)}
         if case .contentData=self {return .binary(data)}
