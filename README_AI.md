@@ -214,35 +214,38 @@ before writes. Never remove a test intent marker to replay an uncertain batch.
 Android still has its previous Command Center placeholder; do not claim parity.
 
 
-## iPad Global EQ (0.9.0)
+## iPad Global EQ (0.9.1 candidate)
 
 `GlobalEQState` validates the entire seven-band/three-output schema. Unknown keys,
 missing/duplicate band or parameter IDs, invalid values and wrong output IDs refuse
 writes. Native values include boolean enables, float32 controls and integer slopes.
-`GlobalEQOperation` is restricted to registered `global.eq.sync` and the three known
-`dsp.globaleq.<output>` whole-output properties; native FourCC key encoding is limited
-to this validated settings schema. Do not use it to rewrite arbitrary native presets.
+Numeric native FourCC keys use the exact unsigned32 MessagePack tag observed in the
+desktop. Do not use this settings encoder to rewrite native presets.
 
-`StadiumSession.editGlobalEQ` serializes a fresh state comparison, private settings
-backup, selected-output DSP write/ACK, other-output race check, full sync write/ACK
-and independent readback. An uncertain write is never retried automatically. Do not
-save/recall a preset for Global EQ. Copy includes source bypass; Reset preserves
-selected-output bypass. Original settings must be backed up/restored for hardware
-checks because EQ is inherently global. The qualification harness also proves the
-spare's preset bytes, ID, snapshot and dirty state stayed unchanged.
+`GlobalEQOperation.liveUpdates` emits the native individual band/control properties
+for gestures, output enable and level. Native whole-output Paste/Reset messages are
+separate operations. Session serializes fresh-state comparison, original native and
+effective live backups, each live command/ACK, allowed partial-echo and other-output
+checks, the native `globals.eq` commit/ACK, then `global.eq.sync` publication/readback.
+No uncertain write is automatically retried. Do not save/recall presets for EQ.
+Copy includes source bypass; Reset preserves destination bypass.
 
-Firmware1.4.2 observations: native desktop1.4.0.20 sends DSP changes followed by
-`globals.eq`, which is not registered/readable and did not update `global.eq.sync`
-in our tests, even after reopening the editor. The registered `global.eq.sync`
-property was separately tested and supports full-state write/readback and fresh
-session reads. StadiumPad uses it after DSP acknowledgement. Power-cycle flash
-persistence and acoustic filter matching have not been qualified; do not claim them.
+Important validation correction: owner reported 0.9.0's iPad graph changes did not
+appear on the Stadium's own EQ screen. Earlier41hardware/17native API checks proved
+command ACKs, stored sync-property values and preservation, not actual front-panel
+or audio-engine changes. Never equate sync-mirror readback with independent DSP
+verification.0.9.0 used whole-output messages for gestures and omitted the native
+`globals.eq` commit in favor of a readable sync property. That substitution was
+not justified by `globals.eq` being absent from property lookup: a command-style
+property can be consumed without a registered readable value.0.9.1 restores the
+observed native sequence. The candidate still requires physical-screen comparison;
+no resolved-pedal-update or acoustic/power-cycle persistence claim until verified.
 
 Desktop DSP broadcasts can precede an unchanged/stale sync-property read. The
-connection-scoped EQ shadow applies validated live broadcasts, while changed full
-sync reads replace it. Reset on disconnect. Tests cover stale reads versus live
-updates; never discard this behavior by polling the property alone. The view polls
-while open, coalesces gestures and refuses stale/disconnected edits. Switching away
-discards unsent gesture updates; a sent transaction finishes and is read back.
-`EQResponse` is our calculated visual approximation; Stadium performs the actual
-DSP. No vendor DSP code or art is included. Android EQ is not implemented here.
+connection-scoped EQ shadow applies validated live broadcasts; changed full sync
+reads replace it. Coalesce pending typed properties and preserve newer events across
+older in-flight reads. Reset on disconnect. Gestures coalesce and refuse stale or
+disconnected edits. Leaving the view discards unsent changes; sent transactions
+finish/read back. `EQResponse` is our visual approximation, not vendor DSP.
+Android EQ is not implemented here. Debug-only STADIUM_TRACE_GLOBAL_EQ=1 records a
+private owner-side wire trace capped at8MiB for diagnostics; never publish captures/preset data.

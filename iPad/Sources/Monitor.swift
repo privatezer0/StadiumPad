@@ -72,7 +72,16 @@ import StadiumNetwork
         lastEvent=nil;let current=StadiumSession();session=current;connecting=true;status="Connecting…"
         worker=Task {
             do {
+                #if DEBUG
+                let eqTrace:TraceRecorder?
+                if ProcessInfo.processInfo.environment["STADIUM_TRACE_GLOBAL_EQ"]=="1" {
+                    let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+                    eqTrace=try TraceRecorder(path:folder.appendingPathComponent("global-eq-wire-"+UUID().uuidString+".jsonl").path,maximumBytes:8*1024*1024)
+                }else{eqTrace=nil}
+                try await current.connect(host:host,port:port,trace:eqTrace)
+                #else
                 try await current.connect(host:host,port:port)
+                #endif
                 let state=try await current.snapshot()
                 guard generation==token,!Task.isCancelled else{await current.disconnect();return}
                 snapshot=state;connecting=false;connected=true;status="Connected · live view";report()

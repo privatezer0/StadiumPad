@@ -77,6 +77,11 @@ for the official desktop editor.
 - Read library inventories: Factory/User presets, setlists, IRs, Favorites, Templates,
   Songs and the clone hierarchy reported by the device. File-based models need files.
 
+**Global EQ validation notice:** the owner reported that 0.9.0's iPad graph changed
+without an update on the pedal's own EQ screen. The 0.9.1 candidate now follows the
+native per-control and commit message sequence; physical-screen verification is
+still pending. Acknowledgements and stored sync values alone do not prove DSP changes.
+
 ## What is not implemented yet
 
 Android Command Center and Global EQ editing, song/Showcase editing and

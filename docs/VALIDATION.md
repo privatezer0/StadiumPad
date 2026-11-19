@@ -562,3 +562,26 @@ portrait were inspected; band controls and level fit without workspace scrolling
 Physical touch-drag confirmation was requested from the owner after the harness;
 that direct interaction remains pending, separate from the passed on-device API
 and screen checks. No implementation changes or new TestFlight upload were made.
+
+
+### November19 — physical-screen report and 0.9.1 candidate
+
+Owner confirmed the graph moves on iPad but the Stadium's own Global EQ screen
+stays unchanged. This narrows the failure to physical-screen propagation; no claim
+about audible DSP behavior was established. Earlier ACK/sync-property tests must
+not be read as proof of physical front-panel or audio-engine updates.
+
+Candidate changes: native individual band/control properties for gestures, native
+unsigned32 FourCC tags, the previously omitted `globals.eq` commit before sync
+publication, and a transition check permitting only original/desired parameter
+values while gesture echoes arrive. Copy/Reset keep their native whole-output path.
+Debug-only private wire capture is opt-in and capped at8MiB for the next physical check.
+
+73 Swift tests passed, EQ-targeted9 integration cases passed; full suite62 tests with
+59 passed/3existing catalogue-dependent skips. New regressions enforce native live/
+commit/sync ordering, refused commit without subsequent mirror publication, unsigned
+key framing and partial echoes without unrelated edits. Device Debug and Release
+builds compile. Debug 0.9.1/build19 installed and foreground-launched on Pro for
+qualification. Physical confirmation remains pending; the candidate has not replaced
+the validated release installer inventories and is not claimed to fix the pedal yet.
+No preset save/recall/allocation or TestFlight upload occurred.

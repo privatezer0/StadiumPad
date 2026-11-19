@@ -8,6 +8,7 @@ public enum EQOutput:Int,CaseIterable,Codable,Sendable {
 }
 public enum EQBand:Int,CaseIterable,Codable,Sendable {
     case lowCut,lowShelf,low,mid,high,highShelf,highCut
+    public var wire:String {["lowcut","lowshelf","low","mid","high","highshelf","highcut"][rawValue]}
     public var name:String {["Low Cut","Low Shelf","Low","Mid","High","High Shelf","High Cut"][rawValue]}
     public var parameters:[EQParameter] {switch self {case .lowCut,.highCut:return [.enable,.frequency,.slope];case .lowShelf,.highShelf:return [.enable,.frequency,.gain];default:return [.enable,.frequency,.gain,.q]}}
 }
@@ -61,6 +62,14 @@ public struct GlobalEQState:Sendable {
         for band in EQBand.allCases {for p in band.parameters {let x=parameter(in:a,band:band,parameter:p),y=parameter(in:b,band:band,parameter:p);if p == .enable {if x.boolean != y.boolean {return false}}else if !sameParameterValue(x,y){return false}}}
         return sameParameterValue(a["olvl"]["valu"],b["olvl"]["valu"])
     }
+    public static func isTransition(_ value:Value,from before:Value,to desired:Value)->Bool {
+        guard [before["enab"].boolean,desired["enab"].boolean].contains(value["enab"].boolean) else{return false}
+        for band in EQBand.allCases {for p in band.parameters+[.level] {
+            let current=parameter(in:value,band:band,parameter:p),a=parameter(in:before,band:band,parameter:p),b=parameter(in:desired,band:band,parameter:p)
+            if p == .enable {guard current.boolean==a.boolean || current.boolean==b.boolean else{return false}}
+            else {guard sameParameterValue(current,a) || sameParameterValue(current,b) else{return false}}
+        }};return true
+    }
     public func sameSettings(_ other:GlobalEQState)->Bool {EQOutput.allCases.allSatisfy{Self.sameOutput(output($0),other.output($0))} && value["anyl"]==other.value["anyl"] && value["post"]==other.value["post"]}
 }
 public struct GlobalEQChange:Sendable {
@@ -89,10 +98,28 @@ public enum GlobalEQOperation:Sendable {
         target["drty"] = .bool(!GlobalEQState.sameOutput(.object(target),GlobalEQState.defaults(output),ignoreEnabled:true));root[output.key] = .object(target)
         return try GlobalEQState(value:.object(root),origin:state.origin)
     }
+    /// Match the desktop's live gesture messages. Whole-output replacement is
+    /// reserved for native Paste/Reset, not used as a substitute for a parameter edit.
+    public func liveUpdates(in state:GlobalEQState,output:EQOutput)throws->[EQDSPUpdate] {
+        let desired=try applying(to:state,output:output),prefix="dsp.globaleq."+output.wire
+        switch self {
+        case .parameters(let changes):return try changes.flatMap{try GlobalEQOperation.parameter($0.band,$0.parameter,$0.value).liveUpdates(in:state,output:output)}
+        case .parameter(let band,let parameter,_):
+            let value=desired.parameter(output,band,parameter)
+            if parameter == .level {return [EQDSPUpdate(key:prefix+".level",value:value)]}
+            let suffix:[EQParameter:String] = [.enable:"enable",.frequency:"freq",.gain:"gain",.q:"q",.slope:"slope"]
+            return [EQDSPUpdate(key:prefix+"."+band.wire+"."+suffix[parameter]!,value:.object(["parm":.int(Int64(parameter.rawValue)),"valu":value]))]
+        case .enabled:return [EQDSPUpdate(key:prefix+".enable",value:desired.output(output)["enab"])]
+        case .replace,.reset:return [EQDSPUpdate(key:prefix,value:desired.output(output))]
+        }
+    }
     public static func propertyMessage(key:String,value:Value,id:Int32)throws->OSCMessage {
-        guard key=="global.eq.sync" || EQOutput.allCases.contains(where:{key=="dsp.globaleq."+$0.wire}) else{throw ProtocolError.invalid("Unsupported Global EQ property.")}
-        if key=="global.eq.sync" {_ = try GlobalEQState(value:value)}
+        guard ["global.eq.sync","globals.eq"].contains(key) || EQOutput.allCases.contains(where:{key=="dsp.globaleq."+$0.wire}) else{throw ProtocolError.invalid("Unsupported Global EQ property.")}
+        if ["global.eq.sync","globals.eq"].contains(key) {_ = try GlobalEQState(value:value)}
         else if let output=EQOutput.allCases.first(where:{key=="dsp.globaleq."+$0.wire}) {try GlobalEQState.validateOutput(value,output:output)}
+        return try encodeProperty(key:key,value:value,id:id)
+    }
+    fileprivate static func encodeProperty(key:String,value:Value,id:Int32)throws->OSCMessage {
         let payload:Value = .object(["key_":.string(key),"type":.string("v"),"val_":value])
         var blob=Data("lavppgsm".utf8);blob.append(try nativeEncode(payload))
         return OSCMessage("/PropertyValueSet",[.int(Int64(id)),.int(0),.binary(blob)])
@@ -102,7 +129,7 @@ public enum GlobalEQOperation:Sendable {
         switch value {
         case .object(let map):
             guard map.count<16 else{throw ProtocolError.invalid("EQ object too large.")};var bytes=Data([0x80|UInt8(map.count)])
-            for key in map.keys.sorted(){guard key.utf8.count==4 else{throw ProtocolError.invalid("Unknown native EQ key.")};let code=key.utf8.reduce(Int64(0)){($0<<8)|Int64($1)};bytes.append(try MessagePack.encode(.int(code)));bytes.append(try nativeEncode(map[key]!))};return bytes
+            for key in map.keys.sorted(){guard key.utf8.count==4 else{throw ProtocolError.invalid("Unknown native EQ key.")};let code=key.utf8.reduce(UInt32(0)){($0<<8)|UInt32($1)};bytes.append(0xce);bytes.appendBE(code);bytes.append(try nativeEncode(map[key]!))};return bytes
         case .array(let values):guard values.count<16 else{throw ProtocolError.invalid("EQ array too large.")};var bytes=Data([0x90|UInt8(values.count)]);for value in values {bytes.append(try nativeEncode(value))};return bytes
         default:return try MessagePack.encode(value)
         }
@@ -122,7 +149,7 @@ public enum GlobalEQUpdate:Sendable {
             if key==prefix+".enable",let enabled=value.boolean{return .output(output,.enabled(enabled))}
             if key==prefix+".level",(try? EQParameter.level.validated(value)) != nil{return .output(output,.parameter(.mid,.level,value))}
             for band in EQBand.allCases {
-                let wire=["lowcut","lowshelf","low","mid","high","highshelf","highcut"][band.rawValue]
+                let wire=band.wire
                 for parameter in band.parameters {
                     let name:[EQParameter:String] = [.enable:"enable",.frequency:"freq",.gain:"gain",.q:"q",.slope:"slope"]
                     if key==prefix+"."+wire+"."+name[parameter]!,value["parm"].integer==parameter.rawValue,(try? parameter.validated(value["valu"])) != nil {return .output(output,.parameter(band,parameter,value["valu"]))}
@@ -143,4 +170,11 @@ public enum GlobalEQUpdate:Sendable {
     public func applying(to state:GlobalEQState)throws->GlobalEQState {
         switch self {case .sync(let value):return try GlobalEQState(value:value,origin:state.origin);case .output(let output,let operation):return try operation.applying(to:state,output:output)}
     }
+}
+
+/// Constructed only by validated GlobalEQOperation; callers cannot supply arbitrary keys.
+public struct EQDSPUpdate:Sendable {
+    public let key:String;public let value:Value
+    fileprivate init(key:String,value:Value){self.key=key;self.value=value}
+    public func message(id:Int32)throws->OSCMessage {try GlobalEQOperation.encodeProperty(key:key,value:value,id:id)}
 }

@@ -154,14 +154,21 @@ Native Copy/Paste and Reset send the complete selected output; Paste includes th
 source bypass state, while Reset keeps the destination bypass. Native properties
 use numeric FourCC map keys. The typed encoder refuses arbitrary keys and schemas.
 
-On tested firmware1.4.2, desktop1.4.0.20's subsequent `globals.eq` write received an
-ACK but remained unregistered/unreadable and left fresh sync reads unchanged.
-The registered `global.eq.sync` property was qualified with reversible settings
-and fresh-session readback. StadiumPad sends the selected-output DSP update,
-checks other outputs for races, then publishes the full validated sync state and
-verifies independent readback. Native bytes and effective live settings are backed
-up first. Uncertain writes stop without automatic retries. No preset Save occurs.
-Flash persistence through a pedal power cycle has not been qualified.
+On firmware1.4.2, desktop1.4.0.20 sends individual parameter properties for live
+editing (`dsp.globaleq.<output>.<band>.<control>`), separate enable/level values,
+then a complete `globals.eq` commit. This last message is not a registered readable
+property; that does not establish that its command handler has no side effects.
+The 0.9.0 implementation incorrectly omitted it, substituted a `global.eq.sync`
+publication and used whole-output messages for every gesture. Owner testing found
+the iPad graph changed while the physical pedal's EQ screen stayed unchanged.
+
+The 0.9.1 candidate sends native per-control live messages, checks each ACK and allowed
+partial readback, checks unrelated outputs, sends the native commit/ACK, then
+publishes/verifies the sync mirror. FourCC keys use native uint32 MessagePack tags.
+Original bytes/effective live state are backed up, and uncertain writes never retry.
+Sync-property readback proves the stored mirror, not independent DSP or physical
+screen changes. Front-panel qualification remains required for this candidate;
+flash persistence through a pedal power cycle is unqualified.
 
 DSP property broadcasts are applied to a connection-local shadow because native
 editor changes can arrive without a changed sync-property read. Pending updates

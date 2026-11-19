@@ -31,9 +31,10 @@ final class GlobalEQTests:XCTestCase {
     }
     func testOnlyValidatedEQUsesNativeFourCCWireKeys()throws {
         let s=try initial(),m=try GlobalEQOperation.propertyMessage(key:"global.eq.sync",value:s.value,id:11),bytes=try XCTUnwrap(m.values[2].data)
-        XCTAssertEqual(m.address,"/PropertyValueSet");XCTAssertTrue(bytes.starts(with:Data("lavppgsm".utf8)));XCTAssertEqual(bytes[9],0xd2) // key_ integer FourCC, not a string
+        XCTAssertEqual(m.address,"/PropertyValueSet");XCTAssertTrue(bytes.starts(with:Data("lavppgsm".utf8)));XCTAssertEqual(bytes[9],0xce) // Native unsigned FourCC tag, not a string/signed integer
         let decoded=try MessagePack.decode(bytes);XCTAssertEqual(decoded["key_"],.string("global.eq.sync"));XCTAssertEqual(decoded["val_"],s.value)
-        XCTAssertThrowsError(try GlobalEQOperation.propertyMessage(key:"globals.eq",value:s.value,id:1))
+        XCTAssertNoThrow(try GlobalEQOperation.propertyMessage(key:"globals.eq",value:s.value,id:1))
+        XCTAssertThrowsError(try GlobalEQOperation.propertyMessage(key:"global.eq.unknown",value:s.value,id:1))
         XCTAssertThrowsError(try GlobalEQOperation.propertyMessage(key:"dsp.globaleq.xlr",value:s.output(.quarter),id:1))
     }
     func testComparisonIgnoresArrayOrderAndDirtyButChecksAllSettings()throws {
@@ -69,6 +70,29 @@ final class GlobalEQTests:XCTestCase {
         XCTAssertEqual(a.pendingKey,b.pendingKey)
         XCTAssertNotEqual(a.pendingKey,GlobalEQUpdate.output(.phones,.parameter(.mid,.gain,.number(1))).pendingKey)
         XCTAssertNotEqual(a.pendingKey,GlobalEQUpdate.output(.quarter,.parameter(.mid,.frequency,.number(1000))).pendingKey)
+    }
+
+    func testLiveDragUsesNativeIndividualParameterProperties()throws {
+        let before=try initial(),operation=GlobalEQOperation.parameters([GlobalEQChange(.mid,.frequency,.number(2500)),GlobalEQChange(.mid,.gain,.number(-0.125))])
+        let messages=try operation.liveUpdates(in:before,output:.quarter)
+        XCTAssertEqual(messages.map(\.key),["dsp.globaleq.qtr.mid.freq","dsp.globaleq.qtr.mid.gain"])
+        let gainBlob=try XCTUnwrap(messages[1].message(id:2).values[2].data)
+        XCTAssertEqual(gainBlob.map{String(format:"%02x",$0)}.joined(),"6c6176707067736d83ce6b65795fb96473702e676c6f62616c65712e7174722e6d69642e6761696ece74797065a176ce76616c5f82ce7061726d03ce76616c75cbbfc0000000000000")
+        for (index,message) in messages.enumerated() {
+            let wire=try message.message(id:Int32(index+1)),blob=try XCTUnwrap(wire.values[2].data),body=try MessagePack.decode(blob)
+            XCTAssertEqual(blob[9],0xce);XCTAssertEqual(body["key_"].text,message.key)
+            XCTAssertEqual(body["val_"]["parm"].integer,index==0 ? 2:3)
+        }
+        XCTAssertEqual(try GlobalEQOperation.enabled(true).liveUpdates(in:before,output:.xlr).first?.key,"dsp.globaleq.xlr.enable")
+        XCTAssertEqual(try GlobalEQOperation.parameter(.mid,.level,.number(-1)).liveUpdates(in:before,output:.phones).first?.value,.number(-1))
+        XCTAssertEqual(try GlobalEQOperation.reset.liveUpdates(in:before,output:.quarter).first?.key,"dsp.globaleq.qtr")
+    }
+    func testPartialGestureEchoAllowsOnlyBeforeOrDesiredValues()throws {
+        let before=try initial(),desired=try GlobalEQOperation.parameters([GlobalEQChange(.mid,.frequency,.number(2500)),GlobalEQChange(.mid,.gain,.number(2))]).applying(to:before,output:.quarter)
+        let partial=try GlobalEQOperation.parameter(.mid,.gain,.number(2)).applying(to:before,output:.quarter)
+        XCTAssertTrue(GlobalEQState.isTransition(partial.output(.quarter),from:before.output(.quarter),to:desired.output(.quarter)))
+        let concurrent=try GlobalEQOperation.parameter(.high,.gain,.number(1)).applying(to:partial,output:.quarter)
+        XCTAssertFalse(GlobalEQState.isTransition(concurrent.output(.quarter),from:before.output(.quarter),to:desired.output(.quarter)))
     }
 
 }

@@ -558,12 +558,16 @@ extension StadiumSession {
         _ = try await backups.retain(contentID:-100,name:"Global EQ native settings",data:before.raw)
         let effective=try GlobalEQOperation.propertyMessage(key:"global.eq.sync",value:before.value,id:0).values[2].data!
         _ = try await backups.retain(contentID:-100,name:"Global EQ live settings",data:effective)
-        let live=try await exchange({try GlobalEQOperation.propertyMessage(key:"dsp.globaleq."+output.wire,value:desired.output(output),id:$0)},reply:"/status");try EditCommand.acknowledge(live)
-        // Publish the registered device state separately from live DSP. Firmware 1.4.2
-        // accepts native editor globals.eq writes but does not expose/read them back.
-        // global.eq.sync is the registered full-state property, qualified on hardware.
+        for update in try operation.liveUpdates(in:before,output:output) {
+            let live=try await exchange(update.message,reply:"/status");try EditCommand.acknowledge(live)
+        }
+        // Check unrelated outputs before native commit and sync publication.
+        // Neither an echoed property nor an ACK proves a physical-screen refresh.
         let intermediate=try await globalEQUnlocked()
-        guard (GlobalEQState.sameOutput(intermediate.output(output),before.output(output)) || GlobalEQState.sameOutput(intermediate.output(output),desired.output(output))),EQOutput.allCases.filter({$0 != output}).allSatisfy({GlobalEQState.sameOutput(before.output($0),intermediate.output($0))}),before.value["anyl"]==intermediate.value["anyl"],before.value["post"]==intermediate.value["post"] else{throw ProtocolError.invalid("Another EQ output changed during the update. No persistence or retry was sent.")}
+        guard GlobalEQState.isTransition(intermediate.output(output),from:before.output(output),to:desired.output(output)),EQOutput.allCases.filter({$0 != output}).allSatisfy({GlobalEQState.sameOutput(before.output($0),intermediate.output($0))}),before.value["anyl"]==intermediate.value["anyl"],before.value["post"]==intermediate.value["post"] else{throw ProtocolError.invalid("Another EQ output changed during the update. No persistence or retry was sent.")}
+        // Native globals.eq is an event-style commit, not a readable registered
+        // property. Do not substitute publishing the sync mirror for this command.
+        let committed=try await exchange({try GlobalEQOperation.propertyMessage(key:"globals.eq",value:desired.value,id:$0)},reply:"/status");try EditCommand.acknowledge(committed)
         let saved=try await exchange({try GlobalEQOperation.propertyMessage(key:"global.eq.sync",value:desired.value,id:$0)},reply:"/status");try EditCommand.acknowledge(saved)
         let after=try await globalEQUnlocked()
         guard after.sameSettings(desired) else{throw ProtocolError.invalid("Global EQ readback did not match. Nothing was retried.")}
