@@ -428,7 +428,7 @@ public installation. No new TestFlight upload or public invitation is claimed.
 IR import/assignment, clone-to-block assignment and other Librarian write functions
 remain unimplemented. Complete desktop parity is not claimed.
 
-## November18 — iPad Command Center 0.8.0/build17 candidate
+## November18 — iPad Command Center 0.8.0/build17
 
 Implemented full-width iPad Command Center, controller map, both stomp banks,
 16Instants, X/Y, onboard EXP1/2/toe, configured external inputs, two command slots,
@@ -468,10 +468,29 @@ unqualified. This is assignment editing, not Gig View command execution.
   copy. Research observer/discovery advertising stopped; desktop reconnected
   directly to the physical Stadium over Wi-Fi.
 
-**Native iPad qualification pending:** Debug0.8.0/build17 compiles and installs on
-Pro, but iPadOS refuses launch while passcode-locked. The owner has been asked to
-unlock it. The prepared explicit Debug harness will test actual Monitor assignment,
-EXP2, snapshot control, Label/Color and persistence, then capture Command Center at
-Pro/regular-landscape/portrait sizes. No native layout/touch qualification, Release
-installer promotion, TestFlight upload or complete desktop parity is claimed yet.
-Validated installer mirrors remain at iPad0.7.0/build16 until this gate passes.
+Native Pro qualification completed after the owner unlocked it:
+
+- The explicit native Monitor harness passed18checks: MIDI value/paired Action,
+  snapshot enable/disable, EXP2 create/edit/remove, custom label/blue LED, Save,
+  switch-away/reload, persisted command/appearance and unchanged tone blocks.
+  Tests remained confined to the previously allocated Commands Test spare.
+- Actual Pro screen and native Pro/regular-landscape/portrait renders inspected.
+  Initial regular render exposed a clipped bottom slider; portrait exposed a
+  scaled-map offset. Corrected map layout alignment, available inspector height,
+  centered heading and pedal outlines; replaced unavailable trigger symbol with
+  an original vector drum. Refreshed native renders fit without workspace scrolling.
+  Additional six-field Bank/Program and Note previews use a detached synthetic
+  render monitor only; they do not write or replace live pedal state.
+- Release0.8.0/build17 compiled, installed and cold-launched on Pro. Independent
+  installed-app inventory confirms version/build; fresh normal Release monitoring
+  confirms connected firmware1.4.2,20blocks,97named parameters and clean state.
+  The test spare remains available for inspection. All279original hashes still match.
+- Packaged development-signed IPA verified byte-for-byte against the signed app.
+  Both complete13product installer inventories/readbacks passed; unrelated products
+  retained. Current iPad IPA SHA-256:
+  `fae7d9caa0632ba29e50d00ce21adc91fcd3b94b339540ae7c15a0b2105b158e`.
+
+Regular-iPad sizing is native UIKit rendering on the Pro, not separate physical
+regular-iPad touch qualification. External Switch/Trigger modes and all command
+execution destinations are not physically qualified. Assignment editing is verified;
+no complete desktop parity, new TestFlight upload or Android Command Center claim.

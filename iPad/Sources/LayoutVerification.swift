@@ -1,6 +1,7 @@
 #if DEBUG
 import SwiftUI
 import UIKit
+import StadiumProtocol
 
 @MainActor func captureEditorLayouts(monitor:StadiumMonitor,discovery:StadiumDiscovery,selection:BlockSelection?) async {
     let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
@@ -14,8 +15,8 @@ import UIKit
             if let block,let context=try? state.context(for:block) {cases.append((name,CGSize(width:1024,height:724),BlockSelection(block:block,context:context)))}
         }
     }
-    func render(_ name:String,_ size:CGSize,_ currentSelection:BlockSelection?,_ section:EditorSection = .home,_ mode:EditorMode = .preset,_ focus:Bool=false,_ libraryCategory:LibraryCategory = .presets)async {
-        let root=StadiumView(initialSelection:currentSelection,preview:true,initialSection:section,initialMode:mode,initialFocus:focus,initialLibraryCategory:libraryCategory).environmentObject(monitor).environmentObject(discovery).preferredColorScheme(.dark)
+    func render(_ name:String,_ size:CGSize,_ currentSelection:BlockSelection?,_ section:EditorSection = .home,_ mode:EditorMode = .preset,_ focus:Bool=false,_ libraryCategory:LibraryCategory = .presets,_ renderMonitor:StadiumMonitor?=nil)async {
+        let root=StadiumView(initialSelection:currentSelection,preview:true,initialSection:section,initialMode:mode,initialFocus:focus,initialLibraryCategory:libraryCategory).environmentObject(renderMonitor ?? monitor).environmentObject(discovery).preferredColorScheme(.dark)
         let host=UIHostingController(rootView:root);host.view.frame=CGRect(origin:.zero,size:size);host.view.backgroundColor = .black
         host.view.setNeedsLayout();host.view.layoutIfNeeded()
         try? await Task.sleep(for:.milliseconds(250))
@@ -26,6 +27,17 @@ import UIKit
     for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render("librarian-"+name,size,selection,.librarian)}
     for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render("clones-"+name,size,selection,.librarian,.preset,false,.clones)}
     for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render("commands-"+name,size,selection,.commands)}
+    // Preview-only six-field MIDI variants; no synthetic values enter the live monitor.
+    if let state=monitor.snapshot,let context=try? CommandContext(state:state,source:CommandSource(.stomp,number:1,bank:1),slot:0),let cid=context.commandID,context.family == .midi {
+        for (name,subtype) in [("bank",0),("note",2)] {
+            let copy=StadiumMonitor();copy.connected=true;copy.stompProperties=monitor.stompProperties;copy.commandProperties=monitor.commandProperties
+            var buffer=state.editBuffer.object,graph=buffer["cg__"]!.object,entities=graph["entt"]!.object
+            entities["cmnd"] = .array(entities["cmnd"]!.items.map{command in guard command["cid_"].integer==cid else{return command};var values=command.object;values["pvlb"] = .int(Int64(subtype));return .object(values)})
+            graph["entt"] = .object(entities);buffer["cg__"] = .object(graph)
+            copy.snapshot=DeviceSnapshot(product:state.product,editBuffer:.object(buffer),preset:state.preset,activeSnapshot:state.activeSnapshot,origin:state.origin)
+            await render("commands-regular-"+name,CGSize(width:1024,height:724),selection,.commands,.preset,false,.presets,copy)
+        }
+    }
     for section in [EditorSection.librarian,.commands,.eq,.songs] {await render("section-"+section.rawValue,CGSize(width:1024,height:724),selection,section)}
     for mode in [EditorMode.scene,.footswitch,.tuner] {
         for (name,size) in [("pro",CGSize(width:1366,height:980)),("regular",CGSize(width:1024,height:724)),("portrait",CGSize(width:768,height:980))] {await render(mode.rawValue+"-"+name,size,selection,.home,mode)}

@@ -29,7 +29,7 @@ struct CommandCenterView:View {
         GeometryReader {geometry in
             VStack(spacing:0) {
                 titleBar
-                sourceMap.frame(height:max(215,min(310,geometry.size.height*0.43)))
+                sourceMap.frame(height:max(190,min(310,geometry.size.height*0.34)))
                 HStack(spacing:12) {
                     ForEach(0..<source.slots,id:\.self) {index in let family=slotFamily(index);Button {slot=index} label:{Image(systemName:family.icon).foregroundStyle(family.tint).font(.system(size:19)).frame(width:32,height:32).background(index==slot ? .white.opacity(0.12):.clear,in:RoundedRectangle(cornerRadius:3))}.accessibilityLabel("Select Command \(index+1)")}
                     Spacer();Text(source.name).font(.system(size:23,weight:.light));Spacer()
@@ -53,14 +53,16 @@ struct CommandCenterView:View {
         .alert(editParameter?.name ?? "Value",isPresented:Binding(get:{editParameter != nil},set:{if !$0 {editParameter=nil}})){TextField("Value",text:$numericDraft).keyboardType(.numbersAndPunctuation);Button("Cancel",role:.cancel){editParameter=nil};Button("Set"){if let p=editParameter,let n=Double(numericDraft){setParameter(p,.number(n))};editParameter=nil}}
     }
     private var titleBar:some View {
-        HStack(spacing:10) {
-            Spacer(minLength:0);Text("Command Center").font(.system(size:28,weight:.light));Spacer(minLength:0)
+        GeometryReader {geometry in ZStack {
+            Text("Command Center").font(.system(size:geometry.size.width<900 ? 22:28,weight:.light))
+            HStack(spacing:10) {Spacer(minLength:0)
             if let state=monitor.snapshot {
-                Menu {ForEach(state.snapshots){s in Button(s.name){Task {await monitor.activate(s.id,expectedID:state.presetID,expectedSnapshot:state.activeSnapshot)}}.disabled(!s.defined)}} label:{Label("\(state.activeSnapshot+1) · \(state.snapshots.first{$0.id==state.activeSnapshot}?.name ?? "Snapshot")",systemImage:"square.stack").font(.callout).lineLimit(1).frame(maxWidth:215).padding(9).background(.black.opacity(0.3),in:RoundedRectangle(cornerRadius:5))}.accessibilityLabel("Command Center snapshot").disabled(monitor.busy)
-                ForEach([-1,1],id:\.self){direction in Button {let choices=state.snapshots.filter(\.defined).sorted{$0.id<$1.id};let target=direction>0 ? choices.first{$0.id>state.activeSnapshot} ?? choices.first:choices.last{$0.id<state.activeSnapshot} ?? choices.last;if let target {Task {await monitor.activate(target.id,expectedID:state.presetID,expectedSnapshot:state.activeSnapshot)}}} label:{Image(systemName:direction<0 ? "chevron.left":"chevron.right").frame(width:25,height:36)}.accessibilityLabel(direction<0 ? "Previous snapshot":"Next snapshot").disabled(monitor.busy)}
+                Menu {ForEach(state.snapshots){s in Button(s.name){Task {await monitor.activate(s.id,expectedID:state.presetID,expectedSnapshot:state.activeSnapshot)}}.disabled(!s.defined)}} label:{Label("\(state.activeSnapshot+1) · \(state.snapshots.first{$0.id==state.activeSnapshot}?.name ?? "Snapshot")",systemImage:"square.stack").font(.callout).lineLimit(1).frame(width:geometry.size.width<900 ? 175:215).padding(9).background(.black.opacity(0.3),in:RoundedRectangle(cornerRadius:5))}.accessibilityLabel("Command Center snapshot").disabled(monitor.busy)
+                if geometry.size.width>=900 {ForEach([-1,1],id:\.self){direction in Button {let choices=state.snapshots.filter(\.defined).sorted{$0.id<$1.id};let target=direction>0 ? choices.first{$0.id>state.activeSnapshot} ?? choices.first:choices.last{$0.id<state.activeSnapshot} ?? choices.last;if let target {Task {await monitor.activate(target.id,expectedID:state.presetID,expectedSnapshot:state.activeSnapshot)}}} label:{Image(systemName:direction<0 ? "chevron.left":"chevron.right").frame(width:25,height:36)}.accessibilityLabel(direction<0 ? "Previous snapshot":"Next snapshot").disabled(monitor.busy)}}
                 Button {confirmSave=true} label:{SaveDiskIcon().frame(width:36,height:36)}.accessibilityLabel("Save Command Center preset").disabled(monitor.busy || state.preset["ownr"].integer != 1)
             }
-        }.padding(.horizontal,16).frame(height:58).background(EditorTheme.header)
+            }.padding(.horizontal,16)
+        }}.frame(height:58).background(EditorTheme.header)
     }
     private var sourceMap:some View {
         GeometryReader {geometry in
@@ -82,7 +84,7 @@ struct CommandCenterView:View {
                     sourceButton(CommandSource(.externalSwitch,number:i),shape:.stomp).frame(width:55,height:55).position(x:CGFloat(i)*73+744,y:118)
                     sourceButton(CommandSource(.expression,number:i+1),shape:.pedal).frame(width:58,height:115).position(x:CGFloat(i)*73+744,y:229)
                 }
-            }.frame(width:1000,height:300).scaleEffect(scale,anchor:.topLeading).frame(width:1000*scale,height:300*scale).position(x:geometry.size.width/2,y:geometry.size.height/2)
+            }.frame(width:1000,height:300).scaleEffect(scale,anchor:.topLeading).frame(width:1000*scale,height:300*scale,alignment:.topLeading).position(x:geometry.size.width/2,y:geometry.size.height/2)
         }.background(Color(white:0.065))
     }
     private func sourceButton(_ item:CommandSource,shape:CommandSourceGlyph.Kind)->some View {
@@ -116,7 +118,7 @@ struct CommandCenterView:View {
                 if definitions.isEmpty {Text("Command metadata is unavailable for this editor version.").foregroundStyle(.secondary).padding(20)}
                 else {GeometryReader {geometry in
                     let fields=definitions.filter{$0.visible(source:source,family:c.family,command:c.command)}
-                    VStack(spacing:5) {ForEach(fields){p in parameterRow(p,context:c,height:min(75,max(44,(geometry.size.height-20)/CGFloat(max(1,fields.count))-5))) };Spacer(minLength:0)}.padding(.horizontal,18).padding(.vertical,10)
+                    VStack(spacing:5) {ForEach(fields){p in parameterRow(p,context:c,height:min(75,max(38,(geometry.size.height-20)/CGFloat(max(1,fields.count))-5))) };Spacer(minLength:0)}.padding(.horizontal,18).padding(.vertical,10)
                 }}
             } else if !monitor.connected {Text("Connect to Stadium to edit Command Center.").foregroundStyle(.secondary).padding(20)}
         }.background(.black).id("\(source.id)-\(slot)-\(context?.family.rawValue ?? 0)")
@@ -134,7 +136,7 @@ struct CommandCenterView:View {
                 else if p.name=="Setlist" || p.name=="Preset" {presetDestination(p,context:c)}
                 else {Button {numericDraft=value.scalar;editParameter=p} label:{Text(p.display(value)).font(.system(size:14).monospacedDigit()).foregroundStyle(c.command[p.snapshotKey].boolean==true ? .white:tint)};Stepper("",onIncrement:{step(p,1,c)},onDecrement:{step(p,-1,c)}).labelsHidden().scaleEffect(0.65).frame(width:65,height:28)}
             }
-            if p.options==nil && !["Setlist","Preset"].contains(p.name) {CommandValueSlider(parameter:p,value:value,tint:tint){setParameter(p,$0)}.frame(height:max(14,min(22,height-30)))}
+            if p.options==nil && !["Setlist","Preset"].contains(p.name) {CommandValueSlider(parameter:p,value:value,tint:tint){setParameter(p,$0)}.frame(height:max(8,min(22,height-32)))}
         }.frame(height:height,alignment:.top).disabled(!enabled || locked)
     }
     private func optionsControl(_ p:CommandParameter,options:[String],value:Value,context c:CommandContext,tint:Color)->some View {
@@ -202,8 +204,11 @@ struct CommandSourceGlyph:View {
                 switch kind {
                 case .bolt:Image(systemName:"bolt").resizable().scaledToFit().padding(5).foregroundStyle(stroke)
                 case .axisX,.axisY:Image(systemName:kind == .axisX ? "arrow.left.and.right.circle":"arrow.up.and.down.circle").resizable().scaledToFit().padding(5).foregroundStyle(stroke)
-                case .pedal:Path{p in p.move(to:CGPoint(x:w*0.23,y:1));p.addLines([CGPoint(x:w*0.83,y:1),CGPoint(x:w*0.83,y:h*0.35),CGPoint(x:w*0.64,y:h*0.48),CGPoint(x:w*0.64,y:h-1),CGPoint(x:w*0.36,y:h-1),CGPoint(x:w*0.36,y:h*0.48),CGPoint(x:w*0.23,y:h*0.35)]);p.closeSubpath()}.fill(.black.opacity(0.4)).overlay(Path{p in p.move(to:CGPoint(x:w*0.23,y:1));p.addLines([CGPoint(x:w*0.83,y:1),CGPoint(x:w*0.83,y:h*0.35),CGPoint(x:w*0.64,y:h*0.48),CGPoint(x:w*0.64,y:h-1),CGPoint(x:w*0.36,y:h-1),CGPoint(x:w*0.36,y:h*0.48),CGPoint(x:w*0.23,y:h*0.35)]);p.closeSubpath()}.stroke(stroke,lineWidth:selected ? 2:1))
-                case .drum:Image(systemName:"drum").resizable().scaledToFit().padding(4).foregroundStyle(stroke)
+                case .pedal:CommandPedalOutline().fill(.black.opacity(0.4)).overlay(CommandPedalOutline().stroke(stroke,lineWidth:selected ? 2:1))
+                case .drum:
+                    RoundedRectangle(cornerRadius:4).stroke(stroke,lineWidth:1).frame(width:w*0.75,height:h*0.48).offset(y:h*0.06)
+                    Ellipse().fill(Color(white:0.065)).overlay(Ellipse().stroke(stroke,lineWidth:1)).frame(width:w*0.75,height:h*0.25).offset(y:-h*0.17)
+                    ForEach(0..<4,id:\.self){i in Rectangle().fill(stroke).frame(width:1,height:h*0.2).position(x:w*(0.24+Double(i)*0.17),y:h*0.63)}
                 case .stomp:
                     Ellipse().fill(color).frame(width:w*0.83,height:h*0.38).offset(y:h*0.26).overlay(Ellipse().stroke(selected ? .white:.clear,lineWidth:2).frame(width:w*0.83,height:h*0.38).offset(y:h*0.26))
                     RoundedRectangle(cornerRadius:w*0.15).fill(LinearGradient(colors:[Color(white:0.3),Color(white:0.1)],startPoint:.top,endPoint:.bottom)).frame(width:w*0.46,height:h*0.58).overlay(RoundedRectangle(cornerRadius:w*0.15).stroke(stroke,lineWidth:selected ? 2:1).frame(width:w*0.46,height:h*0.58))
@@ -211,5 +216,12 @@ struct CommandSourceGlyph:View {
                 }
             }.frame(width:w,height:h)
         }
+    }
+}
+
+private struct CommandPedalOutline:Shape {
+    func path(in rect:CGRect)->Path {
+        let points:[CGPoint]=[CGPoint(x:0.2,y:0),CGPoint(x:0.8,y:0),CGPoint(x:0.8,y:0.4),CGPoint(x:0.65,y:0.5),CGPoint(x:0.65,y:1),CGPoint(x:0.35,y:1),CGPoint(x:0.35,y:0.5),CGPoint(x:0.2,y:0.4)]
+        return Path {path in for (index,point) in points.enumerated(){let position=CGPoint(x:point.x*rect.width,y:point.y*rect.height);if index==0 {path.move(to:position)} else {path.addLine(to:position)}};path.closeSubpath()}
     }
 }
