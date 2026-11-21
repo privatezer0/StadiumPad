@@ -43,4 +43,39 @@ import StadiumProtocol
         }
     }
 }
+@MainActor func verifyGlobalEQStream(_ monitor:StadiumMonitor)async {
+    let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+    let marker=folder.appendingPathComponent("global-eq-stream-check-started")
+    var checks=0,maxLatency=0.0
+    do {
+        let permission=try JSONSerialization.jsonObject(with:Data(contentsOf:folder.appendingPathComponent("global-eq-stream-intent.json"))) as? [String:Bool]
+        guard permission?["authorizeGlobalEQCheck"]==true,!FileManager.default.fileExists(atPath:marker.path),let preset=monitor.snapshot,preset.presetName=="StadiumPad Commands Test" else{throw ProtocolError.invalid("A fresh reviewed stream-check intent and the spare preset are required.")}
+        await monitor.refreshGlobalEQ()
+        guard let initial=monitor.globalEQ,initial.output(.quarter)["enab"].boolean==false else{throw ProtocolError.invalid("The reviewed bypassed EQ is required for this small live test.")}
+        try initial.raw.write(to:folder.appendingPathComponent("global-eq-stream-original.bin"),options:.atomic)
+        try Data("started".utf8).write(to:marker,options:.atomic)
+        let frequency=initial.parameter(.quarter,.mid,.frequency).numeric!,gain=initial.parameter(.quarter,.mid,.gain).numeric!
+        for index in 0..<12 {
+            if index==6 {monitor.finishGlobalEQGesture(output:.quarter);try await Task.sleep(for:.milliseconds(100))}
+            guard let expected=monitor.globalEQ else{throw ProtocolError.invalid("Live EQ became unavailable.")}
+            let changes=[GlobalEQChange(.mid,.frequency,.number(min(20000,max(20,frequency+Double(index+1)*2)))),GlobalEQChange(.mid,.gain,.number(min(24,max(-24,gain+Double(index+1)*0.01))))]
+            let start=Date()
+            guard await monitor.editGlobalEQ(expected,.quarter,.parameters(changes),live:true),monitor.errorText==nil else{throw ProtocolError.invalid(monitor.errorText ?? "Live EQ edit failed.")}
+            maxLatency=max(maxLatency,Date().timeIntervalSince(start));checks+=1
+            try await Task.sleep(for:.milliseconds(40))
+        }
+        monitor.finishGlobalEQGesture(output:.quarter);await monitor.waitForGlobalEQConfirmation()
+        guard monitor.errorText==nil,let live=monitor.globalEQ else{throw ProtocolError.invalid(monitor.errorText ?? "Commit check failed.")}
+        let stored=try GlobalEQState(value:MessagePack.decode(live.raw)["val_"])
+        guard stored.sameSettings(live) else{throw ProtocolError.invalid("Final stored settings differ from live settings.")}
+        guard await monitor.editGlobalEQ(live,.quarter,.replace(initial.output(.quarter))),monitor.globalEQ?.sameSettings(initial)==true else{throw ProtocolError.invalid(monitor.errorText ?? "Original EQ restoration was not confirmed.")}
+        checks+=1
+        guard monitor.snapshot?.presetID==preset.presetID,monitor.snapshot?.activeSnapshot==preset.activeSnapshot,monitor.snapshot?.editBuffer==preset.editBuffer,monitor.snapshot?.dirty==preset.dirty else{throw ProtocolError.invalid("Preset state changed during the stream check.")}
+        let report:[String:Any] = ["passed":true,"checks":checks,"restored":true,"presetUnchanged":true,"maximumLiveLatencySeconds":maxLatency,"build":Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "unknown"]
+        try JSONSerialization.data(withJSONObject:report,options:.prettyPrinted).write(to:folder.appendingPathComponent("global-eq-stream-verification.json"),options:.atomic)
+    }catch {
+        let report:[String:Any] = ["passed":false,"checks":checks,"maximumLiveLatencySeconds":maxLatency,"error":error.localizedDescription]
+        try? JSONSerialization.data(withJSONObject:report,options:.prettyPrinted).write(to:folder.appendingPathComponent("global-eq-stream-verification.json"),options:.atomic)
+    }
+}
 #endif

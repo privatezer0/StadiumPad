@@ -297,14 +297,18 @@ import StadiumNetwork
         }
     }
     #if DEBUG
+    func waitForGlobalEQConfirmation()async {await eqCommitTask?.value}
     private func reportEQEdit(_ stage:String,_ expected:GlobalEQState,_ output:EQOutput,_ operation:GlobalEQOperation,error:String?=nil) {
         guard ProcessInfo.processInfo.environment["STADIUM_TRACE_GLOBAL_EQ"]=="1" else{return}
         let updates=(try? operation.liveUpdates(in:expected,output:output)) ?? []
-        var report:[String:Any] = ["at":Date().timeIntervalSince1970,"stage":stage,"busy":busy,"connected":connected,"output":output.rawValue,"settings":expected.value.json,"updates":updates.map{["key":$0.key,"value":$0.value.json]}]
+        var report:[String:Any] = ["diagnosticSchema":2,"build":Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "unknown","at":Date().timeIntervalSince1970,"stage":stage,"busy":busy,"connected":connected,"output":output.rawValue,"settings":expected.value.json,"updates":updates.map{["key":$0.key,"value":$0.value.json]}]
         if let error {report["error"]=error}
         let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
-        try? JSONSerialization.data(withJSONObject:report,options:.sortedKeys).write(to:folder.appendingPathComponent("global-eq-last-edit.json"),options:.atomic)
-        if stage.contains("failed") {try? JSONSerialization.data(withJSONObject:report,options:.sortedKeys).write(to:folder.appendingPathComponent("global-eq-last-failure.json"),options:.atomic)}
+        do {
+            let data=try JSONSerialization.data(withJSONObject:report,options:.sortedKeys)
+            try data.write(to:folder.appendingPathComponent("global-eq-last-edit.json"),options:.atomic)
+            if stage.contains("failed") {try data.write(to:folder.appendingPathComponent("global-eq-last-failure.json"),options:.atomic)}
+        }catch {try? Data(error.localizedDescription.utf8).write(to:folder.appendingPathComponent("global-eq-diagnostic-error.txt"),options:.atomic)}
     }
     #endif
     func editCommand(_ context:CommandContext,_ operation:CommandCenterOperation)async->Bool {

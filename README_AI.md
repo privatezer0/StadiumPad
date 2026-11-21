@@ -214,7 +214,7 @@ before writes. Never remove a test intent marker to replay an uncertain batch.
 Android still has its previous Command Center placeholder; do not claim parity.
 
 
-## iPad Global EQ (0.9.5 candidate)
+## iPad Global EQ (0.9.6 candidate)
 
 `GlobalEQState` validates the entire seven-band/three-output schema. Unknown keys,
 missing/duplicate band or parameter IDs, invalid values and wrong output IDs refuse
@@ -281,3 +281,15 @@ replaced `global-eq-last-edit.json` records the last requested edit and its stor
 readback/error result even after that cap; `global-eq-last-failure.json` separately
 retains the last failure so later success cannot erase it; it is diagnostic evidence, not a
 physical-DSP confirmation. Never publish captures/preset data.
+
+
+Build24 includes a one-shot DEBUG `--verify-global-eq-stream` harness. It requires
+an explicit new `global-eq-stream-intent.json` authorization and refuses an existing
+started marker, a different spare preset, or an enabled quarter-output EQ. It drives
+the real Monitor staging/idle-commit path, supersedes a settling commit, verifies
+the final stored state, restores the captured complete original output, and checks
+preset/edit-buffer/snapshot preservation. On native Pro,13checks passed; maximum
+individual live transaction latency was0.4223seconds. This is business-logic/network
+qualification, not a substitute for the final human touch-response check. Do not
+replay a partial run or expose its real native data. Debug records now carry build
+and diagnostic schema; write failures retain a separate small diagnostic text file.

@@ -80,12 +80,13 @@ for the official desktop editor.
 **Global EQ validation notice:** after earlier propagation reports, the owner
 confirmed output Level and graph Frequency/Gain changes on the pedal. Build20
 could still show a confirmation error because the device's readable settings lag
-its live controls. The 0.9.5 candidate streams live changes while dragging, then commits and checks
+its live controls. The 0.9.6 candidate streams live changes while dragging, then commits and checks
 the settled readback in the background;
 it never resends a change or writes the sync mirror to manufacture confirmation.
 Late echoes of this client’s own writes are correlated by source, request ID and
 exact payload so they cannot rewind newer edits; external edits still follow.
-Its final on-iPad response/warning check is pending. Audio measurements and persistence
+A clean on-device build passed13 streaming/commit/restoration checks with the preset
+unchanged. Its fresh touch-response check is pending. Audio measurements and persistence
 through a pedal power cycle remain unqualified.
 
 ## What is not implemented yet
