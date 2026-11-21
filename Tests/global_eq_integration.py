@@ -1,5 +1,5 @@
 """Global EQ hardware transactions against a synthetic local peer, never a pedal."""
-import copy,os,struct,subprocess,tempfile,threading,unittest
+import copy,os,struct,subprocess,tempfile,threading,time,unittest
 from pathlib import Path
 import msgpack
 from integration_peer import Peer,exact,receive,ready,frame,osc,message
@@ -20,7 +20,7 @@ def initial():
   root[key]={'out_':index,'enab':False,'drty':False,'eqbs':bands,'olvl':{'parm':3,'valu':0.}}
  return root
 class EQPeer(Peer):
- def __init__(self,mode):self.eq=initial();self.eq_reads=0;self.live=False;super().__init__(mode)
+ def __init__(self,mode):self.eq=initial();self.eq_reads=0;self.live=False;self.pending_commit=None;self.broadcasts=[];self.broadcast_lock=threading.Lock();super().__init__(mode)
  def serve(self,listener,index):
   try:
    c,_=listener.accept();self.sockets.append(c);c.settimeout(8);greeting=exact(c,64);c.sendall(greeting);receive(c);c.sendall(ready('PUB' if index==0 else 'ROUTER'))
@@ -30,6 +30,9 @@ class EQPeer(Peer):
      change={'key_':'dsp.globaleq.qtr.mid.gain','type':'v','val_':{'parm':3,'valu':.125}}
      c.sendall(frame(struct.pack('>Q',2**40),1)+frame(osc('/setPropertyValue',[1,2,b'lavppgsm'+msgpack.packb(change)])))
     while not self.closed:
+     with self.broadcast_lock:
+      now=time.monotonic();due=[packet for at,packet in self.broadcasts if at<=now];self.broadcasts=[(at,packet) for at,packet in self.broadcasts if at>now]
+     for packet in due:c.sendall(packet)
      try:c.sendall(frame(struct.pack('>Q',2**40),1)+frame(osc('/heartbeat',[1,2,3])))
      except OSError:break
      threading.Event().wait(.1)
@@ -41,6 +44,7 @@ class EQPeer(Peer):
      reply='/getPropertyValue'
      if v[1]=='global.eq.sync':
       self.eq_reads+=1
+      if self.pending_commit and time.monotonic()>=self.pending_commit[0]:self.eq=self.pending_commit[1];self.pending_commit=None
       if self.mode=='stale' and self.eq_reads==2:self.eq['_xlr']['enab']=True
       if self.mode=='concurrent-output' and self.live:self.eq['_pho']['enab']=True
       value=copy.deepcopy(self.eq)
@@ -54,13 +58,21 @@ class EQPeer(Peer):
      property=norm(msgpack.unpackb(v[2][8:],strict_map_key=False));assert property['type']=='v'
      key=property['key_'];value=property['val_']
      if key=='dsp.globaleq.qtr.mid.gain':
-      assert value=={'parm':3,'valu':.125}
+      assert value['parm']==3 and value['valu'] in ([.125,.25,.375] if self.mode.startswith('stream') else [.125])
       self.live=True
+      if self.mode.startswith('stream'):
+       packet=frame(struct.pack('>Q',2**40),1)+frame(osc('/setPropertyValue',[111,rid,v[2]]))
+       with self.broadcast_lock:
+        self.broadcasts.append((time.monotonic(),packet))
+        if value['valu']==.125:
+         self.broadcasts.append((time.monotonic()+.7,packet))
+         if self.mode=='stream-external':self.broadcasts.append((time.monotonic()+.7,frame(struct.pack('>Q',2**40),1)+frame(osc('/setPropertyValue',[222,rid,v[2]]))))
       if self.mode=='timeout':threading.Event().wait(6);return
      elif key=='globals.eq':
       assert self.live,'Native commit before live acknowledgement'
       assert value['_xlr']==self.eq['_xlr'] and value['_pho']==self.eq['_pho'],'Other output overwritten'
-      if self.mode!='readback-mismatch':self.eq=value
+      if (self.mode=='delayed-commit' or self.mode.startswith('stream')):self.pending_commit=(time.monotonic()+.65,copy.deepcopy(value))
+      elif self.mode!='readback-mismatch':self.eq=value
      else:raise AssertionError('Unsupported write '+key)
      reply='/status';args=[rid,-1 if self.mode=='bad-ack' or (self.mode=='bad-native-commit' and key=='globals.eq') else 0,0]
     else:raise AssertionError('Unexpected request '+address)
@@ -72,7 +84,7 @@ class EQIntegration(unittest.TestCase):
   peer=EQPeer(mode)
   try:
    with tempfile.TemporaryDirectory() as directory:
-    r=subprocess.run([str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',directory+'/unused','--backups',directory+'/backups','--global-eq-follow-check' if mode=='follow' else '--global-eq-transaction-check'],capture_output=True,text=True,timeout=18)
+    r=subprocess.run([str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',directory+'/unused','--backups',directory+'/backups','--global-eq-follow-check' if mode=='follow' else '--global-eq-external-echo-check' if mode=='stream-external' else '--global-eq-stream-check' if mode=='stream' else '--global-eq-transaction-check'],capture_output=True,text=True,timeout=18)
     writes=[norm(msgpack.unpackb(v[2][8:],strict_map_key=False))['key_'] for a,v in peer.sent if a=='/PropertyValueSet']
     return r,writes,peer.errors
   finally:peer.close()
@@ -80,6 +92,12 @@ class EQIntegration(unittest.TestCase):
   r,w,e=self.run_peer('follow');self.assertEqual(e,[]);self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(w,[])
  def test_live_then_native_commit_then_device_readback_without_mirror_write(self):
   r,w,e=self.run_peer('normal');self.assertEqual(e,[]);self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain','globals.eq'])
+ def test_delayed_device_commit_polls_reads_without_repeating_writes(self):
+  r,w,e=self.run_peer('delayed-commit');self.assertEqual(e,[]);self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain','globals.eq'])
+ def test_live_updates_continue_while_old_commit_settles(self):
+  r,w,e=self.run_peer('stream');self.assertEqual(e,[]);self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain','dsp.globaleq.qtr.mid.gain','globals.eq','dsp.globaleq.qtr.mid.gain','globals.eq'])
+ def test_foreign_source_is_not_suppressed_by_old_matching_request_and_payload(self):
+  r,w,e=self.run_peer('stream-external');self.assertEqual(e,[]);self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain','dsp.globaleq.qtr.mid.gain','globals.eq','dsp.globaleq.qtr.mid.gain'])
  def test_stale_state_prevents_any_write(self):
   r,w,e=self.run_peer('stale');self.assertEqual(e,[]);self.assertNotEqual(r.returncode,0);self.assertEqual(w,[])
  def test_concurrent_other_output_is_not_overwritten(self):
@@ -94,4 +112,5 @@ class EQIntegration(unittest.TestCase):
   r,w,e=self.run_peer('timeout');self.assertEqual(e,[]);self.assertNotEqual(r.returncode,0);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain'])
  def test_ack_alone_cannot_confirm_eq_settings(self):
   r,w,e=self.run_peer('readback-mismatch');self.assertEqual(e,[]);self.assertNotEqual(r.returncode,0);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain','globals.eq'])
+  self.assertIn('change was sent',r.stderr);self.assertNotIn('Nothing was changed',r.stderr)
 if __name__=='__main__':unittest.main()

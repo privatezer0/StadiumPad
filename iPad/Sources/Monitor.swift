@@ -23,6 +23,8 @@ import StadiumNetwork
     @Published var libraryEntries:[Int:[LibraryEntry]]=[:]
     @Published var presetContainer = -2
     @Published var globalEQ:GlobalEQState?
+    private var eqCommitTask:Task<Void,Never>?
+    private var eqViewRevision:UInt64=0
     @Published var commandProperties:[String:Value]=[:]
     let commandCatalog:[String:[CommandParameter]] = {
         guard let url=Bundle.main.url(forResource:"CommandCatalog",withExtension:"json"),let data=try? Data(contentsOf:url) else{return [:]}
@@ -139,6 +141,7 @@ import StadiumNetwork
         }
     }
     func stop() {
+        eqCommitTask?.cancel();eqCommitTask=nil
         generation=UUID();refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;focusedPresetID=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil
         let closeTuner=tunerRequested;tunerRequested=false
         if let old=session {Task {if closeTuner {try? await old.setTuner(false)};await old.disconnect()}}
@@ -243,8 +246,8 @@ import StadiumNetwork
         } catch {if generation==token {errorText=error.localizedDescription}}
     }
     func refreshGlobalEQ()async {
-        guard !busy,connected,let current=session else{return};let token=generation
-        do {let value=try await current.globalEQ();guard token==generation else{return};globalEQ=value
+        guard !busy,connected,let current=session else{return};let token=generation,revision=eqViewRevision
+        do {let value=try await current.globalEQ();guard token==generation,revision==eqViewRevision else{return};globalEQ=value
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--observe-global-eq") {
                 let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
@@ -254,14 +257,17 @@ import StadiumNetwork
             #endif
         }catch is CancellationError {}catch {if token==generation && !Task.isCancelled {errorText=error.localizedDescription}}
     }
-    func editGlobalEQ(_ expected:GlobalEQState,_ output:EQOutput,_ operation:GlobalEQOperation)async->Bool {
+    func editGlobalEQ(_ expected:GlobalEQState,_ output:EQOutput,_ operation:GlobalEQOperation,live:Bool=false)async->Bool {
+        eqCommitTask?.cancel();eqCommitTask=nil
         #if DEBUG
         reportEQEdit("requested",expected,output,operation)
         #endif
-        guard !busy,connected,let current=session else{return false};busy=true;defer{busy=false};let token=generation
-        do {let value=try await current.editGlobalEQ(expected:expected,output:output,operation:operation,backups:backups);guard token==generation else{return false};globalEQ=value;lastAction="Global EQ \(output.name) updated"
+        guard !busy,connected,let current=session else{return false};busy=true;eqViewRevision &+= 1;defer{busy=false};let token=generation
+        do {let value:GlobalEQState
+            if live {value=try await current.stageGlobalEQ(expected:expected,output:output,operation:operation,backups:backups)}else{value=try await current.editGlobalEQ(expected:expected,output:output,operation:operation,backups:backups)}
+            guard token==generation else{return false};globalEQ=value;lastAction=live ? "Global EQ live":"Global EQ \(output.name) updated"
             #if DEBUG
-            reportEQEdit("stored-readback-confirmed",expected,output,operation)
+            reportEQEdit(live ? "live-acknowledged":"stored-readback-confirmed",expected,output,operation)
             #endif
             return true}
         catch {
@@ -270,14 +276,35 @@ import StadiumNetwork
             #endif
             if token==generation {errorText=error.localizedDescription};return false}
     }
+    func finishGlobalEQGesture(output:EQOutput) {
+        guard connected,let current=session,let expected=globalEQ else{return}
+        eqCommitTask?.cancel();let token=generation
+        eqCommitTask=Task {
+            do {
+                guard let value=try await current.commitGlobalEQ(expected:expected),token==generation,!Task.isCancelled else{return}
+                globalEQ=value;lastAction="Global EQ updated"
+                #if DEBUG
+                reportEQEdit("stored-readback-confirmed",expected,output,.parameters([]))
+                #endif
+            }catch is CancellationError {}catch {
+                if token==generation && !Task.isCancelled {
+                    #if DEBUG
+                    reportEQEdit("commit-failed",expected,output,.parameters([]),error:error.localizedDescription)
+                    #endif
+                    errorText=error.localizedDescription
+                }
+            }
+        }
+    }
     #if DEBUG
     private func reportEQEdit(_ stage:String,_ expected:GlobalEQState,_ output:EQOutput,_ operation:GlobalEQOperation,error:String?=nil) {
         guard ProcessInfo.processInfo.environment["STADIUM_TRACE_GLOBAL_EQ"]=="1" else{return}
         let updates=(try? operation.liveUpdates(in:expected,output:output)) ?? []
-        var report:[String:Any] = ["at":Date().timeIntervalSince1970,"stage":stage,"busy":busy,"connected":connected,"output":output.rawValue,"updates":updates.map{["key":$0.key,"value":$0.value.json]}]
+        var report:[String:Any] = ["at":Date().timeIntervalSince1970,"stage":stage,"busy":busy,"connected":connected,"output":output.rawValue,"settings":expected.value.json,"updates":updates.map{["key":$0.key,"value":$0.value.json]}]
         if let error {report["error"]=error}
         let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
         try? JSONSerialization.data(withJSONObject:report,options:.sortedKeys).write(to:folder.appendingPathComponent("global-eq-last-edit.json"),options:.atomic)
+        if stage.contains("failed") {try? JSONSerialization.data(withJSONObject:report,options:.sortedKeys).write(to:folder.appendingPathComponent("global-eq-last-failure.json"),options:.atomic)}
     }
     #endif
     func editCommand(_ context:CommandContext,_ operation:CommandCenterOperation)async->Bool {

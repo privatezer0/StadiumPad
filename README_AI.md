@@ -214,7 +214,7 @@ before writes. Never remove a test intent marker to replay an uncertain batch.
 Android still has its previous Command Center placeholder; do not claim parity.
 
 
-## iPad Global EQ (0.9.2 candidate)
+## iPad Global EQ (0.9.5 candidate)
 
 `GlobalEQState` validates the entire seven-band/three-output schema. Unknown keys,
 missing/duplicate band or parameter IDs, invalid values and wrong output IDs refuse
@@ -229,6 +229,24 @@ effective live backups, each live command/ACK, allowed partial-echo and other-ou
 checks, the native `globals.eq` commit/ACK, then device-owned `global.eq.sync` readback.
 Never publish the sync mirror to manufacture successful readback. Compare the raw
 stored reply after commit, not the shadow containing live-event echoes.
+Native commit ACK precedes updated readable settings: hardware measurements found
+stale replies beyond1.85seconds and a restoration settling at3.07seconds. Poll reads
+at150ms intervals for up to5seconds, never repeat live/commit writes. `stageGlobalEQ`
+serializes and backs up live DSP updates without waiting for that delayed readback;
+its returned state is optimistic after ACKs, not storage proof. The view coalesces
+updates at40ms and requests a single commit after150ms idle. `commitGlobalEQ` serializes
+its guard/commit and each read individually, releasing the FIFO while sleeping.
+A newer live-write revision supersedes the old confirmation. Monitor cancels its
+old confirmation task and rejects background refreshes started before a newer edit.
+Retain at most32 known committed roots so delayed snapshots cannot rewind newer
+live state. Unknown external state still invalidates guarded writes.
+
+Native own write echoes can arrive seconds late (observed2.63seconds after a newer
+read). Track at most256 exact DSP request-ID/blob receipts, pin the correlated echo
+source, and suppress only matching own receipts; other clients’ events still apply,
+even with the same request ID/payload. Reset receipt/history/revision state on disconnect.
+If readback still mismatches, say the change was sent and confirmation is incomplete;
+never imply nothing changed after a successful live write.
 No uncertain write is automatically retried. Do not save/recall presets for EQ.
 Copy includes source bypass; Reset preserves destination bypass.
 
@@ -243,7 +261,12 @@ property can be consumed without a registered readable value.0.9.1 restores the
 observed native commit. The owner reported that 0.9.1 still did not update the
 pedal. An isolated three-channel desktop trace then confirmed automatic stored-state
 updates with no direct mirror write; the owner confirmed the native level change
-on the pedal. Version 0.9.2 removes mirror writes. It still requires physical-screen comparison;
+on the pedal. Version 0.9.2 removes mirror writes. The owner subsequently confirmed
+Level control and build20 graph Frequency/Gain follow on the pedal, but20's immediate
+stored check falsely failed. Version0.9.3 waited for device readback; owner confirmed no warnings but reported lag.
+Version0.9.4 separated streaming/verification; owner confirmed better response but
+saw a false external-change warning from delayed own echoes. Version0.9.5 adds
+receipt matching and refresh guards; its final response/warning check is pending. Physical observations do not establish audio response;
 no resolved-pedal-update or acoustic/power-cycle persistence claim until verified.
 
 Desktop DSP broadcasts can precede an unchanged/stale sync-property read. The
@@ -255,5 +278,6 @@ finish/read back. `EQResponse` is our visual approximation, not vendor DSP.
 Android EQ is not implemented here. Debug-only STADIUM_TRACE_GLOBAL_EQ=1 records a
 private owner-side wire trace capped at8MiB for diagnostics. A single atomically
 replaced `global-eq-last-edit.json` records the last requested edit and its stored
-readback/error result even after that cap; it is diagnostic evidence, not a
+readback/error result even after that cap; `global-eq-last-failure.json` separately
+retains the last failure so later success cannot erase it; it is diagnostic evidence, not a
 physical-DSP confirmation. Never publish captures/preset data.

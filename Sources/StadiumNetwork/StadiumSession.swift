@@ -7,6 +7,8 @@ public actor StadiumSession {
     private var allocated:Set<Int>=[]
     private var connectionID=UUID()
     private var eqShadow:GlobalEQState?;private var eqLastRead:GlobalEQState?;private var eqPending:[GlobalEQUpdate]=[];private var eqRevision:UInt64=0
+    private var eqWriteRevision:UInt64=0;private var eqCommitHistory:[GlobalEQState]=[]
+    private var eqEchoSource:Int?;private var eqReceipts:[Int32:Data]=[:];private var eqReceiptOrder:[Int32]=[]
     private var selectionReceipts:[Int32:StadiumBlockFocus]=[:]
     public init() {}
     private func acquire()async {if !occupied {occupied=true;return};await withCheckedContinuation{waiters.append($0)}}
@@ -20,7 +22,7 @@ public actor StadiumSession {
             updates=sub;commands=command
         } catch {await sub.close();await command.close();throw error}
     }
-    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0}
+    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0;eqWriteRevision=0;eqCommitHistory=[];eqEchoSource=nil;eqReceipts=[:];eqReceiptOrder=[]}
     private func exchange(_ make:(Int32)throws->OSCMessage,reply:String)async throws->OSCMessage {
         try Task.checkCancellation();guard let socket=commands else{throw ProtocolError.closed}
         let id=nextID;nextID = nextID==Int32.max ? 1:nextID+1
@@ -46,6 +48,14 @@ public actor StadiumSession {
             guard origin==connectionID else{throw ProtocolError.closed}
             let message=try OSCMessage.decode(frame.payload)
             if let update=GlobalEQUpdate.decode(message) {
+                // Correlate our own echoes by request ID AND exact native bytes,
+                // then pin their observed source. Delayed copies must not rewind
+                // newer acknowledged live state; other sources still apply.
+                if let source=message.values[0].integer,let request=message.values[1].integer,let id=Int32(exactly:request),let blob=message.values[2].data,eqReceipts[id]==blob {
+                    if eqEchoSource==nil {eqEchoSource=source}
+                    if eqEchoSource==source {return message}
+                }
+                if case .sync(let value)=update,let state=try? GlobalEQState(value:value),eqCommitHistory.contains(where:{$0.sameSettings(state)}),eqShadow?.sameSettings(state)==false {return message}
                 eqRevision &+= 1
                 if case .sync(let value)=update {eqLastRead=try GlobalEQState(value:value,origin:connectionID)}
                 if let current=eqShadow {eqShadow=try update.applying(to:current)}
@@ -543,7 +553,9 @@ extension StadiumSession {
         let envelope=try MessagePack.decode(raw)
         guard envelope["key_"].text=="global.eq.sync",envelope["type"].text=="v" else{throw ProtocolError.invalid("Wrong Global EQ property reply.")}
         let read=try GlobalEQState(value:envelope["val_"],origin:connectionID,raw:raw)
-        if eqShadow==nil || (revision==eqRevision && eqLastRead?.sameSettings(read)==false) {eqShadow=read}
+        let staleCommit=eqCommitHistory.contains{$0.sameSettings(read)} && eqShadow?.sameSettings(read)==false
+        if eqShadow==nil || (!staleCommit && revision==eqRevision && eqLastRead?.sameSettings(read)==false) {eqShadow=read}
+        if eqShadow?.sameSettings(read)==true {eqCommitHistory=[]}
         if revision==eqRevision {eqLastRead=read}
         for update in eqPending {eqShadow=try update.applying(to:eqShadow ?? read)};eqPending=[]
         guard let shadow=eqShadow else{return read}
@@ -551,6 +563,12 @@ extension StadiumSession {
     }
     public func globalEQ()async throws->GlobalEQState {await acquire();defer{release()};return try await globalEQUnlocked()}
     public func editGlobalEQ(expected:GlobalEQState,output:EQOutput,operation:GlobalEQOperation,backups:PresetBackupStore)async throws->GlobalEQState {
+        let live=try await stageGlobalEQ(expected:expected,output:output,operation:operation,backups:backups)
+        guard let confirmed=try await commitGlobalEQ(expected:live) else{throw ProtocolError.invalid("A newer EQ edit superseded this confirmation. Nothing was resent.")}
+        return confirmed
+    }
+    /// Serialize live DSP updates separately from the slower final snapshot check.
+    public func stageGlobalEQ(expected:GlobalEQState,output:EQOutput,operation:GlobalEQOperation,backups:PresetBackupStore)async throws->GlobalEQState {
         await acquire();defer{release()};try Task.checkCancellation()
         let before=try await globalEQUnlocked()
         guard expected.origin==connectionID,before.sameSettings(expected) else{throw ProtocolError.invalid("Global EQ changed. Review its current values before editing.")}
@@ -558,21 +576,56 @@ extension StadiumSession {
         _ = try await backups.retain(contentID:-100,name:"Global EQ native settings",data:before.raw)
         let effective=try GlobalEQOperation.propertyMessage(key:"globals.eq",value:before.value,id:0).values[2].data!
         _ = try await backups.retain(contentID:-100,name:"Global EQ live settings",data:effective)
+        eqWriteRevision &+= 1
         for update in try operation.liveUpdates(in:before,output:output) {
-            let live=try await exchange(update.message,reply:"/status");try EditCommand.acknowledge(live)
+            let live=try await exchange({id in
+                let message=try update.message(id:id)
+                eqReceipts[id]=message.values[2].data;eqReceiptOrder.append(id)
+                if eqReceiptOrder.count>256 {eqReceipts.removeValue(forKey:eqReceiptOrder.removeFirst())}
+                return message
+            },reply:"/status");try EditCommand.acknowledge(live)
         }
         // Check unrelated outputs before the native commit.
         // Neither an echoed property nor an ACK proves a physical-screen refresh.
         let intermediate=try await globalEQUnlocked()
         guard GlobalEQState.isTransition(intermediate.output(output),from:before.output(output),to:desired.output(output)),EQOutput.allCases.filter({$0 != output}).allSatisfy({GlobalEQState.sameOutput(before.output($0),intermediate.output($0))}),before.value["anyl"]==intermediate.value["anyl"],before.value["post"]==intermediate.value["post"] else{throw ProtocolError.invalid("Another EQ output changed during the update. No persistence or retry was sent.")}
-        // Native globals.eq is an event-style commit, not a readable registered
-        // property. Do not substitute publishing the sync mirror for this command.
-        let committed=try await exchange({try GlobalEQOperation.propertyMessage(key:"globals.eq",value:desired.value,id:$0)},reply:"/status");try EditCommand.acknowledge(committed)
+        // This is optimistic live state after validated ACKs, not storage proof.
+        let staged=try GlobalEQState(value:desired.value,origin:connectionID,raw:intermediate.raw)
+        eqShadow=staged
+        return staged
+    }
+    /// A new live gesture supersedes this check without resending the old commit.
+    public func commitGlobalEQ(expected:GlobalEQState)async throws->GlobalEQState? {
+        let revision=try await beginGlobalEQCommit(expected:expected)
+        return try await confirmGlobalEQ(expected:expected,revision:revision)
+    }
+    private func beginGlobalEQCommit(expected:GlobalEQState)async throws->UInt64 {
+        await acquire();defer{release()};try Task.checkCancellation()
+        let current=try await globalEQUnlocked()
+        guard expected.origin==connectionID,current.sameSettings(expected) else{throw ProtocolError.invalid("Global EQ changed before commit. Review its live values; nothing was resent.")}
+        guard eqCommitHistory.count<32 else{throw ProtocolError.invalid("Earlier EQ commits are still settling. The live change was sent; no further commit was sent.")}
+        eqCommitHistory.append(expected)
+        let committed=try await exchange({try GlobalEQOperation.propertyMessage(key:"globals.eq",value:expected.value,id:$0)},reply:"/status");try EditCommand.acknowledge(committed)
+        return eqWriteRevision
+    }
+    private func globalEQConfirmationRead(revision:UInt64,origin:UUID?)async throws->GlobalEQState? {
+        await acquire();defer{release()};try Task.checkCancellation()
+        guard origin==connectionID,revision==eqWriteRevision else{return nil}
+        return try await globalEQUnlocked()
+    }
+    private func confirmGlobalEQ(expected:GlobalEQState,revision:UInt64)async throws->GlobalEQState? {
         // The device publishes global.eq.sync after the native commit. Writing
         // that mirror ourselves would make a successful readback circular.
-        let after=try await globalEQUnlocked()
-        let stored=try GlobalEQState(value:MessagePack.decode(after.raw)["val_"],origin:connectionID,raw:after.raw)
-        guard stored.sameSettings(desired) else{throw ProtocolError.invalid("The Stadium did not confirm the committed EQ settings. Nothing was retried.")}
-        return after
+        // The live DSP changes precede the device-owned sync snapshot. Measured
+        // native commits can leave that snapshot stale for seconds after ACK.
+        // Poll reads only; never repeat a live write or a commit to obtain proof.
+        let deadline=Date().addingTimeInterval(5)
+        while true {
+            guard let after=try await globalEQConfirmationRead(revision:revision,origin:expected.origin) else{return nil}
+            let stored=try GlobalEQState(value:MessagePack.decode(after.raw)["val_"],origin:connectionID,raw:after.raw)
+            if stored.sameSettings(expected) {return after}
+            guard Date()<deadline else{throw ProtocolError.invalid("The EQ change was sent, but its settings could not be confirmed yet. Check the pedal before editing again. Nothing was resent.")}
+            try await Task.sleep(for:.milliseconds(150))
+        }
     }
 }

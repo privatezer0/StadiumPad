@@ -77,12 +77,16 @@ for the official desktop editor.
 - Read library inventories: Factory/User presets, setlists, IRs, Favorites, Templates,
   Songs and the clone hierarchy reported by the device. File-based models need files.
 
-**Global EQ validation notice:** the owner reported that 0.9.0's iPad graph changed
-without an update on the pedal's own EQ screen; 0.9.1 also failed that owner check.
-The 0.9.2 candidate removes direct writes to the sync mirror and requires the
-device's stored response after the native commit to match. Physical-screen
-verification is still pending. Acknowledgements and stored sync values alone do
-not prove DSP changes.
+**Global EQ validation notice:** after earlier propagation reports, the owner
+confirmed output Level and graph Frequency/Gain changes on the pedal. Build20
+could still show a confirmation error because the device's readable settings lag
+its live controls. The 0.9.5 candidate streams live changes while dragging, then commits and checks
+the settled readback in the background;
+it never resends a change or writes the sync mirror to manufacture confirmation.
+Late echoes of this client’s own writes are correlated by source, request ID and
+exact payload so they cannot rewind newer edits; external edits still follow.
+Its final on-iPad response/warning check is pending. Audio measurements and persistence
+through a pedal power cycle remain unqualified.
 
 ## What is not implemented yet
 

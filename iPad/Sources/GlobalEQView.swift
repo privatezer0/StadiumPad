@@ -75,10 +75,12 @@ struct GlobalEQView:View {
         for change in changes {pending[change.id]=change}
         guard runner==nil else{return};let destination=output,origin=monitor.connectionID
         runner=Task {@MainActor in
-            defer{runner=nil;draft=nil}
-            while active && !pending.isEmpty && origin==monitor.connectionID {
-                try? await Task.sleep(for:.milliseconds(40));guard active,!pending.isEmpty,origin==monitor.connectionID else{return};let changes=Array(pending.values);pending=[:]
-                guard let expected=monitor.globalEQ,await monitor.editGlobalEQ(expected,destination,.parameters(changes)) else{pending=[:];return}
+            var staged=false
+            defer{runner=nil;draft=nil;if staged && origin==monitor.connectionID {monitor.finishGlobalEQGesture(output:destination)}}
+            while active && origin==monitor.connectionID {
+                try? await Task.sleep(for:.milliseconds(pending.isEmpty ? 150:40));guard active,!pending.isEmpty,origin==monitor.connectionID else{return};let changes=Array(pending.values);pending=[:]
+                guard let expected=monitor.globalEQ,await monitor.editGlobalEQ(expected,destination,.parameters(changes),live:true) else{pending=[:];staged=false;return}
+                staged=true
             }
         }
     }

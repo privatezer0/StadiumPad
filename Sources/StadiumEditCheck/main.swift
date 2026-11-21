@@ -22,6 +22,29 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
                 guard after.parameter(.quarter,.mid,.gain).numeric==0.125,!before.sameSettings(after) else{throw ProtocolError.invalid("EQ live broadcast was lost behind a stale property read.")}
                 print("PASS Global EQ live broadcast follow.");await session.disconnect();return
             }
+            if args.contains("--global-eq-stream-check") || args.contains("--global-eq-external-echo-check") {
+                guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic EQ stream checks are loopback-only.")}
+                let listener=Task {while !Task.isCancelled {_ = try await session.event()}}
+                defer{listener.cancel()}
+                let initial=try await session.globalEQ()
+                let first=try await session.stageGlobalEQ(expected:initial,output:.quarter,operation:.parameter(.mid,.gain,.number(0.125)),backups:backups)
+                let second=try await session.stageGlobalEQ(expected:first,output:.quarter,operation:.parameter(.mid,.gain,.number(0.25)),backups:backups)
+                let old=Task {try await session.commitGlobalEQ(expected:second)}
+                try await Task.sleep(for:.milliseconds(150))
+                let start=Date()
+                let third=try await session.stageGlobalEQ(expected:second,output:.quarter,operation:.parameter(.mid,.gain,.number(0.375)),backups:backups)
+                guard Date().timeIntervalSince(start)<0.5 else{throw ProtocolError.invalid("Live EQ was blocked by stored readback.")}
+                guard try await old.value==nil else{throw ProtocolError.invalid("An old EQ confirmation replaced the next gesture.")}
+                try await Task.sleep(for:.milliseconds(650))
+                let fresh=try await session.globalEQ()
+                if args.contains("--global-eq-external-echo-check") {
+                    guard fresh.parameter(.quarter,.mid,.gain).numeric==0.125 else{throw ProtocolError.invalid("A different client's EQ event was ignored.")}
+                    print("PASS external EQ event retained despite matching old request/payload.");await session.disconnect();return
+                }
+                guard fresh.sameSettings(third) else{throw ProtocolError.invalid("A delayed old commit or echo rewound the current live values.")}
+                guard let final=try await session.commitGlobalEQ(expected:fresh),final.sameSettings(third) else{throw ProtocolError.invalid("Final EQ commit was not confirmed.")}
+                print("PASS responsive live EQ, superseded verification and final readback.");await session.disconnect();return
+            }
             if args.contains("--global-eq-transaction-check") {
                 guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic EQ checks are loopback-only.")}
                 let eq=try await session.globalEQ()

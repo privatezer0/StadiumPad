@@ -171,8 +171,23 @@ allowed partial readback, preserves unrelated outputs, commits, then compares th
 actual stored reply rather than a live-event shadow. FourCC keys use native uint32 MessagePack tags.
 Original bytes/effective live state are backed up, and uncertain writes never retry.
 Sync-property readback proves the stored mirror, not independent DSP or physical
-screen changes. Front-panel qualification remains required for this candidate;
-flash persistence through a pedal power cycle is unqualified.
+screen changes. The owner subsequently confirmed Level and build20 graph Frequency/
+Gain propagation on the physical pedal. Its immediate stored check still reported
+failure: native commit ACK can precede the readable snapshot by seconds. Measured
+stale replies lasted beyond1.85seconds; restoration settled at3.07seconds. Version
+0.9.3 polled reads at150ms intervals for up to5seconds. The owner confirmed no
+warning but reported control lag. Version0.9.5 separates40ms-coalesced live staging
+from a final commit after150ms idle. Confirmation releases the FIFO between reads;
+a newer live-write revision supersedes its check. Known earlier committed roots
+are bounded and cannot rewind newer live state. There are no repeated live writes
+or commits to obtain confirmation. A timeout explicitly says the
+change was sent but confirmation remains incomplete. Exact own DSP echoes are correlated using request ID, native bytes and their
+observed source; they do not overwrite newer acknowledged live state. Observed
+late echoes arrived2.63seconds after a subsequent settings read. Other clients’
+updates remain active even with the same old ID/payload. Monitor refresh revisions
+also prevent stale read results replacing newer edits. Final on-iPad response/
+warning qualification is pending; audio response and flash persistence through a power cycle remain
+unqualified.
 
 DSP property broadcasts are applied to a connection-local shadow because native
 editor changes can arrive without a changed sync-property read. Pending updates
