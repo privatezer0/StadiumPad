@@ -214,7 +214,7 @@ before writes. Never remove a test intent marker to replay an uncertain batch.
 Android still has its previous Command Center placeholder; do not claim parity.
 
 
-## iPad Global EQ (0.9.1 candidate)
+## iPad Global EQ (0.9.2 candidate)
 
 `GlobalEQState` validates the entire seven-band/three-output schema. Unknown keys,
 missing/duplicate band or parameter IDs, invalid values and wrong output IDs refuse
@@ -226,7 +226,9 @@ desktop. Do not use this settings encoder to rewrite native presets.
 for gestures, output enable and level. Native whole-output Paste/Reset messages are
 separate operations. Session serializes fresh-state comparison, original native and
 effective live backups, each live command/ACK, allowed partial-echo and other-output
-checks, the native `globals.eq` commit/ACK, then `global.eq.sync` publication/readback.
+checks, the native `globals.eq` commit/ACK, then device-owned `global.eq.sync` readback.
+Never publish the sync mirror to manufacture successful readback. Compare the raw
+stored reply after commit, not the shadow containing live-event echoes.
 No uncertain write is automatically retried. Do not save/recall presets for EQ.
 Copy includes source bypass; Reset preserves destination bypass.
 
@@ -238,7 +240,10 @@ verification.0.9.0 used whole-output messages for gestures and omitted the nativ
 `globals.eq` commit in favor of a readable sync property. That substitution was
 not justified by `globals.eq` being absent from property lookup: a command-style
 property can be consumed without a registered readable value.0.9.1 restores the
-observed native sequence. The candidate still requires physical-screen comparison;
+observed native commit. The owner reported that 0.9.1 still did not update the
+pedal. An isolated three-channel desktop trace then confirmed automatic stored-state
+updates with no direct mirror write; the owner confirmed the native level change
+on the pedal. Version 0.9.2 removes mirror writes. It still requires physical-screen comparison;
 no resolved-pedal-update or acoustic/power-cycle persistence claim until verified.
 
 Desktop DSP broadcasts can precede an unchanged/stale sync-property read. The
@@ -248,4 +253,7 @@ older in-flight reads. Reset on disconnect. Gestures coalesce and refuse stale o
 disconnected edits. Leaving the view discards unsent changes; sent transactions
 finish/read back. `EQResponse` is our visual approximation, not vendor DSP.
 Android EQ is not implemented here. Debug-only STADIUM_TRACE_GLOBAL_EQ=1 records a
-private owner-side wire trace capped at8MiB for diagnostics; never publish captures/preset data.
+private owner-side wire trace capped at8MiB for diagnostics. A single atomically
+replaced `global-eq-last-edit.json` records the last requested edit and its stored
+readback/error result even after that cap; it is diagnostic evidence, not a
+physical-DSP confirmation. Never publish captures/preset data.

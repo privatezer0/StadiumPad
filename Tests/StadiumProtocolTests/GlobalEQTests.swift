@@ -30,9 +30,10 @@ final class GlobalEQTests:XCTestCase {
         root=s.value.object;out=root["_qtr"]!.object;out["out_"] = .int(2);root["_qtr"] = .object(out);XCTAssertThrowsError(try GlobalEQState(value:.object(root)))
     }
     func testOnlyValidatedEQUsesNativeFourCCWireKeys()throws {
-        let s=try initial(),m=try GlobalEQOperation.propertyMessage(key:"global.eq.sync",value:s.value,id:11),bytes=try XCTUnwrap(m.values[2].data)
+        let s=try initial(),m=try GlobalEQOperation.propertyMessage(key:"globals.eq",value:s.value,id:11),bytes=try XCTUnwrap(m.values[2].data)
+        XCTAssertThrowsError(try GlobalEQOperation.propertyMessage(key:"global.eq.sync",value:s.value,id:11))
         XCTAssertEqual(m.address,"/PropertyValueSet");XCTAssertTrue(bytes.starts(with:Data("lavppgsm".utf8)));XCTAssertEqual(bytes[9],0xce) // Native unsigned FourCC tag, not a string/signed integer
-        let decoded=try MessagePack.decode(bytes);XCTAssertEqual(decoded["key_"],.string("global.eq.sync"));XCTAssertEqual(decoded["val_"],s.value)
+        let decoded=try MessagePack.decode(bytes);XCTAssertEqual(decoded["key_"],.string("globals.eq"));XCTAssertEqual(decoded["val_"],s.value)
         XCTAssertNoThrow(try GlobalEQOperation.propertyMessage(key:"globals.eq",value:s.value,id:1))
         XCTAssertThrowsError(try GlobalEQOperation.propertyMessage(key:"global.eq.unknown",value:s.value,id:1))
         XCTAssertThrowsError(try GlobalEQOperation.propertyMessage(key:"dsp.globaleq.xlr",value:s.output(.quarter),id:1))

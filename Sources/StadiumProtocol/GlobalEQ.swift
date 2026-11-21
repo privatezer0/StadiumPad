@@ -114,8 +114,8 @@ public enum GlobalEQOperation:Sendable {
         }
     }
     public static func propertyMessage(key:String,value:Value,id:Int32)throws->OSCMessage {
-        guard ["global.eq.sync","globals.eq"].contains(key) || EQOutput.allCases.contains(where:{key=="dsp.globaleq."+$0.wire}) else{throw ProtocolError.invalid("Unsupported Global EQ property.")}
-        if ["global.eq.sync","globals.eq"].contains(key) {_ = try GlobalEQState(value:value)}
+        guard key=="globals.eq" || EQOutput.allCases.contains(where:{key=="dsp.globaleq."+$0.wire}) else{throw ProtocolError.invalid("Unsupported Global EQ property.")}
+        if key=="globals.eq" {_ = try GlobalEQState(value:value)}
         else if let output=EQOutput.allCases.first(where:{key=="dsp.globaleq."+$0.wire}) {try GlobalEQState.validateOutput(value,output:output)}
         return try encodeProperty(key:key,value:value,id:id)
     }

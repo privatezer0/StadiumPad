@@ -162,9 +162,13 @@ The 0.9.0 implementation incorrectly omitted it, substituted a `global.eq.sync`
 publication and used whole-output messages for every gesture. Owner testing found
 the iPad graph changed while the physical pedal's EQ screen stayed unchanged.
 
-The 0.9.1 candidate sends native per-control live messages, checks each ACK and allowed
-partial readback, checks unrelated outputs, sends the native commit/ACK, then
-publishes/verifies the sync mirror. FourCC keys use native uint32 MessagePack tags.
+The 0.9.1 candidate still failed the owner's physical-screen check. A subsequent
+isolated three-channel desktop trace confirmed that native edits send per-control
+live messages and `globals.eq`, with no `global.eq.sync` write. The device updates
+the readable sync state itself; the owner confirmed a native output-level edit on
+the pedal. Version 0.9.2 removes direct mirror publication, checks each live ACK and
+allowed partial readback, preserves unrelated outputs, commits, then compares the
+actual stored reply rather than a live-event shadow. FourCC keys use native uint32 MessagePack tags.
 Original bytes/effective live state are backed up, and uncertain writes never retry.
 Sync-property readback proves the stored mirror, not independent DSP or physical
 screen changes. Front-panel qualification remains required for this candidate;

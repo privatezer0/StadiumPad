@@ -78,9 +78,11 @@ for the official desktop editor.
   Songs and the clone hierarchy reported by the device. File-based models need files.
 
 **Global EQ validation notice:** the owner reported that 0.9.0's iPad graph changed
-without an update on the pedal's own EQ screen. The 0.9.1 candidate now follows the
-native per-control and commit message sequence; physical-screen verification is
-still pending. Acknowledgements and stored sync values alone do not prove DSP changes.
+without an update on the pedal's own EQ screen; 0.9.1 also failed that owner check.
+The 0.9.2 candidate removes direct writes to the sync mirror and requires the
+device's stored response after the native commit to match. Physical-screen
+verification is still pending. Acknowledgements and stored sync values alone do
+not prove DSP changes.
 
 ## What is not implemented yet
 

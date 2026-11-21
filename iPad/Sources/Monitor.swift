@@ -255,10 +255,31 @@ import StadiumNetwork
         }catch is CancellationError {}catch {if token==generation && !Task.isCancelled {errorText=error.localizedDescription}}
     }
     func editGlobalEQ(_ expected:GlobalEQState,_ output:EQOutput,_ operation:GlobalEQOperation)async->Bool {
+        #if DEBUG
+        reportEQEdit("requested",expected,output,operation)
+        #endif
         guard !busy,connected,let current=session else{return false};busy=true;defer{busy=false};let token=generation
-        do {let value=try await current.editGlobalEQ(expected:expected,output:output,operation:operation,backups:backups);guard token==generation else{return false};globalEQ=value;lastAction="Global EQ \(output.name) updated";return true}
-        catch {if token==generation {errorText=error.localizedDescription};return false}
+        do {let value=try await current.editGlobalEQ(expected:expected,output:output,operation:operation,backups:backups);guard token==generation else{return false};globalEQ=value;lastAction="Global EQ \(output.name) updated"
+            #if DEBUG
+            reportEQEdit("stored-readback-confirmed",expected,output,operation)
+            #endif
+            return true}
+        catch {
+            #if DEBUG
+            reportEQEdit("failed",expected,output,operation,error:error.localizedDescription)
+            #endif
+            if token==generation {errorText=error.localizedDescription};return false}
     }
+    #if DEBUG
+    private func reportEQEdit(_ stage:String,_ expected:GlobalEQState,_ output:EQOutput,_ operation:GlobalEQOperation,error:String?=nil) {
+        guard ProcessInfo.processInfo.environment["STADIUM_TRACE_GLOBAL_EQ"]=="1" else{return}
+        let updates=(try? operation.liveUpdates(in:expected,output:output)) ?? []
+        var report:[String:Any] = ["at":Date().timeIntervalSince1970,"stage":stage,"busy":busy,"connected":connected,"output":output.rawValue,"updates":updates.map{["key":$0.key,"value":$0.value.json]}]
+        if let error {report["error"]=error}
+        let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+        try? JSONSerialization.data(withJSONObject:report,options:.sortedKeys).write(to:folder.appendingPathComponent("global-eq-last-edit.json"),options:.atomic)
+    }
+    #endif
     func editCommand(_ context:CommandContext,_ operation:CommandCenterOperation)async->Bool {
         guard !busy,connected,let current=session else{return false};busy=true;defer{busy=false};let token=generation
         do {let state=try await current.editCommand(context:context,operation:operation,backups:backups);guard token==generation else{return false};snapshot=state;lastAction="Command assignment updated · unsaved";report();return true}

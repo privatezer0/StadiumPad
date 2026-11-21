@@ -59,8 +59,6 @@ class EQPeer(Peer):
       if self.mode=='timeout':threading.Event().wait(6);return
      elif key=='globals.eq':
       assert self.live,'Native commit before live acknowledgement'
-     elif key=='global.eq.sync':
-      assert self.live,'Persistence before live acknowledgement'
       assert value['_xlr']==self.eq['_xlr'] and value['_pho']==self.eq['_pho'],'Other output overwritten'
       if self.mode!='readback-mismatch':self.eq=value
      else:raise AssertionError('Unsupported write '+key)
@@ -80,8 +78,8 @@ class EQIntegration(unittest.TestCase):
   finally:peer.close()
  def test_desktop_dsp_broadcast_is_visible_despite_stale_global_property(self):
   r,w,e=self.run_peer('follow');self.assertEqual(e,[]);self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(w,[])
- def test_live_then_sync_then_independent_readback(self):
-  r,w,e=self.run_peer('normal');self.assertEqual(e,[]);self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain','globals.eq','global.eq.sync'])
+ def test_live_then_native_commit_then_device_readback_without_mirror_write(self):
+  r,w,e=self.run_peer('normal');self.assertEqual(e,[]);self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain','globals.eq'])
  def test_stale_state_prevents_any_write(self):
   r,w,e=self.run_peer('stale');self.assertEqual(e,[]);self.assertNotEqual(r.returncode,0);self.assertEqual(w,[])
  def test_concurrent_other_output_is_not_overwritten(self):
@@ -90,10 +88,10 @@ class EQIntegration(unittest.TestCase):
   r,w,e=self.run_peer('unknown');self.assertEqual(e,[]);self.assertNotEqual(r.returncode,0);self.assertEqual(w,[])
  def test_negative_ack_never_persists_or_retries(self):
   r,w,e=self.run_peer('bad-ack');self.assertEqual(e,[]);self.assertNotEqual(r.returncode,0);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain'])
- def test_native_commit_failure_stops_before_sync_mirror_publication(self):
+ def test_native_commit_failure_stops_before_readback(self):
   r,w,e=self.run_peer('bad-native-commit');self.assertEqual(e,[]);self.assertNotEqual(r.returncode,0);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain','globals.eq'])
  def test_uncertain_live_write_never_persists_or_retries(self):
   r,w,e=self.run_peer('timeout');self.assertEqual(e,[]);self.assertNotEqual(r.returncode,0);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain'])
  def test_ack_alone_cannot_confirm_eq_settings(self):
-  r,w,e=self.run_peer('readback-mismatch');self.assertEqual(e,[]);self.assertNotEqual(r.returncode,0);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain','globals.eq','global.eq.sync'])
+  r,w,e=self.run_peer('readback-mismatch');self.assertEqual(e,[]);self.assertNotEqual(r.returncode,0);self.assertEqual(w,['dsp.globaleq.qtr.mid.gain','globals.eq'])
 if __name__=='__main__':unittest.main()
