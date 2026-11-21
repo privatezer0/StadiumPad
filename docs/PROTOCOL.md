@@ -185,9 +185,10 @@ change was sent but confirmation remains incomplete. Exact own DSP echoes are co
 observed source; they do not overwrite newer acknowledged live state. Observed
 late echoes arrived2.63seconds after a subsequent settings read. Other clients’
 updates remain active even with the same old ID/payload. Monitor refresh revisions
-also prevent stale read results replacing newer edits. Final on-iPad response/
-warning qualification is pending; audio response and flash persistence through a power cycle remain
-unqualified.
+also prevent stale read results replacing newer edits. A clean native iPad build24
+passed13 streaming/commit/restoration checks, then the owner confirmed responsive
+graph dragging and pedal follow without warnings. Audio response and flash
+persistence through a power cycle remain unqualified.
 
 DSP property broadcasts are applied to a connection-local shadow because native
 editor changes can arrive without a changed sync-property read. Pending updates

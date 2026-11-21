@@ -214,7 +214,7 @@ before writes. Never remove a test intent marker to replay an uncertain batch.
 Android still has its previous Command Center placeholder; do not claim parity.
 
 
-## iPad Global EQ (0.9.6 candidate)
+## iPad Global EQ (0.9.6)
 
 `GlobalEQState` validates the entire seven-band/three-output schema. Unknown keys,
 missing/duplicate band or parameter IDs, invalid values and wrong output IDs refuse
@@ -266,7 +266,9 @@ Level control and build20 graph Frequency/Gain follow on the pedal, but20's imme
 stored check falsely failed. Version0.9.3 waited for device readback; owner confirmed no warnings but reported lag.
 Version0.9.4 separated streaming/verification; owner confirmed better response but
 saw a false external-change warning from delayed own echoes. Version0.9.5 adds
-receipt matching and refresh guards; its final response/warning check is pending. Physical observations do not establish audio response;
+receipt matching and refresh guards. The owner’s earlier warning reply was later
+clarified as possibly an older test. A fresh clean build24 native check and human
+touch test confirmed responsive pedal follow without warnings. Physical observations do not establish audio response;
 no resolved-pedal-update or acoustic/power-cycle persistence claim until verified.
 
 Desktop DSP broadcasts can precede an unchanged/stale sync-property read. The
@@ -290,6 +292,8 @@ the real Monitor staging/idle-commit path, supersedes a settling commit, verifie
 the final stored state, restores the captured complete original output, and checks
 preset/edit-buffer/snapshot preservation. On native Pro,13checks passed; maximum
 individual live transaction latency was0.4223seconds. This is business-logic/network
-qualification, not a substitute for the final human touch-response check. Do not
-replay a partial run or expose its real native data. Debug records now carry build
+qualification, not a substitute for human touch testing. The owner subsequently
+confirmed the fresh build24 graph was responsive, followed on the pedal and showed
+no warning. Final Release24 was installed/cold-launched; no new TestFlight upload.
+Do not replay a partial run or expose its real native data. Debug records now carry build
 and diagnostic schema; write failures retain a separate small diagnostic text file.

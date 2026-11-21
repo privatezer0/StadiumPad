@@ -77,17 +77,10 @@ for the official desktop editor.
 - Read library inventories: Factory/User presets, setlists, IRs, Favorites, Templates,
   Songs and the clone hierarchy reported by the device. File-based models need files.
 
-**Global EQ validation notice:** after earlier propagation reports, the owner
-confirmed output Level and graph Frequency/Gain changes on the pedal. Build20
-could still show a confirmation error because the device's readable settings lag
-its live controls. The 0.9.6 candidate streams live changes while dragging, then commits and checks
-the settled readback in the background;
-it never resends a change or writes the sync mirror to manufacture confirmation.
-Late echoes of this client’s own writes are correlated by source, request ID and
-exact payload so they cannot rewind newer edits; external edits still follow.
-A clean on-device build passed13 streaming/commit/restoration checks with the preset
-unchanged. Its fresh touch-response check is pending. Audio measurements and persistence
-through a pedal power cycle remain unqualified.
+**Global EQ validation:** checked on an iPad Pro with Stadium: graph dragging is
+responsive, the pedal follows, and no confirmation warnings appear. Native streaming,
+commit/readback and restoration checks also preserve the current preset. Audio
+measurements and persistence through a pedal power cycle remain unqualified.
 
 ## What is not implemented yet
 
