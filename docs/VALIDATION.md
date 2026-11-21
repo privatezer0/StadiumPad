@@ -585,3 +585,28 @@ builds compile. Debug 0.9.1/build19 installed and foreground-launched on Pro for
 qualification. Physical confirmation remains pending; the candidate has not replaced
 the validated release installer inventories and is not claimed to fix the pedal yet.
 No preset save/recall/allocation or TestFlight upload occurred.
+
+
+## November 20 — public 0.9.6 (build 24) upload and beta review submission
+
+The already qualified 0.9.6 source was archived with public bundle identity
+com.privatezero.stadiumpad, without changing the owner's installed bundle or the
+validated local installer mirrors. Archive checks confirmed version/build 24,
+iPad-only device family, signature, existing encryption declaration and absence of
+DEBUG verification/trace markers and private preset/capture/key file types.
+
+An expired Xcode account session stopped the first distribution attempt before
+upload. After the owner completed normal Xcode authentication, automatic export/
+upload succeeded once. App Store Connect processed 0.9.6 (build 24), its What to Test
+was saved, and it was assigned to StadiumPad Public Beta and submitted for external
+review. Live UI confirms **Waiting for Review**, not external testing availability.
+Beta description and physical-hardware review notes accurately include current EQ,
+Command Center and Librarian features and remaining limitations. Private review
+contact details were retained without publishing them.
+
+Public-link criteria are iPad/iPadOS 18 or later. The link was configured but its
+public landing page is not yet accepting testers. No latest-version download is
+claimed. Automatic tester notification is disabled; no invitations/manual tester
+notifications were sent. Prior approved builds remain unchanged. Existing 73 Swift,
+69 integration (3 existing skips), 12 EQ loopback and 13 native iPad checks remain the
+implementation validation; no new runtime behavior changed in this upload task.

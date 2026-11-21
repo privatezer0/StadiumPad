@@ -1,14 +1,24 @@
 # Maintainer TestFlight release
 
-Status, November 17, 2026: StadiumPad0.6.3/build13 is uploaded, validated and
-submitted for external Beta App Review. App Store Connect confirms **Waiting for
-Review**. This build includes centered pinned Hype, unsaved-preset discard and
-Focus View. Earlier builds10/9 remain in review; build8 was withdrawn. Builds11/12
-were uploaded but superseded before external submission. No beta approval or
-public invitation is live. Automatic tester notification is disabled; no testers
-are invited. Owner Focus and Hype touch checks passed; native spare-preset
-save/reload/restore and discard checks passed. Layout-only build13 uses the same
-accepted Hype gesture implementation.
+Status, November 20, 2026: **StadiumPad 0.9.6 (build 24) is uploaded, processed and
+submitted for external Beta App Review** in StadiumPad Public Beta. App Store
+Connect visibly confirms **Waiting for Review**. This includes the verified live
+Global EQ fixes, Command Center and Librarian, in addition to the earlier editor,
+Focus, scenes, footswitch and Hype features.
+
+The public invitation is configured for **iPad with iPadOS 18 or later**, but its
+public landing page currently says it is not accepting new testers. **0.9.6 is not
+yet downloadable by external testers.** Do not advertise a live 0.9.6 download until
+Apple review and tester release are complete. The older 0.6.3 (build 13) is approved;
+that approval does not cover build 24. Automatically notify testers was disabled for this
+submission, and no tester invitations or manual notification emails were sent.
+
+After approval, verify build 24's testing/release state and activate testing if
+needed, then recheck the public invitation on a compatible iPad before publishing
+it. Do not release or expire an older build merely to make the latest link appear
+active. Beta description, What to Test and hardware review notes were updated;
+owner-approved private contact details remain in App Store Connect only.
+
 Users' simple installation steps are in INSTALL.md. A public repository does not
 produce a TestFlight invitation automatically.
 

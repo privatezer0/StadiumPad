@@ -2,10 +2,13 @@
 
 ## Simple installation for testers — TestFlight
 
-A public TestFlight invitation is being prepared. **There is no live TestFlight
-link yet.** Version 0.6.3/build13 is submitted to Apple and is **Waiting for Review**
-(as of November 17, 2026). The GitHub repository is source code, not a one-tap iPad installer.
-Do not download an arbitrary IPA and expect it to install on any iPad.
+**StadiumPad 0.9.6 (build 24) is uploaded and Waiting for Review** by Apple
+(as of November 20, 2026). The public invitation is configured for compatible iPads,
+but it is **not yet accepting new testers**. The latest EQ-fix beta is not available
+for public installation yet; the released invitation will be published after review
+and tester release are confirmed. The GitHub repository contains source code, not
+a one-tap iPad installer. Do not download an arbitrary IPA and expect it to install
+on any iPad.
 
 Once the invitation is published:
 

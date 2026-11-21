@@ -1,66 +1,52 @@
-# Prepared beta information
+# TestFlight beta information
 
-Template for App Store Connect. The beta description, feedback address and
-owner-approved private Apple review contact are saved there. Contact details are
-intentionally omitted here. Version 0.6.3/build 13 has been uploaded, validated, and submitted for external Beta App Review. As of November 17, 2026, App Store Connect showed Waiting for Review. No public invitation is live; verify current status in App Store Connect before announcing availability.
+Updated November 20, 2026 for StadiumPad 0.9.6 (build 24). Apple has accepted the
+upload, processing completed, and build 24 was submitted for external Beta App
+Review in StadiumPad Public Beta. App Store Connect shows **Waiting for Review**.
+The earlier 0.6.3 (build 13) is approved; build 24 is not yet downloadable. The public invitation
+is configured for iPads on iPadOS 18 or later, but its landing page is not yet accepting
+new testers. Automatic tester notification is disabled; no invitations were sent. Private feedback/review contact details remain only in App
+Store Connect.
 
 ## Beta description
 
-StadiumPad is an unofficial open-source tablet companion for Line 6 Helix Stadium.
-Connect your iPad and Stadium to the same local network, enable Remote Access,
-and allow Local Network access in the app. Browse preset folders, select signal
-blocks/models, edit supported parameters and save a new copy or User preset.
-Focus View offers named tones/X/Y blending, cabinet placement and EQ control
-positions while keeping presets and normal controls visible. Scene view offers eight snapshot buttons; Footswitch view controls validated
-assigned latched effects. Tuner mode opens/closes the device tuner; live pitch
-readings remain on the Stadium display. Designed for iPadOS18+ tablets.
+StadiumPad is an unofficial, open-source iPad companion for Line 6 Helix Stadium. Connect your iPad and Stadium to the same local network, enable Remote Access on Stadium, and allow Local Network access in StadiumPad.
 
-This is an early proof of concept. Command Center editing, Global EQ, song/Showcase
-editing/transport, IR/clone import/assignment and general block/routing editing are
-unfinished. Offline editing/sync and Android are planned. No phone interface.
+Browse preset folders and Factory/User presets, select signal blocks and models, edit supported controls, and save a copy or User preset. Focus View offers supported named tones and X/Y control; Hype stays beside the selected amp/model name. Scene view provides eight snapshot buttons, and Footswitch view controls supported assigned latched effects. Tuner mode opens/closes the pedal tuner; live note/cents remain on Stadium.
 
-## What to test
+Global EQ includes seven colored bands, independent 1/4-inch/XLR/Phones outputs, level/bypass and Copy/Paste/Reset. Command Center edits supported controller assignments, labels and colors. Librarian offers full-width browsing; optional clone file transfers and library backups use a configured Mac companion. Normal preset, EQ and controller editing connects directly to Stadium without a Mac.
 
-- Find and connect to your own Stadium on the local network.
-- Browse User preset folders and Factory presets; use Save Copy before experimenting.
-- Select blocks on the iPad/pedal and check model/category/control synchronization.
-- Edit a parameter on a spare preset, save, switch away and reload.
-- Drag effects within a row, save/reload and confirm order/settings/assignments.
-- Check Hype centered between the model name and ACTIVE on every parameter page.
-- Select another preset to discard unsaved edits; no automatic Save occurs.
-- Open Focus with the aperture icon, tap named tones/drag and restore starting tone.
-- Check Focus responsiveness, cabinet placement and EQ handles on physical tablets.
-- Switch existing scenes; create only an empty scene slot when requested.
-- Toggle standard assigned effects in Footswitch mode; report unsupported assignments.
-- Enter/leave Tuner mode and check the pedal tuner opens/closes. No iPad pitch meter.
-- Check Pro/regular landscape and portrait layouts with the preset sidebar visible.
+Designed for iPadOS 18+ tablets. This is a community proof of concept with incomplete desktop parity: no phone interface, offline editing/sync, Songs/Showcase editing/transport, general routing, IR upload/assignment or clone-to-block assignment. No cloud login or payment is required. Changes are live; use spare presets and Save Copy before experimenting.
 
-Include app/firmware versions, steps, expected/actual results in feedback. Redact
-personal preset/device data. Keep original saved presets safe when testing.
+Independent software, not affiliated with Line 6 or Yamaha. Thanks to Line 6 for Helix Stadium and to Dwayne Charrington (Vheissu/helix-stadium-tools) for protocol research/reference work. Source, acknowledgments, supported features and installation instructions: https://github.com/privatezer0/StadiumPad
+
+## What to test in 0.9.6 (build 24)
+
+StadiumPad 0.9.6 (24) adds the latest iPad Global EQ, Command Center and Librarian work.
+
+Global EQ: open Global EQ, select 1/4-inch, XLR or Phones, then drag a colored band or adjust its controls. Check responsive iPad/pedal follow, including starting a new drag while a previous change settles. The final device confirmation runs in the background; delayed replies must not rewind newer values or show a false change warning. Test band enable, frequency/gain/Q, cut slope, output level/bypass, Copy/Paste and Reset. EQ changes are global and live, separate from preset Save. Record your starting settings and restore them after testing.
+
+Command Center: use a spare preset to check Stomp A/B, instant/expression sources, supported command types, parameter choices, copy/paste, labels and colors. Assignments remain unsaved until Save Preset; assigned commands may affect connected equipment when triggered.
+
+Librarian: check full-width preset/setlist and clone folder browsing/search. Optional clone import/export and User clone/IR library backup require a configured StadiumPad Mac companion; ordinary preset/EQ editing connects directly to Stadium.
+
+Also test network discovery/reconnection, preset folders, two-way selected-block/model/control follow, Focus View, the pinned Hype control, within-row effect dragging, Save Copy and save/reload, eight scenes and supported latched footswitches. Switching presets discards unsaved edits after a local backup. Tuner entry/exit controls the pedal tuner; note/cents remain on the pedal.
+
+Requires your physical Helix Stadium with Remote Access enabled on the same LAN, Local Network permission, and iPadOS 18+. Tablet UI; no phone layout or offline editing/sync. Songs/Showcase transport, general routing, IR upload/assignment and clone-to-block assignment remain unfinished. Use spare presets. Report app/firmware versions, steps and expected/actual behavior; redact private preset/device data.
 
 ## Review notes
 
-This companion app requires a physical Helix Stadium on the same LAN to exercise
-hardware controls. No cloud login/account or payment is required in the app.
-Remote Access must be enabled on the device; Local Network permission is required.
-The app discovers the device through Bonjour or accepts a manually entered address.
-There is no simulated offline editing mode in this build. Please contact the
-maintainer for any additional hardware/testing resources needed for review.
+A physical Line 6 Helix Stadium on the same LAN is required for hardware controls.
+Enable Remote Access and allow Local Network permission. No cloud login,
+subscription or payment is required. Normal preset/EQ/controller editing connects
+directly to Stadium; optional clone transfers and library backup require a configured
+Mac companion. Review contact details already approved by the owner are retained
+in App Store Connect and are intentionally omitted here.
 
-The app is independent and not affiliated with Line 6, Yamaha, Neural DSP or Fender.
-No firmware update or access-control bypass is implemented. Changes are live;
-preset testing should use new copies. Source and acknowledgments are public.
+Changes are live. Use spare preset copies; record and restore starting global EQ
+settings. There is no simulated offline editing mode. The app is independent and
+not affiliated with Line 6/Yamaha. Contact the maintainer for hardware/testing needs.
 
 Source/support: https://github.com/privatezer0/StadiumPad
 Installation: https://github.com/privatezer0/StadiumPad/blob/main/INSTALL.md
-Privacy information: https://github.com/privatezer0/StadiumPad/blob/main/PRIVACY.md
-
-## Maintainer release status
-
-The App Store Connect app record, beta description, feedback/review contact,
-export-compliance information and What to Test were saved for the build 10 Focus submission.
-Automatic tester notifications are disabled and no testers were invited at the
-recorded submission time. Apple external beta approval and enabling a verified
-public invitation remain pending as of November 17, 2026. Confirm live status
-in App Store Connect before updating this document. Do not publish private
-reviewer/contact details in this repository.
+Privacy: https://github.com/privatezer0/StadiumPad/blob/main/PRIVACY.md

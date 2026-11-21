@@ -100,8 +100,8 @@ substantial interface redesign.
 
 ## Install
 
-For nontechnical users, a TestFlight beta is being prepared; no invitation is live
-yet. [Installation instructions](INSTALL.md) explain the planned tap-to-install
+For nontechnical users, 0.9.6 (build 24) is uploaded to TestFlight and Waiting for Review;
+the configured public invitation is not yet accepting testers. [Installation instructions](INSTALL.md) explain the TestFlight installation
 route and the source-build route currently available to developers. Android uses
 a signed APK installed through Android Files; there is no Google Play listing.
 
