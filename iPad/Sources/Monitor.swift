@@ -1,10 +1,13 @@
 import SwiftUI
+import Network
 import StadiumProtocol
 import StadiumNetwork
 
 @MainActor final class StadiumMonitor:ObservableObject {
     @Published var connectionID=UUID()
     @Published var currentHost=""
+    @Published var connectionRoute:StadiumConnectionRoute = .automatic
+    @Published var connectionInterface="Disconnected"
     @Published var tunerRequested=false
     @Published var tunerReference:Double?
     @Published var status="Connect to your Stadium to view its current preset."
@@ -67,9 +70,9 @@ import StadiumNetwork
         guard let url=Bundle.main.url(forResource:"ModelNames",withExtension:"json"),let data=try? Data(contentsOf:url),let names=try? JSONDecoder().decode([String:String].self,from:data) else{return [:]};return names
     }()
     func blockName(_ block:SignalBlock)->String {catalog[String(block.model)]?.name ?? names[String(block.model)] ?? "Effect block \(block.position)"}
-    func connect(host:String,port:UInt16=2001) {
+    func connect(host:String,port:UInt16=2001,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil) {
         guard !busy else{return}
-        stop();connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];commandProperties=[:];globalEQ=nil;lastCopy=nil;lastAction=nil
+        stop();connectionRoute=route;connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];commandProperties=[:];globalEQ=nil;lastCopy=nil;lastAction=nil
         let token=UUID();generation=token
         lastEvent=nil;let current=StadiumSession();session=current;connecting=true;status="Connecting…"
         worker=Task {
@@ -80,13 +83,13 @@ import StadiumNetwork
                     let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
                     eqTrace=try TraceRecorder(path:folder.appendingPathComponent("global-eq-wire-"+UUID().uuidString+".jsonl").path,maximumBytes:8*1024*1024)
                 }else{eqTrace=nil}
-                try await current.connect(host:host,port:port,trace:eqTrace)
+                try await current.connect(host:host,port:port,trace:eqTrace,route:route,interface:interface)
                 #else
-                try await current.connect(host:host,port:port)
+                try await current.connect(host:host,port:port,route:route,interface:interface)
                 #endif
                 let state=try await current.snapshot()
                 guard generation==token,!Task.isCancelled else{await current.disconnect();return}
-                snapshot=state;connecting=false;connected=true;status="Connected · live view";report()
+                connectionInterface=await current.connectionInterface();snapshot=state;connecting=false;connected=true;status="Connected · \(connectionInterface)";report()
                 subscriber=Task {
                     do {
                         while !Task.isCancelled {
@@ -139,6 +142,35 @@ import StadiumNetwork
             } catch {if generation==token,!Task.isCancelled {fail(error)}}
             if generation==token {refreshTask=nil}
         }
+    }
+    #if DEBUG
+    func prepareUSBSpare(name:String,expectedID:Int)async throws->PreservedPreset {
+        guard connected,connectionRoute == .usb,connectionInterface=="USB/Ethernet",!busy,let session,snapshot?.presetID==expectedID else{throw ProtocolError.invalid("USB spare-copy context changed.")}
+        let token=generation;busy=true;defer{busy=false}
+        let copy=try await session.copyCurrent(name:name,expectedID:expectedID,backups:backups)
+        guard token==generation else{throw CancellationError()};return copy
+    }
+    func readUSBSource()async throws->DeviceSnapshot {guard connected,let session else{throw ProtocolError.closed};return try await session.snapshot()}
+    func readUSBSavedSource(_ id:Int)async throws->Data {
+        guard connected,let session,snapshot?.presetID==id,let data=try await session.read(.contentData(id)).data else{throw ProtocolError.invalid("Source saved bytes are unavailable.")};return data
+    }
+    func matrixProperty()async throws->Value {guard connected,let session else{throw ProtocolError.closed};return try await session.read(.matrixMixer)}
+    func matrixMIDIProperty()async throws->Value {guard connected,let session else{throw ProtocolError.closed};return try await session.read(.matrixMIDI)}
+    #endif
+    func readMatrixLevels()async throws->MatrixGuitarLevels {
+        guard connected,let session else{throw ProtocolError.closed}
+        let token=generation
+        let value=try await session.matrixGuitarLevels()
+        guard generation==token else{throw CancellationError()};return value
+    }
+    func matrixChannels()async throws->[Int] {
+        guard connected,let session else{throw ProtocolError.closed};let token=generation
+        let channels=try await session.matrixMIDIChannels();guard generation==token else{throw CancellationError()};return channels
+    }
+    func setMatrixGuitar(output:Int,midi:Int,expected:MatrixGuitarLevels,channel:Int,send:@Sendable @escaping ()async throws->Void)async throws->MatrixGuitarLevels {
+        guard connected,let session else{throw ProtocolError.closed};let token=generation
+        let state=try await session.setMatrixGuitar(output:output,midi:midi,expected:expected,channel:channel,send:send)
+        guard generation==token else{throw CancellationError()};return state
     }
     func stop() {
         eqCommitTask?.cancel();eqCommitTask=nil
@@ -390,7 +422,7 @@ import StadiumNetwork
         } catch {print("Could not write the local verification report.")}
     }
 }
-struct StadiumDevice:Identifiable {var id:String;var host:String;var port:UInt16}
+struct StadiumDevice:Identifiable {var id:String;var host:String;var port:UInt16;var interface:NWInterface?=nil}
 @MainActor final class StadiumDiscovery:NSObject,ObservableObject,@preconcurrency NetServiceBrowserDelegate,@preconcurrency NetServiceDelegate {
     @Published var devices:[StadiumDevice]=[]
     @Published var searching=false

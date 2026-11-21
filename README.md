@@ -7,6 +7,15 @@ for the official desktop editor.
 
 <p align="center"><img src="iPad/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.jpg" width="220" alt="StadiumPad metallic blue app icon"></p>
 
+## USB development candidate
+
+Version 0.10.0 (25) adds USB-scoped editor transport and three persistent Matrix
+Home guitar faders, with navigation on the right. It is under device qualification;
+**it is not a released or fully qualified USB/volume build**. USB reads and Save Copy
+passed on iPad Pro, but final volume and Global EQ confirmation checks remain open.
+See [USB/Matrix development status](docs/USB_MATRIX.md). The validated installer and
+TestFlight submission remain 0.9.6 (24).
+
 ## What it does
 
 - **Preset view:** scrolling User/Factory preset browser, expandable setlist folders,

@@ -60,3 +60,12 @@ Global EQ layout/workflow and control ranges were checked against the installed
 Line 6 Helix Stadium editor and the [official Global EQ manual](https://manuals.line6.com/en/helix-stadium/live/global-eq).
 The SwiftUI graph and filter-response preview are original implementations; no
 Line 6 artwork, DSP implementation or extracted factory data is distributed.
+
+USB/Matrix work references Line 6's [MIDI manual](https://manuals.line6.com/en/helix-stadium/live/midi)
+and [1.4 release notes](https://kb.line6.com/helix-stadium-1-4-release-notes), and the
+Matrix state/event observations in Vheissu's MIT-licensed protocol research.
+[tooh / matrix-mixer-desktop](https://github.com/tooh/matrix-mixer-desktop) was also
+consulted to compare the USB MIDI bridge approach and fader display conventions.
+No source code or assets from that project are incorporated; StadiumPad's candidate
+uses its own direct iPad CoreMIDI implementation. See docs/USB_MATRIX.md for the
+current qualification limits.

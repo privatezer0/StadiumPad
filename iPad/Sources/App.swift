@@ -22,6 +22,8 @@ struct StadiumView:View {
     @State private var blocksPresetID:Int?
     @State private var selected:BlockSelection?
     @State private var showConnection=false
+    @AppStorage("stadiumConnectionRoute") private var connectionRoute:StadiumConnectionRoute = .automatic
+    @StateObject private var usbDiscovery=USBStadiumDiscovery()
     @State private var showSave=false
     @State private var saveID:Int?
     @State private var saveLabel=""
@@ -135,10 +137,21 @@ struct StadiumView:View {
         .task {
             guard !preview else{return}
             let host=ProcessInfo.processInfo.environment["STADIUM_DEVICE_HOST"] ?? address
-            if !host.isEmpty {address=host;monitor.connect(host:host)}
+            #if DEBUG
+            if let route=ProcessInfo.processInfo.environment["STADIUM_CONNECTION_ROUTE"],let selectedRoute=StadiumConnectionRoute(rawValue:route) {connectionRoute=selectedRoute}
+            #endif
+            if connectionRoute == .usb {
+                usbDiscovery.search()
+                for _ in 0..<50 {if !usbDiscovery.devices.isEmpty || Task.isCancelled {break};try? await Task.sleep(for:.milliseconds(150))}
+                if !Task.isCancelled,let device=usbDiscovery.devices.first {address=device.host;monitor.connect(host:device.host,port:device.port,route:.usb,interface:device.interface)}
+                else if !Task.isCancelled {monitor.status="No USB Stadium found. Check the cable and search again."}
+                usbDiscovery.stop()
+            } else if !host.isEmpty {address=host;monitor.connect(host:host,route:connectionRoute)}
 #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--verify-global-eq-stream") || ProcessInfo.processInfo.arguments.contains("--show-global-eq") || ProcessInfo.processInfo.arguments.contains("--verify-global-eq") || ProcessInfo.processInfo.arguments.contains("--verify-command-center") || ProcessInfo.processInfo.arguments.contains("--verify-library-backup") || ProcessInfo.processInfo.arguments.contains("--verify-clones") || ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") || ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
+            if ProcessInfo.processInfo.arguments.contains("--prepare-usb-spares") || ProcessInfo.processInfo.arguments.contains("--inspect-usb-matrix") || ProcessInfo.processInfo.arguments.contains("--verify-global-eq-stream") || ProcessInfo.processInfo.arguments.contains("--show-global-eq") || ProcessInfo.processInfo.arguments.contains("--verify-global-eq") || ProcessInfo.processInfo.arguments.contains("--verify-command-center") || ProcessInfo.processInfo.arguments.contains("--verify-library-backup") || ProcessInfo.processInfo.arguments.contains("--verify-clones") || ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") || ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
                 for _ in 0..<70 {if monitor.connected {break};try? await Task.sleep(for:.milliseconds(200))}
+                if ProcessInfo.processInfo.arguments.contains("--prepare-usb-spares") {await prepareUSBSpareChecks(monitor)}
+                if ProcessInfo.processInfo.arguments.contains("--inspect-usb-matrix") {await inspectUSBConnections(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--show-global-eq") {section = .eq;await monitor.refreshGlobalEQ();await captureGlobalEQLayouts(monitor:monitor,discovery:discovery)}
                 if ProcessInfo.processInfo.arguments.contains("--show-command-center") {section = .commands}
                 if ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") {
@@ -175,14 +188,20 @@ struct StadiumView:View {
         }
     }
     private var header:some View {
-        HStack(spacing:10) {
-            Image(systemName:"point.3.connected.trianglepath.dotted").font(.title2)
-            Text("StadiumPad").font(.headline)
-            Spacer(minLength:2)
-            HStack(spacing:6) {ForEach(EditorSection.allCases,id:\.self) {item in Button {section=item} label:{VStack(spacing:2) {Image(systemName:item.icon).font(.system(size:21,weight:.light));Text(item.rawValue).font(.system(size:9)).lineLimit(1)}.frame(width:item == .commands ? 75:57,height:46).foregroundStyle(section==item ? .white:.gray).background(section==item ? .white.opacity(0.055):.clear,in:RoundedRectangle(cornerRadius:5))}.buttonStyle(.plain)}}
-            Spacer(minLength:2)
-            Button {showConnection=true} label:{Label(monitor.connected ? "Stadium · Wi-Fi":"Connect",systemImage:monitor.connected ? "wifi":"wifi.slash").font(.callout)}.buttonStyle(.plain).foregroundStyle(monitor.connected ? .white:.orange)
-        }.padding(.horizontal,16).frame(height:60).background(EditorTheme.header)
+        GeometryReader {geometry in
+            HStack(spacing:10) {
+                if geometry.size.width>=1250 {Text("StadiumPad").font(.headline)}
+                MatrixVolumeBar(preview:preview).frame(maxWidth:.infinity)
+                Rectangle().fill(EditorTheme.border).frame(width:1,height:36)
+                HStack(spacing:2) {ForEach(EditorSection.allCases,id:\.self) {item in
+                    Button {section=item} label:{VStack(spacing:2) {
+                        Image(systemName:item.icon).font(.system(size:20,weight:.light))
+                        Text(item.rawValue).font(.system(size:9)).lineLimit(1).minimumScaleFactor(0.75)
+                    }.frame(width:item == .commands ? 69:50,height:46).foregroundStyle(section==item ? .white:.gray).background(section==item ? .white.opacity(0.055):.clear,in:RoundedRectangle(cornerRadius:5))}.buttonStyle(.plain)
+                }}
+                Button {showConnection=true} label:{Image(systemName:monitor.connected ? (monitor.connectionInterface=="USB/Ethernet" ? "cable.connector":"wifi"):"wifi.slash").font(.system(size:19)).frame(width:32,height:44)}.accessibilityLabel(monitor.connected ? "Stadium connection":"Connect to Stadium").buttonStyle(.plain).foregroundStyle(monitor.connected ? .white:.orange)
+            }.padding(.horizontal,12).frame(maxWidth:.infinity,maxHeight:.infinity)
+        }.frame(height:66).background(EditorTheme.header)
     }
     private func presetBar(compact:Bool)->some View {
         VStack(spacing:0) {
@@ -218,17 +237,19 @@ struct StadiumView:View {
             Text("Stadium connection").font(.title2.bold())
             Text(monitor.status).font(.callout)
             if monitor.connected || monitor.connecting {Button("Disconnect"){monitor.stop()}.buttonStyle(.bordered).disabled(monitor.busy)}
+            Picker("Connection",selection:$connectionRoute){ForEach(StadiumConnectionRoute.allCases,id:\.self){Text($0.rawValue).tag($0)}}.pickerStyle(.segmented)
             TextField("Stadium address",text:$address).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
             HStack {
-                Button(monitor.connected ? "Switch to Address":"Connect") {discovery.stop();monitor.connect(host:address.trimmingCharacters(in:.whitespacesAndNewlines));showConnection=false}.buttonStyle(.borderedProminent).disabled(monitor.busy || address.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)
-                Button(discovery.searching ? "Searching…":"Search Network"){discovery.search()}.disabled(discovery.searching || monitor.busy)
+                Button(connectionRoute == .usb ? "Find USB Stadium":(monitor.connected ? "Switch to Address":"Connect")) {if connectionRoute == .usb {usbDiscovery.search()}else{discovery.stop();monitor.connect(host:address.trimmingCharacters(in:.whitespacesAndNewlines),route:connectionRoute);showConnection=false}}.buttonStyle(.borderedProminent).disabled(monitor.busy || (connectionRoute != .usb && address.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty))
+                Button(discovery.searching ? "Searching…":(connectionRoute == .usb ? "Search USB":"Search Network")){if connectionRoute == .usb {usbDiscovery.search()}else{discovery.search()}}.disabled(discovery.searching || monitor.busy)
             }
-            ScrollView {VStack(alignment:.leading,spacing:12) {ForEach(discovery.devices){device in Button {address=device.host;discovery.stop();monitor.connect(host:device.host,port:device.port);showConnection=false} label:{Label(device.id,systemImage:device.host==monitor.currentHost ? "checkmark.circle.fill":"hifispeaker")}.disabled(monitor.busy)}}}.frame(maxHeight:180)
+            ScrollView {VStack(alignment:.leading,spacing:12) {ForEach(connectionRoute == .usb ? usbDiscovery.devices:discovery.devices){device in Button {address=device.host;discovery.stop();usbDiscovery.stop();monitor.connect(host:device.host,port:device.port,route:connectionRoute,interface:device.interface);showConnection=false} label:{Label(device.id,systemImage:device.host==monitor.currentHost ? "checkmark.circle.fill":"hifispeaker")}.disabled(monitor.busy)}}}.frame(maxHeight:180)
+            if connectionRoute == .usb {Text(usbDiscovery.message).font(.caption).foregroundStyle(.secondary)}
             if let error=discovery.error {Text(error).font(.caption).foregroundStyle(.orange)}
             if discovery.devices.isEmpty,!discovery.searching {Text("Search for Stadium devices or enter a hostname/IP address.").font(.caption).foregroundStyle(.secondary)}
             Toggle("Follow the selected block on Stadium",isOn:$followExternal)
             Button("About StadiumPad & Acknowledgments"){showConnection=false;showAcknowledgments=true}
-            Text("Use the same local network with Remote Access enabled.").font(.caption).foregroundStyle(.secondary)
+            Text(connectionRoute == .usb ? "Connect Stadium directly by USB-C, enable Remote Access, then Search Network and choose its hostname. USB mode requires the cable and never falls back to Wi-Fi.":"Use the same local network with Remote Access enabled.").font(.caption).foregroundStyle(.secondary)
         }
     }
     private var presetInfo:some View {

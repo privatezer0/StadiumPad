@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import StadiumProtocol
 
 public actor StadiumSession {
@@ -6,6 +7,11 @@ public actor StadiumSession {
     private var occupied=false;private var waiters:[CheckedContinuation<Void,Never>]=[]
     private var allocated:Set<Int>=[]
     private var connectionID=UUID()
+    private var matrixLive:[Int:MatrixGuitarUpdate]=[:]
+    private var matrixRevision:UInt64=0
+    private var matrixReceipt:[Int:UInt64]=[:]
+    private var matrixLastMIDI:[Int:(value:Int,level:Double)]=[:]
+
     private var eqShadow:GlobalEQState?;private var eqLastRead:GlobalEQState?;private var eqPending:[GlobalEQUpdate]=[];private var eqRevision:UInt64=0
     private var eqWriteRevision:UInt64=0;private var eqCommitHistory:[GlobalEQState]=[]
     private var eqEchoSource:Int?;private var eqReceipts:[Int32:Data]=[:];private var eqReceiptOrder:[Int32]=[]
@@ -13,16 +19,17 @@ public actor StadiumSession {
     public init() {}
     private func acquire()async {if !occupied {occupied=true;return};await withCheckedContinuation{waiters.append($0)}}
     private func release() {if waiters.isEmpty {occupied=false}else{waiters.removeFirst().resume()}}
-    public func connect(host:String,port:UInt16=2001,trace:TraceRecorder?=nil)async throws {
-        guard port>0,port<65535,!host.isEmpty else{throw ProtocolError.invalid("Enter a valid Stadium address.")}
+    public func connect(host:String,port:UInt16=2001,trace:TraceRecorder?=nil,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil)async throws {
+        guard port>0,port<65535,!host.isEmpty,route != .usb || interface?.type != .wifi else{throw ProtocolError.invalid("Enter a valid Stadium address.")}
         await disconnect();connectionID=UUID();await acquire();defer{release()};try Task.checkCancellation()
-        let sub=WireSocket(host:host,port:port,trace:trace),command=WireSocket(host:host,port:port+1,trace:trace)
+        let sub=WireSocket(host:host,port:port,trace:trace,route:route,interface:interface),command=WireSocket(host:host,port:port+1,trace:trace,route:route,interface:interface)
         do {
             try await sub.start();try await command.start();try await sub.handshake(type:"SUB");try await command.handshake(type:"DEALER")
             updates=sub;commands=command
         } catch {await sub.close();await command.close();throw error}
     }
-    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0;eqWriteRevision=0;eqCommitHistory=[];eqEchoSource=nil;eqReceipts=[:];eqReceiptOrder=[]}
+    public func connectionInterface()async->String {await commands?.interfaceName() ?? "Disconnected"}
+    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;matrixLive=[:];matrixRevision=0;matrixReceipt=[:];matrixLastMIDI=[:];allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0;eqWriteRevision=0;eqCommitHistory=[];eqEchoSource=nil;eqReceipts=[:];eqReceiptOrder=[]}
     private func exchange(_ make:(Int32)throws->OSCMessage,reply:String)async throws->OSCMessage {
         try Task.checkCancellation();guard let socket=commands else{throw ProtocolError.closed}
         let id=nextID;nextID = nextID==Int32.max ? 1:nextID+1
@@ -47,6 +54,9 @@ public actor StadiumSession {
             if frame.flags&4 != 0 || frame.more || frame.payload.isEmpty {continue}
             guard origin==connectionID else{throw ProtocolError.closed}
             let message=try OSCMessage.decode(frame.payload)
+            if let update=MatrixGuitarUpdate.decode(message) {
+                matrixRevision &+= 1;matrixLive[update.output]=update;matrixReceipt[update.output]=matrixRevision;matrixLastMIDI[update.output]=nil
+            }
             if let update=GlobalEQUpdate.decode(message) {
                 // Correlate our own echoes by request ID AND exact native bytes,
                 // then pin their observed source. Delayed copies must not rewind
@@ -627,5 +637,58 @@ extension StadiumSession {
             guard Date()<deadline else{throw ProtocolError.invalid("The EQ change was sent, but its settings could not be confirmed yet. Check the pedal before editing again. Nothing was resent.")}
             try await Task.sleep(for:.milliseconds(150))
         }
+    }
+}
+
+extension StadiumSession {
+    private func matrixMixerUnlocked()async throws->Value {
+        var property=try await readUnlocked(.matrixMixer)
+        for output in matrixLive.keys.sorted() {property=try matrixLive[output]!.applying(to:property)}
+        return property
+    }
+    public func matrixGuitarLevels()async throws->MatrixGuitarLevels {
+        await acquire();defer{release()};return try MatrixGuitarLevels(value:await matrixMixerUnlocked(),origin:connectionID)
+    }
+    public func matrixMIDIValue(output:Int)->Int? {matrixLastMIDI[output]?.value}
+    public func matrixMIDIChannels()async throws->[Int] {
+        await acquire();defer{release()}
+        return try await matrixChannelsUnlocked()
+    }
+    private func matrixChannelsUnlocked()async throws->[Int] {
+        let properties=try await readUnlocked(.matrixMIDI),rows=properties["vals"].items
+        func value(_ key:String)throws->Int {let found=rows.filter{$0["key_"].text==key};guard found.count==1,let n=found[0]["val_"].integer else{throw ProtocolError.invalid("Matrix MIDI settings are unavailable.")};return n}
+        let channels=try ["qtr","xlr","phones"].map{try value("global.midi.matrix.ch."+$0)}
+        let global=try value("global.midi.channel"),control=try value("global.midi.bcchannel")
+        guard try value("global.midi.over.usb.c") != 0,channels.allSatisfy({(1...16).contains($0) && $0 != global && $0 != control}),Set(channels).count==3 else{throw ProtocolError.invalid("Enable USB-C MIDI and assign separate Matrix MIDI channels on Stadium.")}
+        return channels
+    }
+    public func setMatrixGuitar(output:Int,midi:Int,expected:MatrixGuitarLevels,channel:Int,send:@Sendable ()async throws->Void)async throws->MatrixGuitarLevels {
+        guard (0..<3).contains(output),(0...127).contains(midi) else{throw ProtocolError.invalid("Invalid guitar volume.")}
+        await acquire();defer{release()};try Task.checkCancellation()
+        let origin=connectionID,beforeValue=try await matrixMixerUnlocked(),before=try MatrixGuitarLevels(value:beforeValue,origin:connectionID)
+        let channels=try await matrixChannelsUnlocked()
+        guard expected.origin==connectionID,before==expected,before.linked==0,channels[output]==channel else{throw ProtocolError.invalid("Matrix settings changed. Refresh before adjusting volume.")}
+        if let prior=matrixLastMIDI[output],prior.value==midi,prior.level==before.levels[output] {return before}
+        let watermark=matrixRevision
+        try await send()
+        let deadline=Date().addingTimeInterval(0.8)
+        while matrixReceipt[output].map({$0>watermark}) != true {
+            guard connectionID==origin else{throw ProtocolError.closed}
+            guard Date()<deadline else{matrixLastMIDI[output]=nil;throw ProtocolError.invalid("Stadium did not send a live guitar-volume update. Nothing was retried. Check the USB connection before adjusting again.")}
+            try await Task.sleep(for:.milliseconds(10))
+        }
+        let afterValue=try await matrixMixerUnlocked(),after=try MatrixGuitarLevels(value:afterValue,origin:connectionID)
+        // Compare every mixer field except this guitar fader and transient selected layer.
+        func preserved(_ value:Value)->Value {
+            var root=value["val_"].object;root["atto"]=nil
+            root["lyrs"] = .array(root["lyrs"]!.items.map {layer in
+                guard layer["out_"]["dst_"].integer==output+1 else{return layer}
+                var row=layer.object,home=row["home"]!.object,mix=home["mix_"]!.object
+                mix["vol_"]=nil;home["mix_"] = .object(mix);row["home"] = .object(home);return .object(row)
+            });return .object(root)
+        }
+        guard preserved(beforeValue)==preserved(afterValue) else{throw ProtocolError.invalid("Guitar volume was not confirmed by Stadium. The current reading will refresh; nothing was retried.")}
+        matrixLastMIDI[output]=(midi,after.levels[output])
+        return after
     }
 }

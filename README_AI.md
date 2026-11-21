@@ -297,3 +297,20 @@ confirmed the fresh build24 graph was responsive, followed on the pedal and show
 no warning. Final Release24 was installed/cold-launched; no new TestFlight upload.
 Do not replay a partial run or expose its real native data. Debug records now carry build
 and diagnostic schema; write failures retain a separate small diagnostic text file.
+
+## USB transport and Matrix guitar volume candidate (0.10.0 / 25)
+
+Read docs/USB_MATRIX.md before continuing this work. Carry the discovered NWInterface
+into both editor sockets; a wired interface type alone did not qualify. USB mode
+must never silently use Wi-Fi. CoreMIDI volume is direct from iPad, not a Mac bridge.
+Keep USB/network device identity binding explicit and invalidate availability on
+MIDI detach. Read actual MIDI channel settings and refuse linked/conflicting outputs.
+Only CC11/Home is exposed; there is no arbitrary MIDI sender UI.
+
+Bulk server.mixer.state can lag a device Home-level event. Use the bounded,
+connection-scoped live overlay and a new output receipt to confirm MIDI changes;
+never overwrite a mirror or use an estimated MIDI inverse to skip restoration.
+Preserve queue coalescing and current MIDI thumb position. Initial position mapping
+remains approximate. Live notifications do not prove acoustic/pedal-screen behavior.
+Device-side acceptance, unplug/replug and USB EQ stored confirmation remain open;
+never convert the candidate into a claimed release based only on synthetic tests.

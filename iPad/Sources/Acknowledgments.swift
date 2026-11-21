@@ -13,6 +13,8 @@ struct AcknowledgmentsView:View {
                     Text("Community foundations").font(.title2.bold())
                     Text("A special shout-out to Dwayne Charrington (Vheissu) for helix-stadium-tools. Its MIT-licensed protocol research and implementation informed the transport, editing operations controller-assignment interpretation, block reordering and Focus-map/interpolation research used here. The upstream copyright and license are retained in the repository.")
                     Link("Vheissu / helix-stadium-tools",destination:URL(string:"https://github.com/Vheissu/helix-stadium-tools")!)
+                    Text("USB Matrix references").font(.title2.bold())
+                    Text("Line 6's MIDI documentation and Vheissu's Matrix state/event research inform this work. tooh's matrix-mixer-desktop was consulted for its USB MIDI bridge approach and display conventions; no code or assets were incorporated. StadiumPad uses its own direct iPad USB MIDI implementation. Version 0.10.0 USB/volume device qualification is still in progress.")
                     Text("Gig-view inspiration").font(.title2.bold())
                     Text("The Scene and Footswitch views draw workflow inspiration from the Quad Cortex editor and Fender Tone Master Pro: large scene buttons and an on-screen pedalboard that can be used instead of floor switches. The desktop Helix Stadium editor guides our preset/chain/control layout. StadiumPad uses its own SwiftUI implementation and original icon; no vendor artwork or interface source is included.")
                     Text("Built with help").font(.title2.bold())

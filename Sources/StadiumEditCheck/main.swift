@@ -14,6 +14,16 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
             let trace=try option("--trace").map{try TraceRecorder(path:$0)}
             try await session.connect(host:host,port:UInt16(option("--port") ?? "2001") ?? 2001,trace:trace)
             let state=try await session.snapshot()
+            if args.contains("--matrix-transaction-check") {
+                guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic Matrix checks are loopback-only.")}
+                let listener=Task {while !Task.isCancelled {_ = try await session.event()}}
+                defer{listener.cancel()}
+                let before=try await session.matrixGuitarLevels()
+                let channels=try await session.matrixMIDIChannels()
+                let after=try await session.setMatrixGuitar(output:0,midi:99,expected:before,channel:channels[0],send:{})
+                guard after.levels[0]<before.levels[0],try await session.matrixGuitarLevels().levels[0]==after.levels[0] else{throw ProtocolError.invalid("Matrix level did not change.")}
+                print("PASS Matrix readback and preserved mix fields.");await session.disconnect();return
+            }
             if args.contains("--global-eq-follow-check") {
                 guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic EQ follow checks are loopback-only.")}
                 let before=try await session.globalEQ()

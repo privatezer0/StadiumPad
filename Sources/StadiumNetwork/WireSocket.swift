@@ -31,7 +31,19 @@ public final class TraceRecorder:@unchecked Sendable {
 actor WireSocket {
     let connection:NWConnection;let channel:Int;let trace:TraceRecorder?;let queue=DispatchQueue(label:"stadium.wire",qos:.utility)
     var decoder=FrameDecoder()
-    init(host:String,port:UInt16,trace:TraceRecorder?) {connection=NWConnection(host:NWEndpoint.Host(host),port:NWEndpoint.Port(rawValue:port)!,using:.tcp);channel=Int(port);self.trace=trace}
+    init(host:String,port:UInt16,trace:TraceRecorder?,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil) {
+        let parameters=NWParameters.tcp
+        if let interface {parameters.requiredInterface=interface}
+        if route == .usb {parameters.requiredInterfaceType = .wiredEthernet}
+        if route == .wifi {parameters.requiredInterfaceType = .wifi}
+        connection=NWConnection(host:NWEndpoint.Host(host),port:NWEndpoint.Port(rawValue:port)!,using:parameters);channel=Int(port);self.trace=trace
+    }
+    func interfaceName()->String {
+        guard let path=connection.currentPath else{return "Unknown"}
+        if path.usesInterfaceType(.wiredEthernet) {return "USB/Ethernet"}
+        if path.usesInterfaceType(.wifi) {return "Wi-Fi"}
+        return "Network"
+    }
     func start()async throws {
         let gate=Gate<Void>(),c=connection
         try await withCheckedThrowingContinuation {(continuation:CheckedContinuation<Void,Error>) in
