@@ -139,6 +139,7 @@ struct StompTile:View {
 
 struct TunerBoard:View {
     @EnvironmentObject var monitor:StadiumMonitor
+    let exit:()->Void
     var body:some View {
         VStack(spacing:22) {
             Image(systemName:"tuningfork").font(.system(size:64,weight:.ultraLight)).foregroundStyle(.cyan)
@@ -146,7 +147,7 @@ struct TunerBoard:View {
             Text(monitor.tunerRequested ? "Tuner requested on Stadium":"Tuner is off").font(.title3)
             if let reference=monitor.tunerReference {Text("Reference: \(reference,format:.number.precision(.fractionLength(0...1))) Hz").foregroundStyle(.secondary)}
             Text("Read the note and tuning needle on the Stadium display. Live pitch readings are not available through the known network protocol.").multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth:450)
-            Button(monitor.tunerRequested ? "Turn Tuner Off":"Turn Tuner On") {Task {await monitor.setTuner(!monitor.tunerRequested)}}.buttonStyle(.borderedProminent).disabled(!monitor.connected || monitor.busy)
+            Button("Turn Tuner Off",action:exit).buttonStyle(.borderedProminent)
             Text("Leaving Tuner mode sends the exit command automatically.").font(.caption).foregroundStyle(.secondary)
         }.padding(24).frame(maxWidth:.infinity,maxHeight:.infinity)
     }

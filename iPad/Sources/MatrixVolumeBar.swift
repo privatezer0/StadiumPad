@@ -7,8 +7,9 @@ struct MatrixVolumeBar:View {
     @State private var showingMixer=false
     @AppStorage("matrixLastOutput") private var lastOutput=1
     let preview:Bool
+    var beforeOpen:()->Void = {}
     var body:some View {
-        Button {showingMixer=true}label:{VStack(spacing:2){
+        Button {beforeOpen();showingMixer=true}label:{VStack(spacing:2){
             Image(systemName:"slider.vertical.3").font(.system(size:22,weight:.light)).foregroundStyle(.cyan)
             Text("Matrix Mixer").font(.system(size:9))
         }.frame(width:84,height:46)}.buttonStyle(.plain).accessibilityLabel("Open Matrix Mixer")

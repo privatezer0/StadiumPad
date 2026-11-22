@@ -10,6 +10,9 @@ import StadiumNetwork
     @Published var connectionInterface="Disconnected"
     @Published var tunerRequested=false
     @Published var tunerReference:Double?
+    #if DEBUG
+    private(set) var tunerAcknowledgments:[Bool]=[]
+    #endif
     @Published var status="Connect to your Stadium to view its current preset."
     @Published var snapshot:DeviceSnapshot?
     @Published var connected=false
@@ -303,10 +306,16 @@ import StadiumNetwork
         catch {if generation==token {errorText=error.localizedDescription}}
     }
     func setTuner(_ enabled:Bool)async {
-        guard !busy,connected,let current=session else{return};busy=true;defer{busy=false};let token=generation
+        // Navigation must not silently drop tuner entry/exit while another editor
+        // operation is busy. StadiumSession serializes these explicit commands
+        // through the same FIFO transaction lock as all other device operations.
+        guard connected,let current=session else{return};let token=generation
         tunerRequested=enabled
         do {
             try await current.setTuner(enabled);guard generation==token else{return}
+            #if DEBUG
+            tunerAcknowledgments.append(enabled)
+            #endif
             lastAction=enabled ? "Tuner open command acknowledged · read pitch on Stadium":"Tuner exit acknowledged"
             if enabled {
                 let values=try await current.read(.tunerProperties);guard generation==token else{return}

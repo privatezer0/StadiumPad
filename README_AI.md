@@ -427,3 +427,23 @@ Pro landscape, regular iPad landscape/portrait and library/other section sizes.
 98 Swift unit tests and 30 Matrix loopback tests pass. This presentation change
 does not send Matrix writes or change source routing; no pedal settings were
 changed during validation. FootPressIcon is original SwiftUI vector artwork.
+
+### Tuner navigation (build 48)
+
+TunerBoard has an exit callback: Turn Tuner Off selects Home/Preset, which sends
+the exit command through the existing mode observer. Main toolbar sections use
+selectSection, explicitly clearing Tuner even when Home is already selected.
+Modes use selectMode; entering Tuner sends open automatically, and an explicit
+repeat tap reopens it. MatrixVolumeBar calls beforeOpen to leave tuning too.
+setTuner must not guard on editor busy or own that shared busy flag: the session
+FIFO transaction lock serializes tuner commands behind pending work. Otherwise a
+busy editor silently drops automatic entry/exit. No live pitch support is implied.
+
+Build 48 qualification: 98 Swift tests and 30 Matrix loopback tests pass. An
+explicit DEBUG-only --verify-tuner-navigation check on the connected iPad executes
+the actual view navigation callbacks and observes session acknowledgments: entry
+while editor busy, Off/Home return, entry from Librarian, exit through each of the
+five main sections, final Home/Preset with tuner off (13 checks, 12 acknowledged
+tuner commands). This verifies command acceptance and local navigation, not pedal
+screen pixels or live pitch. Native Tuner layout inspected. Final app relaunched
+without verification flags; no preset or mixer settings changed.

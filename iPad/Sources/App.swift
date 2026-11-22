@@ -64,7 +64,7 @@ struct StadiumView:View {
                         if section == .home {
                             if let state=monitor.snapshot {
                                 switch mode {
-                                case .tuner:TunerBoard()
+                                case .tuner:TunerBoard(exit:{selectSection(.home)})
                                 case .scene:SceneBoard(state:state).id(state.origin)
                                 case .footswitch:FootswitchBoard(state:state).id(state.origin)
                                 case .preset:
@@ -154,7 +154,7 @@ struct StadiumView:View {
                 usbDiscovery.stop()
             } else if !host.isEmpty {address=host;monitor.connect(host:host,route:connectionRoute)}
 #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--capture-matrix-layout") || ProcessInfo.processInfo.arguments.contains("--verify-matrix-solo") || ProcessInfo.processInfo.arguments.contains("--verify-matrix-pan") || ProcessInfo.processInfo.arguments.contains("--show-matrix") || ProcessInfo.processInfo.arguments.contains("--prepare-usb-spares") || ProcessInfo.processInfo.arguments.contains("--inspect-usb-matrix") || ProcessInfo.processInfo.arguments.contains("--verify-global-eq-stream") || ProcessInfo.processInfo.arguments.contains("--show-global-eq") || ProcessInfo.processInfo.arguments.contains("--verify-global-eq") || ProcessInfo.processInfo.arguments.contains("--verify-command-center") || ProcessInfo.processInfo.arguments.contains("--verify-library-backup") || ProcessInfo.processInfo.arguments.contains("--verify-clones") || ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") || ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
+            if ProcessInfo.processInfo.arguments.contains("--verify-tuner-navigation") || ProcessInfo.processInfo.arguments.contains("--capture-matrix-layout") || ProcessInfo.processInfo.arguments.contains("--verify-matrix-solo") || ProcessInfo.processInfo.arguments.contains("--verify-matrix-pan") || ProcessInfo.processInfo.arguments.contains("--show-matrix") || ProcessInfo.processInfo.arguments.contains("--prepare-usb-spares") || ProcessInfo.processInfo.arguments.contains("--inspect-usb-matrix") || ProcessInfo.processInfo.arguments.contains("--verify-global-eq-stream") || ProcessInfo.processInfo.arguments.contains("--show-global-eq") || ProcessInfo.processInfo.arguments.contains("--verify-global-eq") || ProcessInfo.processInfo.arguments.contains("--verify-command-center") || ProcessInfo.processInfo.arguments.contains("--verify-library-backup") || ProcessInfo.processInfo.arguments.contains("--verify-clones") || ProcessInfo.processInfo.arguments.contains("--verify-selection-memory") || ProcessInfo.processInfo.arguments.contains("--verify-live-sync") || ProcessInfo.processInfo.arguments.contains("--verify-discard") || ProcessInfo.processInfo.arguments.contains("--verify-focus") || ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") || ProcessInfo.processInfo.arguments.contains("--verify-reorder") || ProcessInfo.processInfo.arguments.contains("--verify-tuner") || ProcessInfo.processInfo.arguments.contains("--verify-performance") || ProcessInfo.processInfo.arguments.contains("--verify-spare-edit") || ProcessInfo.processInfo.arguments.contains("--verify-layout") || ProcessInfo.processInfo.arguments.contains("--verify-models") {
                 for _ in 0..<70 {if monitor.connected {break};try? await Task.sleep(for:.milliseconds(200))}
                 if ProcessInfo.processInfo.arguments.contains("--prepare-usb-spares") {await prepareUSBSpareChecks(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--inspect-usb-matrix") {await inspectUSBConnections(monitor)}
@@ -180,6 +180,9 @@ struct StadiumView:View {
                 if ProcessInfo.processInfo.arguments.contains("--verify-performance") {await verifyPerformance(monitor)}
                 if ProcessInfo.processInfo.arguments.contains("--verify-reorder-resume") {await verifyReorder(monitor,resume:true)}
                 else if ProcessInfo.processInfo.arguments.contains("--verify-reorder") {await verifyReorder(monitor)}
+                if ProcessInfo.processInfo.arguments.contains("--verify-tuner-navigation") {
+                    await verifyTunerNavigation(monitor:monitor,chooseMode:selectMode,chooseSection:selectSection,currentMode:{mode},currentSection:{section})
+                }
                 if ProcessInfo.processInfo.arguments.contains("--verify-tuner") {
                     await monitor.setTuner(true)
                     let opened=monitor.errorText==nil
@@ -196,20 +199,31 @@ struct StadiumView:View {
 #endif
         }
     }
+    private func selectSection(_ item:EditorSection) {
+        // Home is already selected while tuning, so a section change alone would
+        // never fire its observer. Explicitly leave tuner for every main button.
+        if mode == .tuner {mode = .preset}
+        section=item
+    }
+    private func selectMode(_ item:EditorMode) {
+        let reopenTuner = mode == .tuner && item == .tuner
+        section = .home
+        mode=item
+        if reopenTuner,!preview {Task {await monitor.setTuner(true)}}
+    }
     private var header:some View {
         GeometryReader {geometry in
             ZStack {
                 HStack(spacing:10) {
-                    MatrixVolumeBar(preview:preview)
+                    MatrixVolumeBar(preview:preview,beforeOpen:{if mode == .tuner {selectSection(.home)}})
                     Rectangle().fill(EditorTheme.border).frame(width:1,height:36)
                     HStack(spacing:2) {ForEach(EditorSection.allCases,id:\.self) {item in
-                        navigationButton(item.rawValue,icon:item.icon,width:item == .commands ? 69:50,selected:section==item) {section=item}
+                        navigationButton(item.rawValue,icon:item.icon,width:item == .commands ? 69:50,selected:section==item) {selectSection(item)}
                     }}
                     Rectangle().fill(EditorTheme.border).frame(width:1,height:36)
                     HStack(spacing:2) {ForEach(EditorMode.allCases,id:\.self) {item in
                         navigationButton(item.rawValue,icon:item.icon,width:item == .footswitch ? 58:44,footPedal:item == .footswitch,selected:section == .home && mode==item) {
-                            section = .home
-                            mode=item
+                            selectMode(item)
                         }
                     }}
                 }.fixedSize(horizontal:true,vertical:false)
