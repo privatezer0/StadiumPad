@@ -9,7 +9,7 @@ for the official desktop editor.
 
 ## USB development candidate
 
-Version 0.10.0 (46) has a centered **Matrix Mixer** button opening a pedal-style
+Version 0.10.0 (47) has a centered **Matrix Mixer** button opening a pedal-style
 mixer popup. The popup uses output icons for ¼-inch, XLR and Phones and remembers
 the last viewed output. Generic Song tracks 1–5 use the standard Drums, Bass,
 Guitar, Vocals and Other stem labels; specific native names take precedence. Home and Song expand into a horizontally scrollable row;
@@ -24,6 +24,12 @@ See [USB/Matrix development status](docs/USB_MATRIX.md). The validated installer
 TestFlight submission remain 0.9.6 (24).
 
 ## What it does
+
+- **Persistent top navigation (iPad):** Home, Librarian, Command Center, Global EQ
+  and Songs stay centered. Preset, Scene, Footswitch and Tuner use matching labeled
+  icons directly to the right of Songs, separated by a divider, and return directly to that
+  view from any page. Matrix Mixer sits directly left of Home. Footswitch uses an original side-view
+  foot pressing a pedal icon. Leaving Tuner still exits it.
 
 - **Preset view:** scrolling User/Factory preset browser, expandable setlist folders,
   signal chain, named parameter controls, category/model lists, exact selected-model

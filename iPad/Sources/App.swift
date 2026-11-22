@@ -200,22 +200,37 @@ struct StadiumView:View {
         GeometryReader {geometry in
             ZStack {
                 HStack(spacing:10) {
-                MatrixVolumeBar(preview:preview)
-                Rectangle().fill(EditorTheme.border).frame(width:1,height:36)
-                HStack(spacing:2) {ForEach(EditorSection.allCases,id:\.self) {item in
-                    Button {section=item} label:{VStack(spacing:2) {
-                        Image(systemName:item.icon).font(.system(size:20,weight:.light))
-                        Text(item.rawValue).font(.system(size:9)).lineLimit(1).minimumScaleFactor(0.75)
-                    }.frame(width:item == .commands ? 69:50,height:46).foregroundStyle(section==item ? .white:.gray).background(section==item ? .white.opacity(0.055):.clear,in:RoundedRectangle(cornerRadius:5))}.buttonStyle(.plain)
-                }}
+                    MatrixVolumeBar(preview:preview)
+                    Rectangle().fill(EditorTheme.border).frame(width:1,height:36)
+                    HStack(spacing:2) {ForEach(EditorSection.allCases,id:\.self) {item in
+                        navigationButton(item.rawValue,icon:item.icon,width:item == .commands ? 69:50,selected:section==item) {section=item}
+                    }}
+                    Rectangle().fill(EditorTheme.border).frame(width:1,height:36)
+                    HStack(spacing:2) {ForEach(EditorMode.allCases,id:\.self) {item in
+                        navigationButton(item.rawValue,icon:item.icon,width:item == .footswitch ? 58:44,footPedal:item == .footswitch,selected:section == .home && mode==item) {
+                            section = .home
+                            mode=item
+                        }
+                    }}
                 }.fixedSize(horizontal:true,vertical:false)
-                HStack {
-                if geometry.size.width>=1250 {Text("StadiumPad").font(.headline)}
-                Spacer(minLength:0)
-                Button {showConnection=true} label:{Image(systemName:monitor.connected ? (monitor.connectionInterface=="USB/Ethernet" ? "cable.connector":"wifi"):"wifi.slash").font(.system(size:19)).frame(width:32,height:44)}.accessibilityLabel(monitor.connected ? "Stadium connection":"Connect to Stadium").buttonStyle(.plain).foregroundStyle(monitor.connected ? .white:.orange)
+                // The mode group is 112 points wider than Matrix Mixer. Compensate
+                // so Home through Songs stay at the screen center, with adjacent flanks.
+                .offset(x:56)
+                HStack(spacing:10) {
+                    if geometry.size.width>=1250 {Text("StadiumPad").font(.headline)}
+                    Button {showConnection=true} label:{Image(systemName:monitor.connected ? (monitor.connectionInterface=="USB/Ethernet" ? "cable.connector":"wifi"):"wifi.slash").font(.system(size:19)).frame(width:32,height:44)}.accessibilityLabel(monitor.connected ? "Stadium connection":"Connect to Stadium").buttonStyle(.plain).foregroundStyle(monitor.connected ? .white:.orange)
+                    Spacer(minLength:0)
                 }
             }.padding(.horizontal,12).frame(maxWidth:.infinity,maxHeight:.infinity)
         }.frame(height:66).background(EditorTheme.header)
+    }
+    private func navigationButton(_ title:String,icon:String,width:CGFloat,footPedal:Bool=false,selected:Bool,action:@escaping ()->Void)->some View {
+        Button(action:action) {VStack(spacing:2) {
+            if footPedal {FootPressIcon().frame(width:24,height:24)}
+            else {Image(systemName:icon).font(.system(size:20,weight:.light)).frame(height:24)}
+            Text(title).font(.system(size:9)).lineLimit(1).minimumScaleFactor(0.75)
+        }.frame(width:width,height:46).foregroundStyle(selected ? .white:.gray).background(selected ? .white.opacity(0.055):.clear,in:RoundedRectangle(cornerRadius:5))}
+        .buttonStyle(.plain).accessibilityLabel(title).accessibilityAddTraits(selected ? [.isSelected]:[])
     }
     private func presetBar(compact:Bool)->some View {
         VStack(spacing:0) {
@@ -223,13 +238,12 @@ struct StadiumView:View {
                 ZStack {
                     HStack(spacing:8) {
                         Text(monitor.snapshot?.location.label ?? "—").font(.title3.monospacedDigit().bold()).foregroundStyle(EditorTheme.gold)
-                        Text(monitor.snapshot?.presetName ?? "No preset loaded").font(.title3.weight(.medium)).lineLimit(1).frame(maxWidth:max(80,(geometry.size.width-360)/2-70),alignment:.leading)
+                        Text(monitor.snapshot?.presetName ?? "No preset loaded").font(.title3.weight(.medium)).lineLimit(1).frame(maxWidth:.infinity,alignment:.leading)
                         if monitor.snapshot?.dirty==true {Circle().fill(.orange).frame(width:6,height:6)}
                         Spacer()
                         Button {showInfo=true} label:{Image(systemName:"info.circle").font(.title3).frame(width:40,height:38)}.accessibilityLabel("Preset information")
                         Button {prepareSave()} label:{SaveDiskIcon().frame(width:40,height:38)}.accessibilityLabel("Save Preset").disabled(!monitor.connected || monitor.busy)
                     }
-                    Picker("View",selection:$mode) {ForEach(EditorMode.allCases,id:\.self){Text($0.rawValue).tag($0)}}.pickerStyle(.segmented).frame(width:340).disabled(monitor.busy || !monitor.connected)
                 }.frame(maxWidth:.infinity,maxHeight:.infinity)
             }.frame(height:56)
             HStack {presetActions;Spacer()}.frame(height:40)

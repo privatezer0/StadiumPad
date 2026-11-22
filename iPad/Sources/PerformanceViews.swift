@@ -1,7 +1,35 @@
 import SwiftUI
 import StadiumProtocol
 
-enum EditorMode:String,CaseIterable {case preset="Preset",scene="Scene",footswitch="Footswitch",tuner="Tuner"}
+enum EditorMode:String,CaseIterable {
+    case preset="Preset",scene="Scene",footswitch="Footswitch",tuner="Tuner"
+    var icon:String {switch self {
+    case .preset:return "point.3.connected.trianglepath.dotted"
+    case .scene:return "square.grid.2x2"
+    case .footswitch:return "shoe"
+    case .tuner:return "tuningfork"
+    }}
+}
+/// Original side-view foot pressing a stomp pedal, drawn in the toolbar's outline style.
+struct FootPressIcon:View {
+    var body:some View {
+        GeometryReader {geometry in
+            Path {p in
+                p.move(to:CGPoint(x:6,y:2));p.addLine(to:CGPoint(x:4,y:9))
+                p.addQuadCurve(to:CGPoint(x:5,y:14),control:CGPoint(x:2,y:12))
+                p.addLine(to:CGPoint(x:18,y:18))
+                p.addQuadCurve(to:CGPoint(x:22,y:16),control:CGPoint(x:23,y:19))
+                p.addQuadCurve(to:CGPoint(x:19,y:13),control:CGPoint(x:22,y:14))
+                p.addLine(to:CGPoint(x:12,y:9));p.addLine(to:CGPoint(x:13,y:3))
+                p.move(to:CGPoint(x:5,y:12));p.addLine(to:CGPoint(x:20,y:17))
+                p.move(to:CGPoint(x:12,y:19));p.addLine(to:CGPoint(x:11,y:22))
+                p.addLine(to:CGPoint(x:23,y:22));p.addLine(to:CGPoint(x:22,y:19))
+                p.move(to:CGPoint(x:14,y:20));p.addLine(to:CGPoint(x:20,y:20))
+            }.applying(CGAffineTransform(scaleX:geometry.size.width/24,y:geometry.size.height/24))
+                .stroke(style:StrokeStyle(lineWidth:1.2,lineCap:.round,lineJoin:.round))
+        }.accessibilityHidden(true)
+    }
+}
 enum PerformanceColors {
     static let palette:[Color]=[.cyan,.purple,.pink,.green,.orange,.blue,.red,.yellow]
     static func color(_ value:Int,fallback:Int)->Color {

@@ -411,3 +411,19 @@ state equality and write receipts must remain native. These are the documented
 standard stem labels, not a claim to have fetched active-song custom metadata.
 The observed remote Matrix data still returns Track1–8 while the pedal shows stem
 names. Do not hard-code names into raw properties or reorder sources to match them.
+
+### iPad top navigation (build 47)
+
+The five EditorSection buttons stay centered on screen. Matrix Mixer sits directly
+to their left and EditorMode directly to their right, with dividers and 10-point
+gaps. The grouped header compensates for the unequal flank widths to preserve
+the core center; connection/status remains separate at the left edge. Modes are always visible labeled icons, separated from
+Songs by a divider. A mode tap sets section to Home then selects the mode; the
+existing mode/section observers retain tuner exit behavior. Do not restore the
+preset-bar-only segmented picker. Header buttons share navigationButton styling.
+
+Build 47 validation: physical iPad Pro build/install/launch and native renders at
+Pro landscape, regular iPad landscape/portrait and library/other section sizes.
+98 Swift unit tests and 30 Matrix loopback tests pass. This presentation change
+does not send Matrix writes or change source routing; no pedal settings were
+changed during validation. FootPressIcon is original SwiftUI vector artwork.
