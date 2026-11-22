@@ -366,3 +366,43 @@ import StadiumNetwork
     }
 }
 #endif
+
+#if DEBUG
+/// One-shot screen navigation only; never changes Matrix levels or presets.
+@MainActor func verifyMatrixPanelNavigation(_ monitor:StadiumMonitor,choose:@escaping @MainActor (Int?)async->Bool)async {
+    let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+    var report:[String:Any]=["passed":false],started=false
+    do {
+        let deadline=Date().addingTimeInterval(20)
+        while !monitor.connected,Date()<deadline {try await Task.sleep(for:.milliseconds(100))}
+        guard monitor.connected,monitor.connectionRoute == .usb else{throw ProtocolError.closed}
+        let intent=try JSONSerialization.jsonObject(with:Data(contentsOf:folder.appendingPathComponent("matrix-panel-intent.json"))) as? [String:Any]
+        guard intent?["authorizeMatrixScreenNavigation"] as? Bool==true,let run=intent?["run"] as? String,UUID(uuidString:run) != nil else{throw ProtocolError.invalid("A reviewed screen-navigation intent is required.")}
+        let source=try await monitor.readUSBSource()
+        guard let id=source.presetID else{throw ProtocolError.closed}
+        let saved=try await monitor.readUSBSavedSource(id),before=try await monitor.readMatrixConsole()
+        try Data("started".utf8).write(to:folder.appendingPathComponent("matrix-panel-"+run+"-started"),options:.withoutOverwriting);started=true
+        var rows:[[String:Any]]=[]
+        for output:Int? in [1,2,3,nil,1,nil] {
+            let time=Date()
+            guard await choose(output) else{throw ProtocolError.invalid("Panel navigation failed.")}
+            try await Task.sleep(for:.milliseconds(700))
+            let state=try await monitor.readMatrixConsole()
+            let attached=state.property["val_"]["atto"].integer
+            if let output {guard attached==output else{throw ProtocolError.invalid("Stadium did not select the requested Matrix output.")}}
+            rows.append(["requested":output ?? 0,"attachedOutput":attached ?? -1,"milliseconds":Date().timeIntervalSince(time)*1000])
+            if let window=UIApplication.shared.connectedScenes.compactMap({$0 as? UIWindowScene}).flatMap({$0.windows}).first(where:{$0.isKeyWindow}) {
+                let image=UIGraphicsImageRenderer(bounds:window.bounds).image{_ in window.drawHierarchy(in:window.bounds,afterScreenUpdates:true)}
+                try? image.pngData()?.write(to:folder.appendingPathComponent("matrix-panel-screen-\(output ?? 0).png"),options:.atomic)
+            }
+        }
+        let after=try await monitor.readMatrixConsole(),afterSource=try await monitor.readUSBSource(),afterSaved=try await monitor.readUSBSavedSource(id)
+        let presetUnchanged=source.rawEditBuffer==afterSource.rawEditBuffer && source.presetID==afterSource.presetID && source.activeSnapshot==afterSource.activeSnapshot && source.dirty==afterSource.dirty && saved==afterSaved
+        let mixerUnchanged=(1...3).allSatisfy{before.strips($0)==after.strips($0) && before.layer($0)["out_"]==after.layer($0)["out_"]} && before.linked==after.linked
+        report["closedPresentationCount"]=monitor.debugMatrixPresentationCount
+        report["steps"]=rows;report["presetUnchanged"]=presetUnchanged;report["mixerUnchanged"]=mixerUnchanged;report["passed"]=presetUnchanged && mixerUnchanged && monitor.debugMatrixPresentationCount==0
+    }catch {report["error"]=error.localizedDescription;if started {_ = await choose(nil)}}
+    report["started"]=started
+    try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:folder.appendingPathComponent("matrix-panel-result.json"),options:.atomic)
+}
+#endif

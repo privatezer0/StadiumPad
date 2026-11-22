@@ -298,7 +298,7 @@ no warning. Final Release24 was installed/cold-launched; no new TestFlight uploa
 Do not replay a partial run or expose its real native data. Debug records now carry build
 and diagnostic schema; write failures retain a separate small diagnostic text file.
 
-## USB transport and Matrix guitar volume candidate (0.10.0 / 39)
+## USB transport and Matrix guitar volume candidate (0.10.0 / 40)
 
 Read docs/USB_MATRIX.md before continuing this work. Carry the discovered NWInterface
 into both editor sockets; a wired interface type alone did not qualify. USB mode
@@ -316,7 +316,7 @@ Native Phones/Home Solo and pan qualification passed; broader device coverage,
 unplug/replug and USB EQ stored confirmation remain open;
 never convert the candidate into a claimed release based only on synthetic tests.
 
-## Matrix popup (development candidate 0.10.0 build 39)
+## Matrix popup (development candidate 0.10.0 build 40)
 
 The three header controls sit beside the navigation buttons as one centered group;
 branding and connection remain at the edges. They open MatrixMixerView as a modal,
@@ -332,7 +332,17 @@ preserves unrelated known and unknown data. Bulk properties can stay stale after
 MIDI writes. Retain bounded live overlays per connection for all four channel fields.
 Disconnect/close/output switching clears pending gestures; in-flight transactions
 finish confirmation. MainActor connection identity is checked adjacent to USB send.
-Opening/closing the popup and selecting its output are local view actions only.
+MatrixPanelCommand uses global-channel CC9 screen navigation over bound direct USB.
+Opening sends Home0 then selected output7/8/9; Close, active-output re-tap and swipe
+dismissal send Home0. Do not append a value0 "release" to an output command: that
+would navigate Home. This is distinct from the Solo press/release pair. Read fresh
+USB-MIDI enablement and the configured global channel, rejecting collisions. No
+USB means local view only. UI navigation has no verified panel-visible getter;
+attached-output readback/events confirm output selection, not panel visibility.
+Background editor controls are disabled while the sheet allows header output taps.
+Do not send duplicate closing commands from onDisappear; that callback only cleans
+up the model/presentation lease. Debug panel checks require a separate one-shot UUID
+intent/marker and preserve preset and mixer channel state.
 No meters, main-knob writes, output linking or all-channel Reset are implemented;
 do not fake these or claim full pedal parity. Initial level thumb remains estimated;
 actual dB readouts are live, and calibration requires independent hardware evidence.
