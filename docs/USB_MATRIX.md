@@ -96,7 +96,9 @@ also not independent acoustic or pedal-screen qualification.
   match the original live bytes; the saved original, unsaved source buffer, current
   preset and snapshot stayed unchanged. Copies were not opened by that check.
 - Pro, regular landscape and portrait editor layouts were rendered natively and inspected.
-  New popup captures are checked separately for this revision.
+  The new popup was opened on the USB-connected Pro and read all 19 channels.
+  Native Pro/regular/portrait and expanded-channel captures were visually inspected;
+  the seven collapsed strips and Close fit without horizontal workspace scrolling.
   Preview faders are intentionally disabled and do not send MIDI.
 - An earlier polling implementation failed the owner's pedal-screen check and was
   sluggish. The owner subsequently confirmed the live-event Phones fader follows promptly
