@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (25)**. This work is under physical-device qualification;
+Development version: **0.10.0 (26)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -22,41 +22,57 @@ optional Mac companion remains necessary for its existing clone file-transfer an
 library-backup operations; USB support does not add standalone clone transfers,
 offline editing, Songs/Showcase editing or other unfinished features.
 
-## The three header faders
+## Output buttons and the Matrix popup
 
-The header keeps **¼-inch, XLR and Phones** guitar faders visible across Home,
-Librarian, Command Center, Global EQ and Songs. Navigation moves to the right. The
-workspace still fits Pro and regular iPads; preset/model lists scroll as before.
+The main header now has compact **¼-inch, XLR and Phones** buttons, with editor
+navigation on the right. Tap an output to open a large dismissible Matrix mixer
+modal over the current editor. Close returns to the same editor/preset. Opening,
+changing the local output tab and closing send no MIDI messages or preset edits.
 
-The faders target Matrix **Home / All Paths**, rather than changing preset tone
-controls or the physical output gain. They affect guitar paths routed through that
-Matrix layer; Song, Click, Bluetooth, USB-monitor and Aux channels remain separate.
-The hardware output volume supplies the overall ceiling.
+The popup follows the pedal's channel-strip arrangement: Home, Song, Click, Count
+In, USB In 1/2, Bluetooth and Aux. Expand Home to reveal Path 1A/1B/2A/2B; expand
+Song to reveal its eight tracks. Expanded channels scroll horizontally, as on the
+pedal. Each available strip has a vertical volume fader, pan popup with Center,
+mute and solo. Clear Solos turns off the currently enabled solos through individually
+confirmed operations. The Global EQ shortcut opens the selected output's EQ.
+Count In is reserved by Line 6 and is visibly unavailable. Native channel enable
+flags disable unavailable inputs/tracks.
 
-The volume path is direct iPad USB MIDI, using Line 6's documented CC11 and the
-actual Matrix MIDI channels read from the device. No Mac bridge is used. Default
-channels are 3/4/5, but they are not hard-coded as the current device settings.
-USB-C MIDI must be enabled. Linked outputs or conflicting MIDI channels prevent
-independent operation and are reported in the connection sheet.
+The controls use direct iPad USB MIDI and Line 6's documented per-channel CCs,
+with actual Matrix MIDI channels read from the device. No Mac bridge is used.
+USB-C MIDI must be enabled. Shared MIDI channels or linked outputs prevent
+independent editing; change those settings on Stadium. USB device notifications
+and a pre-send identity check disable edits when the cable disappears. Reading
+requires an editor connection (USB or Wi-Fi); writing requires direct USB MIDI.
+Wi-Fi-only output buttons can open the mixer for viewing with its edits disabled.
 
-CoreMIDI notifications grey out the faders when the USB Stadium disappears. Every
-send rechecks the unique attached USB Stadium. USB and network serial fields differ;
-StadiumPad records a hashed association. A verified USB editor session with one
-attached Stadium can establish this association; Wi-Fi-only sessions require the
-user to confirm that the USB device is the same selected Stadium. No MIDI values
-are sent merely by connecting or restoring local view state.
+USB and network serial fields differ; StadiumPad records a hashed association.
+A verified USB editor session with one attached Stadium can establish it; a Wi-Fi
+session requires confirmation that the attached USB device is the selected Stadium.
+No MIDI values are sent by connection, association or restoring local view state.
+
+### Remaining gaps from the pedal
+
+This candidate does **not** yet provide live audio meters, remote output linking,
+the physical master output knob or all-channel Reset. The verified MIDI table
+provides channel level/pan/mute/solo, but no main-output-volume or link command.
+The popup controls the signals feeding each output, not its hardware gain. There
+are no simulated meters or inactive controls pretending to implement those gaps.
+Exact MIDI-to-dB calibration and unity-reset support also remain unqualified; the
+initial volume thumb estimate is approximate, while the label is actual received dB.
+Do not describe this candidate as complete pedal parity.
 
 ## Live state and confirmation
 
-The device can emit `/syncMixChannelVolume` with a newer Home level while
+The device can emit `/syncMixChannelVolume` with a newer channel level while
 `server.mixer.state` still returns an older value. That bulk property must not be
 used alone to confirm a MIDI edit or claim live-level restoration. The session
-keeps a bounded overlay of device-originated Home events, scoped to the connection.
+keeps a bounded overlay of device-originated level, pan, mute and solo events, scoped to the connection.
 New bulk reads cannot rewind those live values. The UI labels use the received dB
 value, and retain the confirmed MIDI thumb position after an adjustment.
 
 MIDI edits run serially with coalesced newer drag positions. A new matching live
-output event is required; a send return code alone is insufficient. The session
+output/channel/control event is required; a send return code alone is insufficient. The session
 rechecks output links/channels and preserves unrelated mixer fields. It never
 writes a mirror or repeats an uncertain MIDI command to manufacture confirmation.
 A no-op requires a previously confirmed exact MIDI value and corresponding level;
@@ -68,7 +84,9 @@ also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 21, 2026
 
-- 79 Swift tests pass; 76 integration tests pass with 3 existing skips. The Matrix
+- 82 Swift tests pass. Matrix-specific loopback tests: 13 pass. The full
+  integration suite has 82 cases: 79 pass and 3 existing skips. Eight library cases
+  were rerun successfully after correcting their external executable path. The Matrix
   loopback tests deliberately keep the bulk property stale and deliver live events,
   and reject missing/wrong-output receipts, stale contexts, linked outputs, shared
   channels and unrelated changed fields.
@@ -77,11 +95,13 @@ also not independent acoustic or pedal-screen qualification.
 - Native USB Save Copy created two new empty User slots. Their contents independently
   match the original live bytes; the saved original, unsaved source buffer, current
   preset and snapshot stayed unchanged. Copies were not opened by that check.
-- Pro, regular landscape and portrait layouts were rendered natively and inspected.
+- Pro, regular landscape and portrait editor layouts were rendered natively and inspected.
+  New popup captures are checked separately for this revision.
   Preview faders are intentionally disabled and do not send MIDI.
 - An earlier polling implementation failed the owner's pedal-screen check and was
-  sluggish. A later live-event implementation is installed, but a fresh physical
-  screen/volume acceptance check and unplug/replug check remain outstanding.
+  sluggish. The owner subsequently confirmed the live-event Phones fader follows promptly
+  with no warning. The new full-channel popup, other outputs, pan/mute/solo and
+  unplug/replug checks remain outstanding.
 - USB-only Global EQ sent a change but did not pass its stored-snapshot confirmation;
   the existing Global EQ confirmation behavior needs further qualification over USB.
   This is not a claim that every editor control has passed a USB hardware test.

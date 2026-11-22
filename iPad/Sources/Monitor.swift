@@ -172,6 +172,15 @@ import StadiumNetwork
         let state=try await session.setMatrixGuitar(output:output,midi:midi,expected:expected,channel:channel,send:send)
         guard generation==token else{throw CancellationError()};return state
     }
+    func readMatrixConsole()async throws->MatrixConsoleState {
+        guard connected,let session else{throw ProtocolError.closed};let token=generation
+        let state=try await session.matrixConsole();guard generation==token else{throw CancellationError()};return state
+    }
+    func setMatrixConsole(_ command:MatrixConsoleCommand,expected:MatrixConsoleState,channel:Int,send:@Sendable @escaping ()async throws->Void)async throws->MatrixConsoleState {
+        guard connected,let session else{throw ProtocolError.closed};let token=generation
+        let state=try await session.setMatrixConsole(command,expected:expected,channel:channel,send:send)
+        guard generation==token else{throw CancellationError()};return state
+    }
     func stop() {
         eqCommitTask?.cancel();eqCommitTask=nil
         generation=UUID();refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;focusedPresetID=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil

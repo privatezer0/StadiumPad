@@ -314,3 +314,21 @@ Preserve queue coalescing and current MIDI thumb position. Initial position mapp
 remains approximate. Live notifications do not prove acoustic/pedal-screen behavior.
 Device-side acceptance, unplug/replug and USB EQ stored confirmation remain open;
 never convert the candidate into a claimed release based only on synthetic tests.
+
+## Matrix popup (development candidate 0.10.0 build 26)
+
+The three header controls open MatrixMixerView as a modal, not inline volume faders.
+MatrixConsoleState strictly parses the nineteen documented sources per output;
+source IDs differ from CC order (Home=source5/CC11, Song=source14/CC16).
+MatrixConsoleCommand exposes only typed channel fields, never arbitrary MIDI CCs.
+Mute/solo CCs are toggles: send127 once and require the opposite live state. Never
+retry uncertain toggles. Coalesce level/pan gestures, but never toggle commands.
+Every transaction requires a new matching output/source/field live receipt and
+preserves unrelated known and unknown data. Bulk properties can stay stale after
+MIDI writes. Retain bounded live overlays per connection for all four channel fields.
+Disconnect/close/output switching clears pending gestures; in-flight transactions
+finish confirmation. MainActor connection identity is checked adjacent to USB send.
+Opening/closing the popup and selecting its output are local view actions only.
+No meters, main-knob writes, output linking or all-channel Reset are implemented;
+do not fake these or claim full pedal parity. Initial level thumb remains estimated;
+actual dB readouts are live, and calibration requires independent hardware evidence.

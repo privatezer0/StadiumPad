@@ -8,6 +8,9 @@ public actor StadiumSession {
     private var allocated:Set<Int>=[]
     private var connectionID=UUID()
     private var matrixLive:[Int:MatrixGuitarUpdate]=[:]
+    private var consoleLive:[String:MatrixConsoleUpdate]=[:]
+    private var consoleReceipts:[String:UInt64]=[:]
+    private var consoleLastMIDI:[String:(value:Int,level:Value)]=[:]
     private var matrixRevision:UInt64=0
     private var matrixReceipt:[Int:UInt64]=[:]
     private var matrixLastMIDI:[Int:(value:Int,level:Double)]=[:]
@@ -29,7 +32,7 @@ public actor StadiumSession {
         } catch {await sub.close();await command.close();throw error}
     }
     public func connectionInterface()async->String {await commands?.interfaceName() ?? "Disconnected"}
-    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;matrixLive=[:];matrixRevision=0;matrixReceipt=[:];matrixLastMIDI=[:];allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0;eqWriteRevision=0;eqCommitHistory=[];eqEchoSource=nil;eqReceipts=[:];eqReceiptOrder=[]}
+    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;matrixLive=[:];consoleLive=[:];consoleReceipts=[:];consoleLastMIDI=[:];matrixRevision=0;matrixReceipt=[:];matrixLastMIDI=[:];allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0;eqWriteRevision=0;eqCommitHistory=[];eqEchoSource=nil;eqReceipts=[:];eqReceiptOrder=[]}
     private func exchange(_ make:(Int32)throws->OSCMessage,reply:String)async throws->OSCMessage {
         try Task.checkCancellation();guard let socket=commands else{throw ProtocolError.closed}
         let id=nextID;nextID = nextID==Int32.max ? 1:nextID+1
@@ -54,6 +57,9 @@ public actor StadiumSession {
             if frame.flags&4 != 0 || frame.more || frame.payload.isEmpty {continue}
             guard origin==connectionID else{throw ProtocolError.closed}
             let message=try OSCMessage.decode(frame.payload)
+            if let update=MatrixConsoleUpdate.decode(message) {
+                matrixRevision &+= 1;consoleLive[update.key]=update;consoleReceipts[update.key]=matrixRevision;consoleLastMIDI[update.key]=nil
+            }
             if let update=MatrixGuitarUpdate.decode(message) {
                 matrixRevision &+= 1;matrixLive[update.output]=update;matrixReceipt[update.output]=matrixRevision;matrixLastMIDI[update.output]=nil
             }
@@ -644,6 +650,7 @@ extension StadiumSession {
     private func matrixMixerUnlocked()async throws->Value {
         var property=try await readUnlocked(.matrixMixer)
         for output in matrixLive.keys.sorted() {property=try matrixLive[output]!.applying(to:property)}
+        for key in consoleLive.keys.sorted() {property=consoleLive[key]!.applying(to:property)}
         return property
     }
     public func matrixGuitarLevels()async throws->MatrixGuitarLevels {
@@ -690,5 +697,69 @@ extension StadiumSession {
         guard preserved(beforeValue)==preserved(afterValue) else{throw ProtocolError.invalid("Guitar volume was not confirmed by Stadium. The current reading will refresh; nothing was retried.")}
         matrixLastMIDI[output]=(midi,after.levels[output])
         return after
+    }
+}
+
+
+extension StadiumSession {
+    public func matrixConsole()async throws->MatrixConsoleState {
+        await acquire();defer{release()};return try MatrixConsoleState(property:await matrixMixerUnlocked(),origin:connectionID)
+    }
+    public func setMatrixConsole(_ command:MatrixConsoleCommand,expected:MatrixConsoleState,channel:Int,send:@Sendable ()async throws->Void)async throws->MatrixConsoleState {
+        await acquire();defer{release()};try Task.checkCancellation()
+        let origin=connectionID,before=try MatrixConsoleState(property:await matrixMixerUnlocked(),origin:connectionID)
+        let channels=try await matrixChannelsUnlocked()
+        guard expected.origin==origin,expected==before,before.linked==0,channels[command.output-1]==channel,
+              let target=before.strip(output:command.output,source:command.source),target.enabled else{throw ProtocolError.invalid("Matrix settings changed. Refresh before editing again.")}
+        let key=command.key,old=target.raw[command.field.rawValue]
+        if let prior=consoleLastMIDI[key],prior.value==command.value,prior.level==old,command.field == .level || command.field == .pan {return before}
+        let watermark=matrixRevision
+        try await send()
+        let deadline=Date().addingTimeInterval(0.8)
+        while consoleReceipts[key].map({$0>watermark}) != true {
+            guard connectionID==origin else{throw ProtocolError.closed}
+            guard Date()<deadline else{throw ProtocolError.invalid("Stadium did not confirm this Matrix control. Nothing was retried. Refresh before editing again.")}
+            try await Task.sleep(for:.milliseconds(10))
+        }
+        let after=try MatrixConsoleState(property:await matrixMixerUnlocked(),origin:connectionID)
+        guard connectionID==origin,after.linked==before.linked,let actual=after.strip(output:command.output,source:command.source) else{throw ProtocolError.invalid("Matrix output changed during the adjustment.")}
+        if command.field == .mute || command.field == .solo {
+            guard actual.raw[command.field.rawValue].boolean == !(old.boolean!) else{throw ProtocolError.invalid("The Matrix toggle was not confirmed. Nothing was retried.")}
+        }
+        if command.field == .pan {
+            let wanted=command.value<=64 ? Double(command.value-64)/64:Double(command.value-64)/63
+            guard abs(actual.pan-wanted)<0.025 else{throw ProtocolError.invalid("The Matrix pan was not confirmed. Nothing was retried.")}
+        }
+        for output in 1...3 {
+            for row in before.strips(output) {
+                guard let next=after.strip(output:output,source:row.id) else{throw ProtocolError.invalid("A Matrix channel disappeared.")}
+                var lhs=row.raw.object,rhs=next.raw.object
+                if output==command.output && row.id==command.source {lhs[command.field.rawValue]=nil;rhs[command.field.rawValue]=nil}
+                guard lhs==rhs else{throw ProtocolError.invalid("Another Matrix channel changed. Refresh before editing again.")}
+            }
+            guard before.layer(output)["out_"]==after.layer(output)["out_"] else{throw ProtocolError.invalid("The main output volume changed during the adjustment.")}
+        }
+        func preserved(_ property:Value)->Value {
+            func strip(_ value:Value)->Value {
+                switch value {
+                case .object(var row):
+                    if row["src_"]?.integer==command.source {row[command.field.rawValue]=nil}
+                    return .object(row.mapValues{strip($0)})
+                case .array(let rows):return .array(rows.map{strip($0)})
+                default:return value
+                }
+            }
+            var wrapper=property.object,root=property["val_"].object;root["atto"]=nil
+            root["lyrs"] = .array((root["lyrs"] ?? .null).items.map {layer in
+                guard layer["out_"]["dst_"].integer==command.output else{return layer}
+                var row=strip(layer).object
+                // Derived per-layer mute/solo masks may accompany a channel toggle.
+                if command.field == .mute {row["mute"]=nil}
+                if command.field == .solo {row["solo"]=nil}
+                return .object(row)
+            });wrapper["val_"] = .object(root);return .object(wrapper)
+        }
+        guard preserved(before.property)==preserved(after.property) else{throw ProtocolError.invalid("Unrelated Matrix settings changed. Refresh before editing again.")}
+        consoleLastMIDI[key]=(command.value,actual.raw[command.field.rawValue]);return after
     }
 }

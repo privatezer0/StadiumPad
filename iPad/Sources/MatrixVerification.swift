@@ -1,5 +1,7 @@
 #if DEBUG
 import Foundation
+import SwiftUI
+import UIKit
 import Network
 import Darwin
 import StadiumProtocol
@@ -80,5 +82,23 @@ import StadiumNetwork
         report["passed"]=true;report["copies"]=copies.map{["name":$0.preset.name,"id":$0.preset.contentID ?? -1,"label":$0.preset.label]};report["sourceSavedUnchanged"]=true;report["sourceLiveUnchanged"]=true;report["sourcePresetID"]=expectedID;report["sourceHash"]=PresetBackupStore.hash(before.rawEditBuffer)
     }catch{report["error"]=error.localizedDescription}
     try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:folder.appendingPathComponent("usb-spare-verification.json"),options:.atomic)
+}
+#endif
+
+#if DEBUG
+@MainActor func captureMatrixLayouts(_ monitor:StadiumMonitor)async {
+    let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+    do {
+        let state=try await monitor.readMatrixConsole()
+        let report:[String:Any]=["readSucceeded":true,"channels":state.strips(3).count,"linked":state.linked,"interface":monitor.connectionInterface]
+        try JSONSerialization.data(withJSONObject:report).write(to:folder.appendingPathComponent("matrix-console-inspection.json"),options:.atomic)
+        for (name,size,expanded) in [("pro",CGSize(width:1200,height:760),false),("regular",CGSize(width:960,height:620),false),("portrait",CGSize(width:700,height:820),false),("expanded",CGSize(width:960,height:620),true)] {
+            let host=UIHostingController(rootView:MatrixMixerView(initialOutput:3,preview:true,previewState:state,expanded:expanded).environmentObject(monitor))
+            host.view.bounds=CGRect(origin:.zero,size:size);host.view.backgroundColor = .black;host.view.setNeedsLayout();host.view.layoutIfNeeded()
+            try? await Task.sleep(for:.milliseconds(100))
+            let image=UIGraphicsImageRenderer(size:size).image{_ in host.view.drawHierarchy(in:host.view.bounds,afterScreenUpdates:true)}
+            try image.pngData()?.write(to:folder.appendingPathComponent("matrix-layout-"+name+".png"),options:.atomic)
+        }
+    }catch {try? JSONSerialization.data(withJSONObject:["readSucceeded":false,"error":error.localizedDescription]).write(to:folder.appendingPathComponent("matrix-console-inspection.json"),options:.atomic)}
 }
 #endif

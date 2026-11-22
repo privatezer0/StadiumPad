@@ -14,6 +14,16 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
             let trace=try option("--trace").map{try TraceRecorder(path:$0)}
             try await session.connect(host:host,port:UInt16(option("--port") ?? "2001") ?? 2001,trace:trace)
             let state=try await session.snapshot()
+            if args.contains("--matrix-console-check") {
+                guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic Matrix checks are loopback-only.")}
+                let listener=Task {while !Task.isCancelled {_ = try await session.event()}};defer{listener.cancel()}
+                let before=try await session.matrixConsole(),channels=try await session.matrixMIDIChannels()
+                let field:MatrixField=args.contains("--console-mute") ? .mute:.pan
+                let command=try MatrixConsoleCommand(output:1,source:14,field:field,value:field == .mute ? 127:32)
+                let after=try await session.setMatrixConsole(command,expected:before,channel:channels[0],send:{})
+                guard after.strip(output:1,source:14)?.raw[field.rawValue] != before.strip(output:1,source:14)?.raw[field.rawValue],try await session.matrixConsole()==after else{throw ProtocolError.invalid("Matrix live state did not remain current.")}
+                print("PASS Matrix console live receipt and preserved fields.");await session.disconnect();return
+            }
             if args.contains("--matrix-transaction-check") {
                 guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic Matrix checks are loopback-only.")}
                 let listener=Task {while !Task.isCancelled {_ = try await session.event()}}

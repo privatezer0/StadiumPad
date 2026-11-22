@@ -46,10 +46,17 @@ import StadiumProtocol
         refresh();guard bound(to:networkIdentity),(1...16).contains(channel),(0...127).contains(value),port != 0 else{throw ProtocolError.invalid("Stadium USB MIDI disconnected or changed. Nothing was sent.")}
         try sendHome(channel:channel,value:value)
     }
+    func send(_ command:MatrixConsoleCommand,channel:Int,networkIdentity:String)throws {
+        refresh();guard bound(to:networkIdentity),port != 0 else{throw ProtocolError.invalid("Stadium USB MIDI disconnected or changed. Nothing was sent.")}
+        try sendWord(command.midiWord(channel:channel),channel:channel,cc:command.cc,value:command.value)
+    }
     private func sendHome(channel:Int,value:Int)throws {
         // MIDI 1.0 Channel Voice in a Universal MIDI Packet, translated by CoreMIDI
         // to the connected USB device's negotiated protocol.
-        var word=try MatrixGuitarLevels.midiWord(channel:channel,value:value)
+        try sendWord(MatrixGuitarLevels.midiWord(channel:channel,value:value),channel:channel,cc:11,value:value)
+    }
+    private func sendWord(_ packetWord:UInt32,channel:Int,cc:Int,value:Int)throws {
+        var word=packetWord
         var list=MIDIEventList()
         let status=withUnsafeMutablePointer(to:&list){pointer -> OSStatus in
             let packet=MIDIEventListInit(pointer,._1_0)
@@ -59,7 +66,7 @@ import StadiumProtocol
             }
         }
         #if DEBUG
-        let record:[String:Any]=["at":Date().timeIntervalSince1970,"channel":channel,"cc":11,"value":value,"word":String(word,radix:16),"packets":list.numPackets,"status":status]
+        let record:[String:Any]=["at":Date().timeIntervalSince1970,"channel":channel,"cc":cc,"value":value,"word":String(word,radix:16),"packets":list.numPackets,"status":status]
         if let data=try? JSONSerialization.data(withJSONObject:record) {try? data.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("matrix-last-midi.json"),options:.atomic)}
         #endif
         guard status==0 else{throw ProtocolError.invalid("USB MIDI send failed. Nothing was retried.")}

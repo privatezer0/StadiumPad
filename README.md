@@ -9,10 +9,11 @@ for the official desktop editor.
 
 ## USB development candidate
 
-Version 0.10.0 (25) adds USB-scoped editor transport and three persistent Matrix
-Home guitar faders, with navigation on the right. It is under device qualification;
+Version 0.10.0 (26) adds USB-scoped editor transport and compact ¼-inch/XLR/Phones
+buttons opening a pedal-style Matrix mixer popup, with navigation on the right. It is under device qualification;
 **it is not a released or fully qualified USB/volume build**. USB reads and Save Copy
-passed on iPad Pro, but final volume and Global EQ confirmation checks remain open.
+passed on iPad Pro, and the earlier Phones fader passed a fresh owner check.
+The new popup controls and Global EQ USB confirmation still need device qualification.
 See [USB/Matrix development status](docs/USB_MATRIX.md). The validated installer and
 TestFlight submission remain 0.9.6 (24).
 
@@ -145,7 +146,7 @@ python3 -m venv /path/to/dev-venv
 ```
 
 For an external Swift build directory, use `swift test --scratch-path /path/to/build`
-and set `STADIUM_PROBE`, `STADIUM_EDIT_CHECK` to its `debug/` executables and
+and set `STADIUM_PROBE`, `STADIUM_EDIT_CHECK`, `STADIUM_LIBRARY` to its `debug/` executables and
 `STADIUM_TEST_ROOT` to a scratch directory before running Python tests.
 
 ### Local model metadata

@@ -5,9 +5,13 @@ import msgpack
 from integration_peer import Peer,exact,receive,ready,frame,osc,message
 BINARY=Path(os.environ.get('STADIUM_EDIT_CHECK',str(Path(__file__).resolve().parents[1]/'.build/debug/stadium-edit-check')))
 class MatrixPeer(Peer):
- def __init__(self,mode):
+ def __init__(self,mode,console=False):
+  self.console=console
   self.reads=0;self.midi_reads=0;self.broadcasts=[];self.broadcast_lock=threading.Lock()
   self.matrix={'lom_':0,'atto':3,'lyrs':[{'out_':{'dst_':i,'vol_':-20.},'home':{'mix_':{'src_':5,'vol_':0.},'chan':[{'src_':1,'vol_':0.} ]},'song':{'vol_':-6.}} for i in [1,2,3]]}
+  if console:
+   def row(source):return {'src_':source,'name':f'Channel {source}','enbl':-1,'vol_':0.,'pan_':0.,'mute':False,'solo':False,'unknown':123}
+   self.matrix={'lom_':0,'atto':3,'lyrs':[{'out_':{'dst_':i,'vol_':-20.},'home':{'mix_':row(5),'chan':[row(x) for x in range(1,5)]},'song':{'mix_':row(14),'chan':[row(x) for x in range(6,14)]},**{k:row(x) for k,x in [('clik',15),('cntn',16),('usbn',17),('bt__',18),('auxn',19)]}} for i in [1,2,3]]}
   super().__init__(mode)
  def serve(self,listener,index):
   try:
@@ -29,7 +33,7 @@ class MatrixPeer(Peer):
     elif a=='/MatchingPropertyValuesGet':
      self.midi_reads+=1
      if self.midi_reads==2 and self.mode not in ['no-change','stale','shared','linked']:
-      with self.broadcast_lock:self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixChannelVolume',[8,-1,3 if self.mode=='wrong-output' else 1,5,-.5]))))
+      with self.broadcast_lock:self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixChannelMute' if self.console=='mute' else '/syncMixChannelPan' if self.console else '/syncMixChannelVolume',[8,-1,3 if self.mode=='wrong-output' else 1,14 if self.console else 5,1 if self.console=='mute' else -.5]))))
      reply='/getMatchingPropertyValues';rows=[{'key_':'global.midi.'+k,'val_':x} for k,x in [('channel',1),('bcchannel',2),('over.usb.c',1),('matrix.ch.qtr',3),('matrix.ch.xlr',4),('matrix.ch.phones',4 if self.mode=='shared' else 5)]]
      values=[rid,v[1],b'lavppgsm'+msgpack.packb({'vals':rows})]
     elif a=='/PropertyValueGet':
@@ -39,7 +43,7 @@ class MatrixPeer(Peer):
       if self.mode=='stale' and self.reads==2:self.matrix['lyrs'][0]['home']['mix_']['vol_']=-2.
       if self.mode=='linked':self.matrix['lom_']=3
       if self.reads>=3 and self.mode not in ['no-change','stale','shared','linked']:
-       if self.mode=='unrelated':self.matrix['lyrs'][1]['song']['vol_']=-12.
+       if self.mode=='unrelated':self.matrix['lyrs'][1]['song']['unexpected']=True
       value=self.matrix
      else:value=False if key=='volatile.preset.edited' else 7
      values=[rid,key,b'lavppgsm'+msgpack.packb({'key_':key,'val_':copy.deepcopy(value)}),0]
@@ -65,4 +69,21 @@ class MatrixTransactions(unittest.TestCase):
  def test_linked_outputs_refused(self):self.run_mode('linked',False)
  def test_unrelated_changed_field_is_not_success(self):self.run_mode('unrelated',False)
  def test_other_output_event_cannot_confirm_our_command(self):self.run_mode('wrong-output',False)
+class ConsoleTransactions(unittest.TestCase):
+ def run_mode(self,mode,console,success):
+  peer=MatrixPeer(mode,console=console)
+  try:
+   with tempfile.TemporaryDirectory() as folder:
+    args=[str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',folder+'/plan','--backups',folder,'--matrix-console-check']
+    if console=='mute':args+=['--console-mute']
+    r=subprocess.run(args,capture_output=True,text=True,timeout=10)
+   self.assertEqual(peer.errors,[]);self.assertEqual(r.returncode==0,success,r.stdout+r.stderr)
+   self.assertFalse(any('Set' in a or a.startswith('/sync') for a in peer.sent))
+  finally:peer.close()
+ def test_pan_confirmed_by_live_event_with_stale_bulk(self):self.run_mode('normal','pan',True)
+ def test_mute_toggle_confirmed_by_live_event(self):self.run_mode('normal','mute',True)
+ def test_missing_toggle_receipt_is_not_retried(self):self.run_mode('no-change','mute',False)
+ def test_wrong_output_cannot_confirm(self):self.run_mode('wrong-output','pan',False)
+ def test_unrelated_unknown_field_is_preserved(self):self.run_mode('unrelated','pan',False)
+ def test_shared_channels_rejected(self):self.run_mode('shared','pan',False)
 if __name__=='__main__':unittest.main()
