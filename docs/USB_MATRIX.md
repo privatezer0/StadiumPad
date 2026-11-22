@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (40)**. This work is under physical-device qualification;
+Development version: **0.10.0 (41)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -22,26 +22,23 @@ optional Mac companion remains necessary for its existing clone file-transfer an
 library-backup operations; USB support does not add standalone clone transfers,
 offline editing, Songs/Showcase editing or other unfinished features.
 
-## Output buttons and the Matrix popup
+## Matrix Mixer button and popup
 
-The main header has compact **¼-inch, XLR and Phones** buttons centered together
-with Home, Librarian, Command Center, Global EQ and Songs. Tap an output to open a large dismissible Matrix mixer
-modal over the current editor. Close returns to the same iPad editor/preset. With verified direct USB MIDI,
-selecting an output sends the configured global channel CC9: Home (0), then the
-output command (7/8/9). Establishing Home first prevents an already-open pedal
-panel from toggling closed. Re-tap the selected output, use Close or swipe away to
-close the iPad popup and send Home to the pedal. Other output buttons switch both
-views. The header output buttons remain interactive behind the popup; unrelated
-background editor controls are disabled. The popup output buttons also support
-re-tapping to close. Leaving returns the pedal to Home, including when it started
-on Song; the previously visible pedal page is not queried or restored.
+A single **Matrix Mixer** button with a cyan fader icon sits centered beside Home,
+Librarian, Command Center, Global EQ and Songs. It opens a dismissible mixer modal.
+The modal header has three output icon buttons: ¼-inch connector, XLR connector
+and headphones. Highlighting identifies the selected output; accessible labels
+identify each icon. The last viewed output is remembered locally. Tapping the
+selected icon keeps that output open; use Close or swipe to dismiss the popup.
 
-These are screen-navigation commands, never level, mute, solo or preset writes.
-Wi-Fi-only and preview use remain local; no USB device means no pedal navigation.
-Identity, connection generation, USB-MIDI enablement and configured global channel
-are checked before each send. A global channel shared with bypass or Matrix is
-rejected. No automatic retry is made. If USB disappears, local dismissal still
-works; StadiumPad cannot close the disconnected pedal screen.
+Opening, selecting an output and closing are local view actions. They send no
+pedal-screen commands and never change presets. Build 40's CC9/Home screen-link
+behavior was removed after the owner reported the screens became out of sync.
+There is no verified pedal panel-visible getter; do not restore that navigation
+based on an assumed remote screen state. The working channel-edit transport and
+receipt checks are unchanged. Wi-Fi-only opens the mixer for viewing; channel
+editing still needs bound direct USB MIDI. Background interaction uses the normal
+modal behavior, without the experimental header tap-through behavior.
 
 The popup follows the pedal's channel-strip arrangement: Home, Song, Click, Count
 In, USB In 1/2, Bluetooth and Aux. Expand Home to reveal Path 1A/1B/2A/2B; expand
@@ -101,16 +98,12 @@ also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 21, 2026
 
-Build 40 adds linked output-panel navigation. Build 39 centered the header group;
-physical Pro and rendered regular landscape/portrait layouts fit without clipping.
-Build 40 passed 94 Swift tests and the unchanged 22 Matrix loopback regressions.
-Its native screen-navigation check selected all three outputs, verified the device
-attached-output readback, closed the popup and preserved the preset and mixer
-channel settings. Independent live events confirmed output 1/2/3 selection. Final native popup,
-closed editor and regular/portrait popup layouts were inspected; the presentation
-lease returned to zero. Debug navigation intent was removed after qualification.
-No remote screenshot of the pedal display is available; a MIDI send result alone
-is not independent visual proof of its panel visibility.
+Build 41 removes the unsuccessful screen-navigation feature and simplifies the UI.
+It retains build 38's channel-control fixes. Hardware navigation qualification from
+build 40 is superseded; attached-output readback never established panel visibility.
+Build 41 passes 91 Swift tests, 22 Matrix loopback tests and native build/install/
+launch. The physical Pro main screen and regular/portrait popup renders were
+inspected. No new channel edits were sent for this navigation-only fix.
 
 - 91 Swift tests and 22 Matrix loopback tests pass. These include stale bulk reads,
   missing/wrong-output receipts, receipt invalidation, linked/shared routing,

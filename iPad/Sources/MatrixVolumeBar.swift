@@ -2,54 +2,22 @@ import SwiftUI
 import UIKit
 import StadiumProtocol
 
-/// Compact output selectors. The mixer owns editing only while its modal is open.
+/// Opens the Matrix console locally; channel editing still uses verified USB MIDI.
 struct MatrixVolumeBar:View {
-    @EnvironmentObject var monitor:StadiumMonitor
-    @StateObject private var usb=MatrixUSBMIDI()
-    @State private var selected:Int?
-    @State private var panelSending=false
-    @State private var linkedConnection:UUID?
+    @State private var showingMixer=false
+    @AppStorage("matrixLastOutput") private var lastOutput=1
     let preview:Bool
     var body:some View {
-        HStack(spacing:8) {
-            ForEach(1...3,id:\.self){output in
-                Button {Task{_ = await choose(output==selected ? nil:output)}}label:{VStack(spacing:3){
-                    Image(systemName:output==3 ? "headphones":output==2 ? "circle.dotted":"cable.connector").font(.system(size:21,weight:.light))
-                    Text(MatrixGuitarLevels.labels[output-1]).font(.system(size:10,weight:.semibold))
-                }.frame(width:58,height:46).foregroundStyle(usb.online && monitor.connected ? .white:.gray)}.buttonStyle(.plain).disabled(panelSending || monitor.busy).accessibilityLabel("Open \(MatrixGuitarLevels.labels[output-1]) Matrix mixer")
-            }
-        }
+        Button {showingMixer=true}label:{VStack(spacing:2){
+            Image(systemName:"slider.vertical.3").font(.system(size:22,weight:.light)).foregroundStyle(.cyan)
+            Text("Matrix Mixer").font(.system(size:9))
+        }.frame(width:84,height:46)}.buttonStyle(.plain).accessibilityLabel("Open Matrix Mixer")
         #if DEBUG
-        .task {
-            if ProcessInfo.processInfo.arguments.contains("--show-matrix") {selected=3}
-            if !preview,ProcessInfo.processInfo.arguments.contains("--verify-matrix-panel") {await verifyMatrixPanelNavigation(monitor,choose:choose)}
-        }
+        .task {if ProcessInfo.processInfo.arguments.contains("--show-matrix") {showingMixer=true}}
         #endif
-        .sheet(isPresented:Binding(get:{selected != nil},set:{if !$0 {Task{_ = await choose(nil)}}})) {
-            MatrixMixerView(initialOutput:selected ?? 1,preview:preview,linkedOutput:selected,selectOutput:{value in await choose(value)},closePanel:{Task{_ = await choose(nil)}})
-                .environmentObject(monitor).frame(idealWidth:1100,idealHeight:730).presentationSizing(.fitted).presentationDragIndicator(.visible).presentationBackgroundInteraction(.enabled)
-        }
-    }
-    @MainActor private func choose(_ output:Int?)async->Bool {
-        guard !preview else{selected=output;return true}
-        guard !panelSending else{return false}
-        panelSending=true;defer{panelSending=false}
-        let connection=monitor.connectionID
-        do {
-            usb.refresh()
-            let shouldSend=output != nil ? usb.online && monitor.connected:linkedConnection==connection && monitor.connected && usb.online
-            if shouldSend {
-                guard let product=monitor.snapshot?.product,let id=FileCompanion.deviceID(product) else{throw ProtocolError.closed}
-                if monitor.connectionRoute == .usb,monitor.connectionInterface=="USB/Ethernet",!usb.bound(to:id) {try usb.bind(to:id)}
-                let channel=try await monitor.matrixPanelChannel()
-                guard connection==monitor.connectionID,monitor.connected else{throw CancellationError()}
-                try usb.navigate(MatrixPanelCommand(output:output),channel:channel,networkIdentity:id)
-                linkedConnection=output == nil ? nil:connection
-            }else {linkedConnection=nil}
-            selected=output;return true
-        }catch {
-            if output==nil {selected=nil;linkedConnection=nil}
-            monitor.errorText=error.localizedDescription;return false
+        .sheet(isPresented:$showingMixer) {
+            MatrixMixerView(initialOutput:(1...3).contains(lastOutput) ? lastOutput:1,preview:preview)
+                .frame(idealWidth:1100,idealHeight:730).presentationSizing(.fitted).presentationDragIndicator(.visible)
         }
     }
 }
@@ -170,29 +138,30 @@ struct MatrixMixerView:View {
     @StateObject private var model:MatrixConsoleModel
     @StateObject private var presence=MatrixUSBMIDI()
     @State private var output:Int
+    @AppStorage("matrixLastOutput") private var lastOutput=1
     @State private var homeExpanded=false
     @State private var songExpanded=false
     @State private var showEQ=false
     @State private var previousIdleTimer:Bool?
     @State private var matrixPresentation:UUID?
     let preview:Bool
-    let linkedOutput:Int?
-    let selectOutput:((Int?)async->Bool)?
-    let closePanel:(()->Void)?
-    @State private var panelSending=false
-    init(initialOutput:Int,preview:Bool=false,previewState:MatrixConsoleState?=nil,expanded:Bool=false,linkedOutput:Int?=nil,selectOutput:((Int?)async->Bool)?=nil,closePanel:(()->Void)?=nil){self.linkedOutput=linkedOutput;self.selectOutput=selectOutput;self.closePanel=closePanel;_output=State(initialValue:initialOutput);self.preview=preview;_model=StateObject(wrappedValue:MatrixConsoleModel(previewState:previewState));_homeExpanded=State(initialValue:expanded);_songExpanded=State(initialValue:expanded)}
+    init(initialOutput:Int,preview:Bool=false,previewState:MatrixConsoleState?=nil,expanded:Bool=false){_output=State(initialValue:initialOutput);self.preview=preview;_model=StateObject(wrappedValue:MatrixConsoleModel(previewState:previewState));_homeExpanded=State(initialValue:expanded);_songExpanded=State(initialValue:expanded)}
     private var sources:[Int] {[5]+(homeExpanded ? [1,2,3,4]:[])+[14]+(songExpanded ? Array(6...13):[])+[15,16,17,18,19]}
-    private var enabled:Bool {model.ready && presence.online && !preview && !panelSending}
+    private var enabled:Bool {model.ready && presence.online && !preview}
     var body:some View {
         GeometryReader {area in VStack(spacing:0) {
             HStack(spacing:12) {
                 Menu {
                     Button("Clear Solos on \(MatrixGuitarLevels.labels[output-1])"){model.clearSolos(output:output,monitor:monitor)}.disabled(!presence.online || !monitor.connected || model.state==nil || model.sending)
                 }label:{Image(systemName:"line.3.horizontal").foregroundStyle(.cyan).frame(width:30,height:44)}.accessibilityLabel("Matrix mixer options")
-                Text("Matrix").font(.system(size:26,weight:.light))
-                HStack(spacing:0){ForEach(1...3,id:\.self){n in
-                    Button {Task{await tapOutput(n)}}label:{Text(MatrixGuitarLevels.labels[n-1]).font(.system(size:14,weight:.medium)).frame(maxWidth:.infinity).padding(.vertical,9).background(output==n ? Color.white.opacity(0.2):.clear,in:Capsule())}.buttonStyle(.plain).accessibilityLabel("\(MatrixGuitarLevels.labels[n-1]) Matrix").accessibilityValue(output==n ? "Selected; tap to close":"Tap to open")
-                }}.padding(2).background(.white.opacity(0.07),in:Capsule()).frame(maxWidth:280).disabled(panelSending || model.sending)
+                Text("Matrix Mixer").font(.system(size:26,weight:.light))
+                HStack(spacing:6){ForEach(1...3,id:\.self){n in
+                    Button {output=n}label:{Image(systemName:n==3 ? "headphones":n==2 ? "circle.dotted":"cable.connector")
+                        .font(.system(size:23,weight:.light)).frame(width:48,height:42)
+                        .foregroundStyle(output==n ? Color.cyan:Color.gray)
+                        .background(output==n ? Color.cyan.opacity(0.13):.clear,in:RoundedRectangle(cornerRadius:7))
+                    }.buttonStyle(.plain).accessibilityLabel(MatrixGuitarLevels.labels[n-1]+" Matrix output").accessibilityValue(output==n ? "Selected":"Not selected")
+                }}.disabled(model.sending)
                 Spacer(minLength:0)
                 Button {showEQ=true}label:{Label("Global EQ",systemImage:"waveform.path")}.disabled(!monitor.connected || model.sending)
                 Button("Close"){closeMixer()}.fontWeight(.semibold).padding(.leading,10)
@@ -217,10 +186,8 @@ struct MatrixMixerView:View {
         }}.background(Color(white:0.045)).foregroundStyle(.white).preferredColorScheme(.dark)
         .task(id:"\(monitor.connectionID)-\(monitor.connected)"){if !preview {await model.observe(monitor)}}
         .onAppear{if !preview {previousIdleTimer=UIApplication.shared.isIdleTimerDisabled;UIApplication.shared.isIdleTimerDisabled=true;if matrixPresentation==nil {matrixPresentation=monitor.beginMatrixPresentation()}}}
-        .interactiveDismissDisabled(model.sending || panelSending)
         .onDisappear{finishPresentation()}
-        .onChange(of:output){_,_ in model.dropPending()}
-        .onChange(of:linkedOutput){_,value in if let value {output=value}}
+        .onChange(of:output){_,value in model.dropPending();if !preview {lastOutput=value}}
         #if DEBUG
         .task {
             guard !preview,!nativeMatrixTestsDisarmed() else{return}
@@ -234,17 +201,7 @@ struct MatrixMixerView:View {
         #endif
         .sheet(isPresented:$showEQ){NavigationStack{GlobalEQView(preview:preview,initialOutput:output==3 ? .phones:output==2 ? .xlr:.quarter).environmentObject(monitor).toolbar{ToolbarItem(placement:.confirmationAction){Button("Done"){showEQ=false}}}}}
     }
-    @MainActor private func tapOutput(_ next:Int)async {
-        guard !panelSending,!model.sending else{return}
-        if next==output {closeMixer();return}
-        panelSending=true;defer{panelSending=false}
-        if let selectOutput {if await selectOutput(next) {model.dropPending();output=next}}
-        else {output=next}
-    }
-    private func closeMixer(){
-        guard !panelSending,!model.sending else{return}
-        model.stop();if let closePanel {closePanel()}else{dismiss()}
-    }
+    private func closeMixer(){model.stop();dismiss()}
     private func finishPresentation(){
         model.stop()
         if let previousIdleTimer {UIApplication.shared.isIdleTimerDisabled=previousIdleTimer}

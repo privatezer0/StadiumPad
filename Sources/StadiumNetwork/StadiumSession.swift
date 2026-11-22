@@ -657,10 +657,6 @@ extension StadiumSession {
         await acquire();defer{release()};return try MatrixGuitarLevels(value:await matrixMixerUnlocked(),origin:connectionID)
     }
     public func matrixMIDIValue(output:Int)->Int? {matrixLastMIDI[output]?.value}
-    public func matrixPanelChannel()async throws->Int {
-        await acquire();defer{release()}
-        return try MatrixPanelCommand.globalChannel(properties:await readUnlocked(.matrixMIDI))
-    }
     public func matrixMIDIChannels()async throws->[Int] {
         await acquire();defer{release()}
         return try await matrixChannelsUnlocked()

@@ -51,7 +51,7 @@ struct StadiumView:View {
                 header
                 if section == .librarian {
                     Text("Librarian").font(.system(size:28,weight:.light)).frame(maxWidth:.infinity).frame(height:58).background(EditorTheme.header)
-                } else if section != .commands && section != .eq {presetBar(compact:geometry.size.width<1150).disabled(monitor.matrixPresented)}
+                } else if section != .commands && section != .eq {presetBar(compact:geometry.size.width<1150)}
                 HStack(spacing:0) {
                     if section != .librarian && section != .commands && section != .eq {PresetSidebar(refreshID:libraryRevision).frame(width:max(190,min(290,geometry.size.width*0.245)))}
                     Group {
@@ -83,7 +83,7 @@ struct StadiumView:View {
                         else if section == .songs {LibraryRows(title:"Songs",entries:(monitor.libraryEntries[-7] ?? []).filter{$0.type==4},canOpen:false).overlay(alignment:.bottom){Text("Showcase editing and transport are not connected yet").font(.caption).padding(10).background(.black)}}
                         else {SectionStatusView(section:section)}
                     }.frame(maxWidth:.infinity,maxHeight:.infinity)
-                }.frame(maxWidth:.infinity,maxHeight:.infinity).disabled(monitor.matrixPresented)
+                }.frame(maxWidth:.infinity,maxHeight:.infinity)
                 HStack(spacing:8) {
                     Circle().fill(monitor.connected ? .green:.orange).frame(width:5,height:5)
                     Text(monitor.busy ? "Updating Stadium…":monitor.lastAction ?? monitor.status).lineLimit(1)
@@ -200,13 +200,13 @@ struct StadiumView:View {
                     Button {section=item} label:{VStack(spacing:2) {
                         Image(systemName:item.icon).font(.system(size:20,weight:.light))
                         Text(item.rawValue).font(.system(size:9)).lineLimit(1).minimumScaleFactor(0.75)
-                    }.frame(width:item == .commands ? 69:50,height:46).foregroundStyle(section==item ? .white:.gray).background(section==item ? .white.opacity(0.055):.clear,in:RoundedRectangle(cornerRadius:5))}.buttonStyle(.plain).disabled(monitor.matrixPresented)
+                    }.frame(width:item == .commands ? 69:50,height:46).foregroundStyle(section==item ? .white:.gray).background(section==item ? .white.opacity(0.055):.clear,in:RoundedRectangle(cornerRadius:5))}.buttonStyle(.plain)
                 }}
                 }.fixedSize(horizontal:true,vertical:false)
                 HStack {
                 if geometry.size.width>=1250 {Text("StadiumPad").font(.headline)}
                 Spacer(minLength:0)
-                Button {showConnection=true} label:{Image(systemName:monitor.connected ? (monitor.connectionInterface=="USB/Ethernet" ? "cable.connector":"wifi"):"wifi.slash").font(.system(size:19)).frame(width:32,height:44)}.accessibilityLabel(monitor.connected ? "Stadium connection":"Connect to Stadium").buttonStyle(.plain).disabled(monitor.matrixPresented).foregroundStyle(monitor.connected ? .white:.orange)
+                Button {showConnection=true} label:{Image(systemName:monitor.connected ? (monitor.connectionInterface=="USB/Ethernet" ? "cable.connector":"wifi"):"wifi.slash").font(.system(size:19)).frame(width:32,height:44)}.accessibilityLabel(monitor.connected ? "Stadium connection":"Connect to Stadium").buttonStyle(.plain).foregroundStyle(monitor.connected ? .white:.orange)
                 }
             }.padding(.horizontal,12).frame(maxWidth:.infinity,maxHeight:.infinity)
         }.frame(height:66).background(EditorTheme.header)

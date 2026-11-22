@@ -15,10 +15,9 @@ import StadiumNetwork
     @Published var connected=false
     @Published var connecting=false
     private(set) var lastEvent:Date?
-    @Published private(set) var matrixPresented=false
     private var matrixPresentations:Set<UUID>=[]
-    func beginMatrixPresentation()->UUID {let id=UUID();matrixPresentations.insert(id);matrixPresented=true;return id}
-    func endMatrixPresentation(_ id:UUID){matrixPresentations.remove(id);matrixPresented = !matrixPresentations.isEmpty}
+    func beginMatrixPresentation()->UUID {let id=UUID();matrixPresentations.insert(id);return id}
+    func endMatrixPresentation(_ id:UUID){matrixPresentations.remove(id)}
     #if DEBUG
     var debugMatrixPresentationCount:Int {matrixPresentations.count}
     #endif
@@ -174,10 +173,6 @@ import StadiumNetwork
         let token=generation
         let value=try await session.matrixGuitarLevels()
         guard generation==token else{throw CancellationError()};return value
-    }
-    func matrixPanelChannel()async throws->Int {
-        guard connected,let session else{throw ProtocolError.closed};let token=generation
-        let channel=try await session.matrixPanelChannel();guard generation==token else{throw CancellationError()};return channel
     }
     func matrixChannels()async throws->[Int] {
         guard connected,let session else{throw ProtocolError.closed};let token=generation
