@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (32)**. This work is under physical-device qualification;
+Development version: **0.10.0 (33)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -33,8 +33,9 @@ The popup follows the pedal's channel-strip arrangement: Home, Song, Click, Coun
 In, USB In 1/2, Bluetooth and Aux. Expand Home to reveal Path 1A/1B/2A/2B; expand
 Song to reveal its eight tracks. Expanded channels scroll horizontally, as on the
 pedal. Each available strip has a vertical volume fader, pan popup with Center,
-mute and solo. Clear Solos turns off the currently enabled solos through individually
-confirmed operations. The Global EQ shortcut opens the selected output's EQ.
+mute and solo. The top-left mixer menu includes Clear Solos for the selected output,
+using the absolute CC103 operation. It stays available after an uncertain toggle;
+controls pause while recovery runs. The Global EQ shortcut opens that output's EQ.
 Count In is reserved by Line 6 and is visibly unavailable. Native channel enable
 flags disable unavailable inputs/tracks.
 
@@ -84,10 +85,10 @@ also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 21, 2026
 
-- 83 Swift tests pass. Matrix-specific loopback tests: 14 pass, including
+- 84 Swift tests pass. Matrix-specific loopback tests: 21 pass, including
   invalidating an older no-op receipt before any new send. The full integration
   suite with TCP tuning completed 82 cases: 79 pass and 3 existing skips; the new
-  receipt regression then passed in the 14-case Matrix suite. The Matrix
+  receipt and recovery regressions then passed in the 21-case Matrix suite. The Matrix
   loopback tests deliberately keep the bulk property stale and deliver live events,
   and reject missing/wrong-output receipts, stale contexts, linked outputs, shared
   channels and unrelated changed fields.
@@ -166,3 +167,18 @@ in the owner's earlier check. Fresh gesture and Solo acceptance remain required.
 An opt-in DEBUG Matrix trace filters to the live-update socket, with a2MiB cap.
 This avoids large preset-read responses exhausting the event trace before testing.
 No source traces or native mixer data are included in Git.
+
+## Absolute Solo recovery and autonomous qualification
+
+Clear Solos sends only the selected output's documented CC103. It requires fresh
+routing/identity checks and off receipts for all previously active strips; partial,
+missing and other-output events cannot claim success. All non-solo fields and other
+outputs are preserved. It does not loop through uncertain toggle commands.
+
+A DEBUG --verify-matrix-solo check is prepared for unattended qualification. A fresh
+reviewed intent and UUID marker are mandatory; it starts with Phones solos off,
+records the Matrix baseline, runs only Home Solo on/off, then verifies saved preset
+and live edit bytes stayed unchanged. If that toggle check becomes uncertain, it
+attempts one separate absolute Clear Solos restoration. An uncertain clear is never
+retried. Normal launch sends no test writes. Physical qualification of this recovery
+path remains pending while the iPad cannot launch the check.

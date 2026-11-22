@@ -89,3 +89,17 @@ public struct MatrixConsoleCommand:Equatable,Sendable {
         return UInt32(0x2)<<28 | UInt32(0xB0+channel-1)<<16 | UInt32(cc)<<8 | UInt32(value)
     }
 }
+
+/// Documented absolute Clear Solo for one Matrix output (CC103), not a toggle.
+public struct MatrixClearSolosCommand:Equatable,Sendable {
+    public let output:Int
+    public init(output:Int)throws {
+        guard (1...3).contains(output) else{throw ProtocolError.invalid("Invalid Matrix output.")}
+        self.output=output
+    }
+    public func midiWords(channel:Int)throws->[UInt32] {
+        guard (1...16).contains(channel) else{throw ProtocolError.invalid("Invalid Matrix MIDI channel.")}
+        let press=UInt32(0x2)<<28 | UInt32(0xB0+channel-1)<<16 | UInt32(103)<<8 | UInt32(127)
+        return [press,press & 0xFFFFFF00]
+    }
+}

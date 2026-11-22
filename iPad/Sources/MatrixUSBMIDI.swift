@@ -50,6 +50,10 @@ import StadiumProtocol
         refresh();guard bound(to:networkIdentity),port != 0 else{throw ProtocolError.invalid("Stadium USB MIDI disconnected or changed. Nothing was sent.")}
         try sendWords(command.midiWords(channel:channel),channel:channel,cc:command.cc,value:command.value)
     }
+    func clearSolos(_ command:MatrixClearSolosCommand,channel:Int,networkIdentity:String)throws {
+        refresh();guard bound(to:networkIdentity),port != 0 else{throw ProtocolError.invalid("Stadium USB MIDI disconnected or changed. Nothing was sent.")}
+        try sendWords(command.midiWords(channel:channel),channel:channel,cc:103,value:127)
+    }
     private func sendHome(channel:Int,value:Int)throws {
         // MIDI 1.0 Channel Voice in a Universal MIDI Packet, translated by CoreMIDI
         // to the connected USB device's negotiated protocol.

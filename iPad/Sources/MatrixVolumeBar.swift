@@ -84,9 +84,25 @@ struct MatrixVolumeBar:View {
     func retry(){blocked=false;revision+=1}
     func dropPending(){queue=[]}
     func clearSolos(output:Int,monitor:StadiumMonitor){
-        guard ready,!sending,let state else{return}
-        let commands=state.strips(output).filter{$0.enabled && $0.solo}.compactMap{try? MatrixConsoleCommand(output:output,source:$0.id,field:.solo,value:127)}
-        guard let first=commands.first else{return};send(first,monitor:monitor);queue.append(contentsOf:commands.dropFirst())
+        lastRequested=["output":output,"field":"clearSolos"];report()
+        guard writer==nil,!sending,usb.online,monitor.connected,let id=deviceID else{return}
+        queue=[];revision+=1;ready=false
+        let epoch=token,connection=monitor.connectionID
+        writer=Task {
+            sending=true
+            defer{sending=false;writer=nil;report()}
+            do {
+                let before=try await monitor.readMatrixConsole(),actualChannels=try await monitor.matrixChannels()
+                let command=try MatrixClearSolosCommand(output:output),channel=actualChannels[output-1]
+                let after=try await monitor.clearMatrixSolos(command,expected:before,channel:channel) {
+                    try await MainActor.run {
+                        guard self.token==epoch,monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
+                        try self.usb.clearSolos(command,channel:channel,networkIdentity:id)
+                    }
+                }
+                guard token==epoch else{return};state=after;channels=actualChannels;blocked=false;ready=usb.bound(to:id);message="Solos cleared";lastRequested=["output":output,"field":"clearSolos"]
+            }catch {guard token==epoch else{return};ready=false;blocked=true;message=error.localizedDescription}
+        }
     }
     func stop(){token=UUID();queue=[];ready=false}
     func send(_ command:MatrixConsoleCommand,monitor:StadiumMonitor) {
@@ -138,11 +154,12 @@ struct MatrixMixerView:View {
     var body:some View {
         GeometryReader {area in VStack(spacing:0) {
             HStack(spacing:12) {
-                Image(systemName:"slider.vertical.3").foregroundStyle(.cyan)
+                Menu {
+                    Button("Clear Solos on \(MatrixGuitarLevels.labels[output-1])"){model.clearSolos(output:output,monitor:monitor)}.disabled(!presence.online || !monitor.connected || model.state==nil || model.sending)
+                }label:{Image(systemName:"line.3.horizontal").foregroundStyle(.cyan).frame(width:30,height:44)}.accessibilityLabel("Matrix mixer options")
                 Text("Matrix").font(.system(size:26,weight:.light))
                 Picker("Output",selection:$output){ForEach(1...3,id:\.self){n in Text(MatrixGuitarLevels.labels[n-1]).tag(n)}}.pickerStyle(.segmented).frame(maxWidth:280)
                 Spacer(minLength:0)
-                if model.state?.strips(output).contains(where:{$0.solo})==true {Button("Clear Solos"){model.clearSolos(output:output,monitor:monitor)}.disabled(!enabled || model.sending)}
                 Button {showEQ=true}label:{Label("Global EQ",systemImage:"waveform.path")}.disabled(!monitor.connected || model.sending)
                 Button("Close"){model.stop();dismiss()}.fontWeight(.semibold).padding(.leading,10)
             }.padding(.horizontal,18).frame(height:64).background(EditorTheme.header)

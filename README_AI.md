@@ -315,13 +315,14 @@ remains approximate. Live notifications do not prove acoustic/pedal-screen behav
 Device-side acceptance, unplug/replug and USB EQ stored confirmation remain open;
 never convert the candidate into a claimed release based only on synthetic tests.
 
-## Matrix popup (development candidate 0.10.0 build 32)
+## Matrix popup (development candidate 0.10.0 build 33)
 
 The three header controls open MatrixMixerView as a modal, not inline volume faders.
 MatrixConsoleState strictly parses the nineteen documented sources per output;
 source IDs differ from CC order (Home=source5/CC11, Song=source14/CC16).
 MatrixConsoleCommand exposes only typed channel fields, never arbitrary MIDI CCs.
-Mute/solo CCs are toggles: send127 once and require the opposite live state. Never
+Mute/solo CCs are toggles: require the opposite live state. Solo currently sends
+127 then0 as a press/release pair under device qualification. Never
 retry uncertain toggles. Coalesce level/pan gestures, but never toggle commands.
 Every transaction requires a new matching output/source/field live receipt and
 preserves unrelated known and unknown data. Bulk properties can stay stale after
@@ -332,3 +333,12 @@ Opening/closing the popup and selecting its output are local view actions only.
 No meters, main-knob writes, output linking or all-channel Reset are implemented;
 do not fake these or claim full pedal parity. Initial level thumb remains estimated;
 actual dB readouts are live, and calibration requires independent hardware evidence.
+
+Clear Solos is a separate absolute CC103 operation for one output, not a loop of
+unconfirmed Solo toggles. Its menu remains usable after an uncertain toggle, with
+fresh connection/USB identity/channel/link guards. Require new off receipts for
+all previously active known strips and preserve every non-solo mixer field and all
+other outputs. Do not retry an uncertain clear. The guarded DEBUG Solo qualification
+uses a reviewed UUID, starts only with all Phones solos off, preserves saved/live
+preset bytes, tests Home on/off once, and uses one absolute clear as recovery only.
+Do not replay marked runs or enable these tests on normal launch.

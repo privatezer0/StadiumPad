@@ -766,3 +766,43 @@ extension StadiumSession {
         consoleLastMIDI[key]=(command.value,actual.raw[command.field.rawValue]);return after
     }
 }
+
+extension StadiumSession {
+    /// Absolute recovery remains available after an uncertain toggle. No retries.
+    public func clearMatrixSolos(_ command:MatrixClearSolosCommand,expected:MatrixConsoleState,channel:Int,send:@Sendable ()async throws->Void)async throws->MatrixConsoleState {
+        await acquire();defer{release()};try Task.checkCancellation()
+        let origin=connectionID,before=try MatrixConsoleState(property:await matrixMixerUnlocked(),origin:connectionID)
+        let channels=try await matrixChannelsUnlocked()
+        guard expected.origin==origin,expected==before,before.linked==0,channels[command.output-1]==channel else{throw ProtocolError.invalid("Matrix settings changed. Refresh before clearing solos.")}
+        let active=before.strips(command.output).filter(\.solo).map(\.id),watermark=matrixRevision
+        for source in MatrixStrip.order {consoleLastMIDI["\(command.output):\(source):solo"]=nil}
+        try await send()
+        let deadline=Date().addingTimeInterval(0.8)
+        while true {
+            guard connectionID==origin else{throw ProtocolError.closed}
+            let fresh=MatrixStrip.order.filter {source in
+                let key="\(command.output):\(source):solo"
+                return (consoleReceipts[key] ?? 0)>watermark && consoleLive[key]?.value.boolean==false
+            }
+            if !fresh.isEmpty,active.allSatisfy({fresh.contains($0)}) {break}
+            guard Date()<deadline else{throw ProtocolError.invalid("Clear Solos was sent, but Stadium did not confirm it. Nothing was retried; check the pedal.")}
+            try await Task.sleep(for:.milliseconds(10))
+        }
+        let after=try MatrixConsoleState(property:await matrixMixerUnlocked(),origin:connectionID)
+        guard origin==connectionID,after.strips(command.output).allSatisfy({!$0.solo}) else{throw ProtocolError.invalid("Stadium has not confirmed every Solo is off.")}
+        func preserved(_ property:Value)->Value {
+            func removeSolo(_ value:Value)->Value {
+                switch value {
+                case .object(var row):row["solo"]=nil;return .object(row.mapValues{removeSolo($0)})
+                case .array(let rows):return .array(rows.map{removeSolo($0)})
+                default:return value
+                }
+            }
+            var wrapper=property.object,root=property["val_"].object;root["atto"]=nil
+            root["lyrs"] = .array((root["lyrs"] ?? .null).items.map {layer in layer["out_"]["dst_"].integer==command.output ? removeSolo(layer):layer})
+            wrapper["val_"] = .object(root);return .object(wrapper)
+        }
+        guard preserved(before.property)==preserved(after.property) else{throw ProtocolError.invalid("Other Matrix settings changed during Clear Solos. Inspect the pedal.")}
+        return after
+    }
+}

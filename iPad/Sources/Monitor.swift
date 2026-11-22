@@ -188,6 +188,12 @@ import StadiumNetwork
         let state=try await session.setMatrixConsole(command,expected:expected,channel:channel,send:send)
         guard generation==token else{throw CancellationError()};return state
     }
+    func clearMatrixSolos(_ command:MatrixClearSolosCommand,expected:MatrixConsoleState,channel:Int,send:@Sendable @escaping ()async throws->Void)async throws->MatrixConsoleState {
+        guard connected,!busy,let session else{throw ProtocolError.invalid("Finish the current editor update before clearing solos.")}
+        let token=generation;busy=true;defer{if token==generation {busy=false}}
+        let state=try await session.clearMatrixSolos(command,expected:expected,channel:channel,send:send)
+        guard token==generation else{throw CancellationError()};return state
+    }
     func stop() {
         eqCommitTask?.cancel();eqCommitTask=nil
         generation=UUID();refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;focusedPresetID=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil

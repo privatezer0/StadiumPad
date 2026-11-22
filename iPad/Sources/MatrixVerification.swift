@@ -70,7 +70,7 @@ import StadiumNetwork
         let saved=try await monitor.readUSBSavedSource(expectedID)
         try before.rawEditBuffer.write(to:folder.appendingPathComponent("usb-source-live-original.bin"),options:.atomic)
         try saved.write(to:folder.appendingPathComponent("usb-source-saved-original.bin"),options:.atomic)
-        try Data("started".utf8).write(to:marker,options:.atomic)
+        try Data("started".utf8).write(to:marker,options:.withoutOverwriting)
         var copies:[PreservedPreset]=[]
         for name in ["USB Preserve 1121","USB Edit Test 1121"] {
             let copy=try await monitor.prepareUSBSpare(name:name,expectedID:expectedID)
@@ -135,7 +135,7 @@ import StadiumNetwork
         identity=id;midi.refresh();guard midi.bound(to:id) else{throw ProtocolError.invalid("The attached USB Stadium is not confirmed.")}
         let before=try await monitor.readMatrixConsole()
         try MessagePack.encode(before.property).write(to:folder.appendingPathComponent("matrix-pan-before.bin"),options:.atomic)
-        try Data("started".utf8).write(to:marker,options:.atomic)
+        try Data("started".utf8).write(to:marker,options:.withoutOverwriting)
         needsRestore=true
         try await apply(62)
         try await apply(64);needsRestore=false
@@ -149,5 +149,75 @@ import StadiumNetwork
     }
     report["steps"]=steps
     try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:folder.appendingPathComponent("matrix-pan-timing.json"),options:.atomic)
+}
+#endif
+
+#if DEBUG
+/// Bounded autonomous Solo qualification, with absolute CC103 recovery.
+@MainActor func verifyMatrixSoloRoundTrip(_ monitor:StadiumMonitor)async {
+    let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+    var report:[String:Any]=["passed":false,"restored":false]
+    var steps:[[String:Any]]=[],started=false,clearAttempted=false,soloMayBeActive=false
+    let midi=MatrixUSBMIDI()
+    var identity:String?
+    func context()async throws->(MatrixConsoleState,Int,String,UUID) {
+        let state=try await monitor.readMatrixConsole(),channels=try await monitor.matrixChannels()
+        guard monitor.connected,monitor.connectionRoute == .usb,monitor.connectionInterface=="USB/Ethernet",state.linked==0,let id=identity,midi.bound(to:id) else{throw ProtocolError.invalid("USB Solo test context changed.")}
+        return(state,channels[2],id,monitor.connectionID)
+    }
+    func toggle(_ name:String)async throws {
+        let (before,channel,id,connection)=try await context(),time=Date()
+        let command=try MatrixConsoleCommand(output:3,source:5,field:.solo,value:127)
+        let after=try await monitor.setMatrixConsole(command,expected:before,channel:channel) {
+            try await MainActor.run {
+                guard monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
+                try midi.send(command,channel:channel,networkIdentity:id)
+            }
+        }
+        steps.append(["name":name,"solo":after.strip(output:3,source:5)!.solo,"milliseconds":Date().timeIntervalSince(time)*1000])
+    }
+    func clear()async throws {
+        clearAttempted=true
+        let (before,channel,id,connection)=try await context(),time=Date()
+        let command=try MatrixClearSolosCommand(output:3)
+        let after=try await monitor.clearMatrixSolos(command,expected:before,channel:channel) {
+            try await MainActor.run {
+                guard monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
+                try midi.clearSolos(command,channel:channel,networkIdentity:id)
+            }
+        }
+        guard after.strips(3).allSatisfy({!$0.solo}) else{throw ProtocolError.invalid("Solo recovery is not confirmed.")}
+        report["restored"]=true
+        steps.append(["name":"Clear Solos","solo":false,"milliseconds":Date().timeIntervalSince(time)*1000])
+    }
+    do {
+        let intent=try JSONSerialization.jsonObject(with:Data(contentsOf:folder.appendingPathComponent("matrix-solo-intent.json"))) as? [String:Any]
+        guard intent?["authorizePhonesHomeSoloRoundTrip"] as? Bool==true,let run=intent?["run"] as? String,UUID(uuidString:run) != nil,
+              monitor.connected,let product=monitor.snapshot?.product,let id=FileCompanion.deviceID(product) else{throw ProtocolError.invalid("A reviewed one-shot Solo intent is required.")}
+        let marker=folder.appendingPathComponent("matrix-solo-"+run+"-started")
+        guard !FileManager.default.fileExists(atPath:marker.path) else{throw ProtocolError.invalid("Do not replay an interrupted Solo test.")}
+        identity=id;midi.refresh()
+        let (baseline,_,_,_)=try await context()
+        guard baseline.strips(3).allSatisfy({!$0.solo}) else{throw ProtocolError.invalid("Clear existing Phones solos before qualification.")}
+        let source=try await monitor.readUSBSource()
+        guard let sourceID=source.presetID else{throw ProtocolError.invalid("Current preset identity unavailable.")}
+        let saved=try await monitor.readUSBSavedSource(sourceID)
+        try MessagePack.encode(baseline.property).write(to:folder.appendingPathComponent("matrix-solo-before.bin"),options:.atomic)
+        try Data("started".utf8).write(to:marker,options:.withoutOverwriting);started=true
+        soloMayBeActive=true
+        try await toggle("Solo on")
+        try await toggle("Solo off")
+        let final=try await monitor.readMatrixConsole()
+        guard final.strips(3).allSatisfy({!$0.solo}) else{throw ProtocolError.invalid("Solo off is not confirmed.")}
+        soloMayBeActive=false;report["restored"]=true
+        let afterSource=try await monitor.readUSBSource(),afterSaved=try await monitor.readUSBSavedSource(sourceID)
+        guard afterSource.rawEditBuffer==source.rawEditBuffer,afterSource.presetID==source.presetID,afterSource.activeSnapshot==source.activeSnapshot,afterSource.dirty==source.dirty,saved==afterSaved else{throw ProtocolError.invalid("Preset preservation differs after the Solo test.")}
+        report["presetUnchanged"]=true;report["passed"]=true
+    }catch {
+        report["error"]=error.localizedDescription
+        if started,soloMayBeActive,!clearAttempted {do{try await clear()}catch{report["restoreError"]=error.localizedDescription}}
+    }
+    report["steps"]=steps
+    try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:folder.appendingPathComponent("matrix-solo-result.json"),options:.atomic)
 }
 #endif

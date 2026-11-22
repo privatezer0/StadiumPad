@@ -40,4 +40,10 @@ final class MatrixConsoleTests:XCTestCase {
         XCTAssertEqual(try MatrixConsoleCommand(output:3,source:5,field:.pan,value:64).midiWords(channel:5),[0x20B42240])
     }
 
+    func testClearSoloIsAnAbsoluteSeparateCCAndNotAToggleLoop()throws {
+        XCTAssertEqual(try MatrixClearSolosCommand(output:3).midiWords(channel:5),[0x20B4677F,0x20B46700])
+        XCTAssertThrowsError(try MatrixClearSolosCommand(output:0))
+        XCTAssertThrowsError(try MatrixClearSolosCommand(output:1).midiWords(channel:17))
+    }
+
 }

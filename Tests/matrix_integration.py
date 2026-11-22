@@ -12,6 +12,9 @@ class MatrixPeer(Peer):
   if console:
    def row(source):return {'src_':source,'name':f'Channel {source}','enbl':-1,'vol_':0.,'pan_':0.,'mute':False,'solo':False,'unknown':123}
    self.matrix={'lom_':0,'atto':3,'lyrs':[{'out_':{'dst_':i,'vol_':-20.},'home':{'mix_':row(5),'chan':[row(x) for x in range(1,5)]},'song':{'mix_':row(14),'chan':[row(x) for x in range(6,14)]},**{k:row(x) for k,x in [('clik',15),('cntn',16),('usbn',17),('bt__',18),('auxn',19)]}} for i in [1,2,3]]}
+  if console=='clear':
+   self.matrix['lyrs'][0]['home']['mix_']['solo']=True
+   self.matrix['lyrs'][0]['song']['mix_']['solo']=True
   super().__init__(mode)
  def serve(self,listener,index):
   try:
@@ -33,7 +36,11 @@ class MatrixPeer(Peer):
     elif a=='/MatchingPropertyValuesGet':
      self.midi_reads+=1
      if self.midi_reads==2 and self.mode not in ['no-change','stale','shared','linked']:
-      with self.broadcast_lock:self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixChannelMute' if self.console=='mute' else '/syncMixChannelPan' if self.console else '/syncMixChannelVolume',[8,-1,3 if self.mode=='wrong-output' else 1,14 if self.console else 5,1 if self.console=='mute' else -.5]))))
+      with self.broadcast_lock:
+       if self.console=='clear':
+        for source in ([5] if self.mode=='partial' else [5,14]):
+         self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixChannelSolo',[8,-1,3 if self.mode=='wrong-output' else 1,source,0]))))
+       else:self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixChannelMute' if self.console=='mute' else '/syncMixChannelPan' if self.console else '/syncMixChannelVolume',[8,-1,3 if self.mode=='wrong-output' else 1,14 if self.console else 5,1 if self.console=='mute' else -.5]))))
      reply='/getMatchingPropertyValues';rows=[{'key_':'global.midi.'+k,'val_':x} for k,x in [('channel',1),('bcchannel',2),('over.usb.c',1),('matrix.ch.qtr',3),('matrix.ch.xlr',4),('matrix.ch.phones',4 if self.mode=='shared' else 5)]]
      values=[rid,v[1],b'lavppgsm'+msgpack.packb({'vals':rows})]
     elif a=='/PropertyValueGet':
@@ -74,7 +81,7 @@ class ConsoleTransactions(unittest.TestCase):
   peer=MatrixPeer(mode,console=console)
   try:
    with tempfile.TemporaryDirectory() as folder:
-    args=[str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',folder+'/plan','--backups',folder,'--matrix-console-check']
+    args=[str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',folder+'/plan','--backups',folder,'--matrix-clear-check' if console=='clear' else '--matrix-console-check']
     if console=='mute':args+=['--console-mute']
     if console=='invalidated':args+=['--console-invalidated-noop']
     r=subprocess.run(args,capture_output=True,text=True,timeout=10)
@@ -88,4 +95,13 @@ class ConsoleTransactions(unittest.TestCase):
  def test_wrong_output_cannot_confirm(self):self.run_mode('wrong-output','pan',False)
  def test_unrelated_unknown_field_is_preserved(self):self.run_mode('unrelated','pan',False)
  def test_shared_channels_rejected(self):self.run_mode('shared','pan',False)
+class ClearSoloTransactions(unittest.TestCase):
+ run_mode=ConsoleTransactions.run_mode
+ def test_clear_all_requires_live_off_for_each_active_strip(self):self.run_mode('normal','clear',True)
+ def test_partial_clear_does_not_claim_success(self):self.run_mode('partial','clear',False)
+ def test_clear_without_event_is_not_confirmed(self):self.run_mode('no-change','clear',False)
+ def test_clear_other_output_is_rejected(self):self.run_mode('wrong-output','clear',False)
+ def test_clear_preserves_unrelated_unknown_fields(self):self.run_mode('unrelated','clear',False)
+ def test_clear_shared_channels_are_rejected(self):self.run_mode('shared','clear',False)
+ def test_clear_linked_outputs_are_rejected(self):self.run_mode('linked','clear',False)
 if __name__=='__main__':unittest.main()
