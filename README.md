@@ -9,9 +9,10 @@ for the official desktop editor.
 
 ## USB development candidate
 
-Version 0.10.0 (45) has a centered **Matrix Mixer** button opening a pedal-style
+Version 0.10.0 (46) has a centered **Matrix Mixer** button opening a pedal-style
 mixer popup. The popup uses output icons for ¼-inch, XLR and Phones and remembers
-the last viewed output. Home and Song expand into a horizontally scrollable row;
+the last viewed output. Generic Song tracks 1–5 use the standard Drums, Bass,
+Guitar, Vocals and Other stem labels; specific native names take precedence. Home and Song expand into a horizontally scrollable row;
 sideways swipes over the faders scroll without changing their values. Opening is local. With direct USB, Close also sends a guarded pedal-mixer close
 sequence. Tapping an output
 icon inside the popup selects that output’s mixer on the pedal. Repeated taps use

@@ -276,14 +276,14 @@ private struct MatrixChannelStrip:View {
                 Image(systemName:row.id==5 ? "house":row.id==14 ? "music.note":row.id==15 ? "metronome":row.id==17 ? "cable.connector":row.id==18 ? "dot.radiowaves.left.and.right":"waveform").font(.system(size:15))
                 if row.id==5 || row.id==14 {Button(action:toggleExpanded){Image(systemName:expanded ? "minus.circle":"plus.circle").font(.system(size:23))}.buttonStyle(.plain).accessibilityLabel("\(expanded ? "Hide":"Show") \(row.id==5 ? "Home paths":"Song tracks")")}
             }.frame(height:30)
-            Text(row.id==5 ? "Home":row.id==16 ? "Count In":row.name).font(.system(size:12,weight:.medium)).lineLimit(1).minimumScaleFactor(0.7)
+            Text(row.id==5 ? "Home":row.id==16 ? "Count In":row.displayName).font(.system(size:12,weight:.medium)).lineLimit(1).minimumScaleFactor(0.7)
         }.padding(.horizontal,9).padding(.vertical,14).background(tint.opacity(row.id==5 || row.id==14 ? 0.13:0.05)).opacity(row.enabled ? 1:0.4)
         .onChange(of:output){_,_ in draft=nil;panDraft=nil;showPan=false}
         .onChange(of:enabled){_,available in if !available {draft=nil;panDraft=nil}}
-        .popover(isPresented:$showPan){VStack(spacing:20){Text("\(row.name) · Pan").font(.headline);Slider(value:Binding(get:{panDraft ?? Double(panPosition ?? (try? MatrixPan.midi(forValue:row.pan)) ?? 64)},set:{panDraft=$0;changed(.pan,Int($0.rounded()))}),in:0...127,step:1,onEditingChanged:{active in if !active {panDraft=nil}}).frame(width:260).disabled(!enabled);HStack{Text("Left");Spacer();Button("Center"){panDraft=64;changed(.pan,64)};Spacer();Text("Right")};Button("Done"){showPan=false}}.padding(24).presentationCompactAdaptation(.popover)}
+        .popover(isPresented:$showPan){VStack(spacing:20){Text("\(row.displayName) · Pan").font(.headline);Slider(value:Binding(get:{panDraft ?? Double(panPosition ?? (try? MatrixPan.midi(forValue:row.pan)) ?? 64)},set:{panDraft=$0;changed(.pan,Int($0.rounded()))}),in:0...127,step:1,onEditingChanged:{active in if !active {panDraft=nil}}).frame(width:260).disabled(!enabled);HStack{Text("Left");Spacer();Button("Center"){panDraft=64;changed(.pan,64)};Spacer();Text("Right")};Button("Done"){showPan=false}}.padding(24).presentationCompactAdaptation(.popover)}
     }
     private func toggle(_ title:String,active:Bool,color:Color,field:MatrixField)->some View {
-        Button{changed(field,127)}label:{Text(title).font(.system(size:15,weight:.medium)).frame(maxWidth:.infinity).frame(height:35).foregroundStyle(active ? .black:color).background(active ? color:Color.black.opacity(0.35),in:RoundedRectangle(cornerRadius:4)).overlay(RoundedRectangle(cornerRadius:4).stroke(color.opacity(0.55),lineWidth:1))}.buttonStyle(.plain).disabled(!enabled || !togglesEnabled).accessibilityLabel("\(row.name) \(title=="M" ? "Mute":"Solo")").accessibilityValue(active ? "On":"Off")
+        Button{changed(field,127)}label:{Text(title).font(.system(size:15,weight:.medium)).frame(maxWidth:.infinity).frame(height:35).foregroundStyle(active ? .black:color).background(active ? color:Color.black.opacity(0.35),in:RoundedRectangle(cornerRadius:4)).overlay(RoundedRectangle(cornerRadius:4).stroke(color.opacity(0.55),lineWidth:1))}.buttonStyle(.plain).disabled(!enabled || !togglesEnabled).accessibilityLabel("\(row.displayName) \(title=="M" ? "Mute":"Solo")").accessibilityValue(active ? "On":"Off")
     }
 }
 private struct MatrixVerticalFader:View {

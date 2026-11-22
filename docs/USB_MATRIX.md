@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (45)**. This work is under physical-device qualification;
+Development version: **0.10.0 (46)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -83,6 +83,15 @@ a fader, and ending/cancelling the pan releases the local draft. Each available 
 mute and solo. The top-left mixer menu includes Clear Solos for the selected output,
 using the absolute CC103 operation. It stays available after an uncertain toggle;
 controls pause while recovery runs. The Global EQ shortcut opens that output's EQ.
+Song strips 1–5 use **Drums, Bass, Guitar, Vocals, Other** when the remote data
+supplies only the corresponding generic Track1–5 names. These are Line 6's standard
+five stem labels. Specific names supplied by the device remain unchanged; tracks6–8
+retain their native labels. This is a display-only fallback: raw mixer fields,
+source IDs, order and MIDI mappings are unchanged. The API can still return generic
+names for a song with custom track names; full active-song metadata is not yet
+available to resolve that case. Do not describe this fallback as complete custom
+song-name synchronization.
+
 Count In is reserved by Line 6 and is visibly unavailable. Native channel enable
 flags disable unavailable inputs/tracks.
 
@@ -133,6 +142,11 @@ is confirmed; its dB readout is not a calibrated MIDI-to-dB formula. A live even
 also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 22, 2026
+
+Build 46 adds only the Song stem-label fallback.98Swift tests and30Matrix loopback
+checks pass, including preservation of native names/data/IDs and specific custom
+names taking priority. Native build/install and the expanded layout were checked.
+No track renaming or mixer/preset writes are performed for this label change.
 
 Build 45 changes scroll layout and gesture arbitration only; the build 44 pedal
 control and Close sequences are unchanged. A DEBUG synthetic harness and optional
@@ -239,6 +253,7 @@ See [Apple TCP noDelay documentation](https://developer.apple.com/documentation/
 ## References
 
 - [Line 6 MIDI manual](https://manuals.line6.com/en/helix-stadium/live/midi)
+- [Line 6 Song View and five-stem labels](https://manuals.line6.com/en/helix-stadium/live/song-view)
 - [Line 6 Matrix Mixer manual](https://manuals.line6.com/en/helix-stadium/live/matrix-mixer)
 - [Line 6 firmware 1.4 notes](https://kb.line6.com/helix-stadium-1-4-release-notes)
 - [Vheissu protocol research](https://github.com/Vheissu/helix-stadium-tools)

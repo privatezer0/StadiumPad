@@ -298,7 +298,7 @@ no warning. Final Release24 was installed/cold-launched; no new TestFlight uploa
 Do not replay a partial run or expose its real native data. Debug records now carry build
 and diagnostic schema; write failures retain a separate small diagnostic text file.
 
-## USB transport and Matrix guitar volume candidate (0.10.0 / 45)
+## USB transport and Matrix guitar volume candidate (0.10.0 / 46)
 
 Read docs/USB_MATRIX.md before continuing this work. Carry the discovered NWInterface
 into both editor sockets; a wired interface type alone did not qualify. USB mode
@@ -400,3 +400,14 @@ normal connected editor. Native UI tests check expansion, far-end reachability,
 unchanged values during horizontal swipes, collapse and vertical adjustment after
 a sideways gesture. Release does not include the harness. Distinguish simulator
 passes from physical automation; the first physical run timed out enabling automation.
+
+## Song strip display labels (build 46)
+
+MatrixStrip.displayName maps only sourceIDs6–10 whose native name is the matching
+case-insensitive trimmed Track1–5 default to Drums/Bass/Guitar/Vocals/Other. Prefer
+all specific native labels. Other IDs/names are unchanged. UI footer, Pan title
+and accessibility names use displayName; raw name, property bytes, IDs, routing,
+state equality and write receipts must remain native. These are the documented
+standard stem labels, not a claim to have fetched active-song custom metadata.
+The observed remote Matrix data still returns Track1–8 while the pedal shows stem
+names. Do not hard-code names into raw properties or reorder sources to match them.

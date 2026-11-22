@@ -6,6 +6,13 @@ public enum MatrixField:String,CaseIterable,Sendable {case level="vol_",pan="pan
 public struct MatrixStrip:Equatable,Sendable,Identifiable {
     public let id:Int
     public let name:String
+    /// Firmware can expose generic names while its display uses the five stem labels.
+    /// Keep raw names/state intact and prefer any specific device-provided label.
+    public var displayName:String {
+        let stems=["Drums","Bass","Guitar","Vocals","Other"]
+        guard (6...10).contains(id),name.trimmingCharacters(in:.whitespacesAndNewlines).caseInsensitiveCompare("Track \(id-5)") == .orderedSame else{return name}
+        return stems[id-6]
+    }
     public let enabled:Bool
     public let raw:Value
     public var level:Double {raw["vol_"].numeric!}
