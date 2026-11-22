@@ -177,7 +177,8 @@ import StadiumNetwork
         let state=try await session.matrixConsole();guard generation==token else{throw CancellationError()};return state
     }
     func setMatrixConsole(_ command:MatrixConsoleCommand,expected:MatrixConsoleState,channel:Int,send:@Sendable @escaping ()async throws->Void)async throws->MatrixConsoleState {
-        guard connected,let session else{throw ProtocolError.closed};let token=generation
+        guard connected,!busy,let session else{throw ProtocolError.invalid("Finish the current editor update before adjusting Matrix.")};let token=generation
+        busy=true;defer{if generation==token {busy=false}}
         let state=try await session.setMatrixConsole(command,expected:expected,channel:channel,send:send)
         guard generation==token else{throw CancellationError()};return state
     }

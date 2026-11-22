@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import StadiumProtocol
 
 /// Compact output selectors. The mixer owns editing only while its modal is open.
@@ -41,13 +42,14 @@ struct MatrixVolumeBar:View {
     private var token=UUID(),revision=0
     private var blocked=false
     private var lastRequested:[String:Any]=[:]
+    private var lastTransactionMilliseconds=0.0
     init(previewState:MatrixConsoleState?=nil){state=previewState;if previewState != nil {message="USB Matrix mixer · layout preview"}}
     private func report() {
         #if DEBUG
         guard ProcessInfo.processInfo.environment["STADIUM_VERIFY"]=="1" else{return}
         let root=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
         let rows=(1...3).flatMap{output in (state?.strips(output) ?? []).map{row in ["output":output,"source":row.id,"level":row.level,"pan":row.pan,"mute":row.muted,"solo":row.solo] as [String:Any]}}
-        let record:[String:Any]=["ready":ready,"sending":sending,"blocked":blocked,"message":message,"at":Date().timeIntervalSince1970,"channels":rows,"lastRequested":lastRequested]
+        let record:[String:Any]=["ready":ready,"sending":sending,"blocked":blocked,"message":message,"at":Date().timeIntervalSince1970,"channels":rows,"lastRequested":lastRequested,"transactionMilliseconds":lastTransactionMilliseconds]
         try? JSONSerialization.data(withJSONObject:record).write(to:root.appendingPathComponent("matrix-console-ui.json"),options:.atomic)
         #endif
     }
@@ -103,13 +105,14 @@ struct MatrixVolumeBar:View {
                 guard let before=state,let id=deviceID,channels.count==3 else{break}
                 let channel=channels[command.output-1]
                 do {
+                    let started=Date()
                     let after=try await monitor.setMatrixConsole(command,expected:before,channel:channel) {
                         try await MainActor.run {
                             guard self.token==epoch,monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
                             try self.usb.send(command,channel:channel,networkIdentity:id)
                         }
                     }
-                    guard token==epoch else{break};state=after;positions[command.key]=command.value
+                    guard token==epoch else{break};lastTransactionMilliseconds=Date().timeIntervalSince(started)*1000;state=after;positions[command.key]=command.value
                 }catch {guard token==epoch else{break};queue=[];ready=false;blocked=true;message=error.localizedDescription}
             }
             sending=false;writer=nil;report()
@@ -126,6 +129,7 @@ struct MatrixMixerView:View {
     @State private var homeExpanded=false
     @State private var songExpanded=false
     @State private var showEQ=false
+    @State private var previousIdleTimer:Bool?
     let preview:Bool
     init(initialOutput:Int,preview:Bool=false,previewState:MatrixConsoleState?=nil,expanded:Bool=false){_output=State(initialValue:initialOutput);self.preview=preview;_model=StateObject(wrappedValue:MatrixConsoleModel(previewState:previewState));_homeExpanded=State(initialValue:expanded);_songExpanded=State(initialValue:expanded)}
     private var sources:[Int] {[5]+(homeExpanded ? [1,2,3,4]:[])+[14]+(songExpanded ? Array(6...13):[])+[15,16,17,18,19]}
@@ -160,7 +164,8 @@ struct MatrixMixerView:View {
             }.padding(.horizontal,18).frame(minHeight:42).background(Color(white:0.09))
         }}.background(Color(white:0.045)).foregroundStyle(.white).preferredColorScheme(.dark)
         .task(id:"\(monitor.connectionID)-\(monitor.connected)"){if !preview {await model.observe(monitor)}}
-        .onDisappear{model.stop()}
+        .onAppear{if !preview {previousIdleTimer=UIApplication.shared.isIdleTimerDisabled;UIApplication.shared.isIdleTimerDisabled=true}}
+        .onDisappear{model.stop();if let previousIdleTimer {UIApplication.shared.isIdleTimerDisabled=previousIdleTimer}}
         .onChange(of:output){_,_ in model.dropPending()}
         .sheet(isPresented:$showEQ){NavigationStack{GlobalEQView(preview:preview,initialOutput:output==3 ? .phones:output==2 ? .xlr:.quarter).environmentObject(monitor).toolbar{ToolbarItem(placement:.confirmationAction){Button("Done"){showEQ=false}}}}}
     }

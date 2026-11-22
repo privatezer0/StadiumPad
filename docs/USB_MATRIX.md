@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (27)**. This work is under physical-device qualification;
+Development version: **0.10.0 (28)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -129,3 +129,12 @@ An independent observer saw Home mute on/off but no pan or solo events during th
 check. Build 27 retains a local pan draft during dragging and adds an opt-in DEBUG
 local status report to distinguish UI requests, send failures and missing receipts.
 This is diagnostic progress, not a claim that the hardware issue has passed.
+
+Build 27's focused Phones/Home drag was independently observed to reach full left
+(CC34 value0, live pan−1); the owner reported lag. No confirmation error or blocked
+state remained. Build 28 marks Matrix writes busy to pause background preset polling
+while the serialized mixer transaction runs. It retains full fresh checks and
+per-control receipts; no routing cache or unchecked stream was introduced. Its DEBUG
+report includes transaction duration. The mixer keeps the screen awake while open,
+then restores the app's prior idle-timer setting on close; previews do not change it.
+The latency improvement and centered-pan restoration still need a fresh device check.
