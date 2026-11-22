@@ -9,7 +9,13 @@ import UIKit
     @StateObject private var discovery=StadiumDiscovery()
     @Environment(\.scenePhase) private var phase
     var body:some Scene {WindowGroup {
-        StadiumView().environmentObject(monitor).environmentObject(discovery).preferredColorScheme(.dark)
+        Group {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--matrix-scroll-harness") {MatrixScrollHarness()}else{StadiumView()}
+            #else
+            StadiumView()
+            #endif
+        }.environmentObject(monitor).environmentObject(discovery).preferredColorScheme(.dark)
             .onChange(of:phase){_,value in if value != .active {discovery.stop();monitor.stop()}}
     }}
 }

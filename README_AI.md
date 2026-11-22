@@ -298,7 +298,7 @@ no warning. Final Release24 was installed/cold-launched; no new TestFlight uploa
 Do not replay a partial run or expose its real native data. Debug records now carry build
 and diagnostic schema; write failures retain a separate small diagnostic text file.
 
-## USB transport and Matrix guitar volume candidate (0.10.0 / 44)
+## USB transport and Matrix guitar volume candidate (0.10.0 / 45)
 
 Read docs/USB_MATRIX.md before continuing this work. Carry the discovered NWInterface
 into both editor sockets; a wired interface type alone did not qualify. USB mode
@@ -316,7 +316,7 @@ Native Phones/Home Solo and pan qualification passed; broader device coverage,
 unplug/replug and USB EQ stored confirmation remain open;
 never convert the candidate into a claimed release based only on synthetic tests.
 
-## Matrix popup (development candidate 0.10.0 build 44)
+## Matrix popup (development candidate 0.10.0 build 45)
 
 A single Matrix Mixer header button opens MatrixMixerView. Its output selector uses
 three accessible icon buttons; selection is remembered locally. Opening never sends MIDI. Close reads attached output and uses the closing plan
@@ -380,3 +380,23 @@ sequentially, never concurrently. The on-device matrix-tests-gate.json disarms d
 helpers after testing; malformed existing gates fail closed. The delivered gate is
 disarmed. Equivalent pan endpoints may skip a send only with a prior fresh matching
 receipt; estimated volume mappings never authorize a no-op.
+
+## Matrix expansion and scroll gestures (build 45)
+
+Home/Song insert child strips into the same horizontal ScrollView. The HStack keeps
+its full intrinsic horizontal width; never squeeze expanded controls into the viewport.
+MatrixFaderTouchSurface bridges a clear UIKit view over the existing SwiftUI fader
+artwork. Its UIPanGestureRecognizer delegate rejects horizontal velocity before
+recognition begins, so the enclosing ScrollView can claim that swipe. Vertical
+pan/tap callbacks update the existing binding and release on end/cancellation.
+VoiceOver adjustment remains on the SwiftUI element. An initial simultaneous
+SwiftUI DragGesture passed vertical edits but failed the far-end swipe test; do
+not restore that workaround or a minimumDistance0 exclusive drag.
+
+MatrixScrollHarness is DEBUG-only, synthetic and has no monitor/session/MIDI sender.
+The optional STADIUMPAD_UI_TESTS=1 project-generation flag adds StadiumPadScrolling
+with iPad/UITests/MatrixScrollingUITests.swift. Its launch argument bypasses the
+normal connected editor. Native UI tests check expansion, far-end reachability,
+unchanged values during horizontal swipes, collapse and vertical adjustment after
+a sideways gesture. Release does not include the harness. Distinguish simulator
+passes from physical automation; the first physical run timed out enabling automation.

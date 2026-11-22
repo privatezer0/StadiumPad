@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (44)**. This work is under physical-device qualification;
+Development version: **0.10.0 (45)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -75,8 +75,11 @@ signal. Do not reopen a user-dismissed popup merely on an attached-output update
 
 The popup follows the pedal's channel-strip arrangement: Home, Song, Click, Count
 In, USB In 1/2, Bluetooth and Aux. Expand Home to reveal Path 1A/1B/2A/2B; expand
-Song to reveal its eight tracks. Expanded channels scroll horizontally, as on the
-pedal. Each available strip has a vertical volume fader, pan popup with Center,
+Song to reveal its eight tracks. Expanded channels keep their normal strip width and scroll horizontally, as on
+the pedal. Sideways swipes, including those starting over a fader, scroll the row
+without issuing a level edit. A directional UIKit pan recognizer accepts only vertical movement before
+beginning, letting horizontal movement reach the scroll view. Taps still position
+a fader, and ending/cancelling the pan releases the local draft. Each available strip has a vertical volume fader, pan popup with Center,
 mute and solo. The top-left mixer menu includes Clear Solos for the selected output,
 using the absolute CC103 operation. It stays available after an uncertain toggle;
 controls pause while recovery runs. The Global EQ shortcut opens that output's EQ.
@@ -129,7 +132,18 @@ MIDI has 128 steps. The initial thumb estimate is approximate until a device val
 is confirmed; its dB readout is not a calibrated MIDI-to-dB formula. A live event is
 also not independent acoustic or pedal-screen qualification.
 
-## Qualification as of November 21, 2026
+## Qualification as of November 22, 2026
+
+Build 45 changes scroll layout and gesture arbitration only; the build 44 pedal
+control and Close sequences are unchanged. A DEBUG synthetic harness and optional
+XCTest UI target exercise real touch recognition without any session/MIDI sender.
+Physical automation could not start because the iPad timed out enabling automation
+mode. Both native XCTest cases passed on an iPad A16 simulator: expanded Home/Song
+scroll to AUX and back with zero level writes, collapse correctly, and allow a
+vertical fader adjustment after a horizontal swipe. The final physical Pro build
+was installed/launched and its popup/expanded layout inspected; it reports ready
+with no control requests from this check. The 96 Swift and 30 Matrix loopback
+regressions also pass. No live pedal settings were edited for gesture testing.
 
 Build 44 passes 96 Swift tests and 30 Matrix loopback tests. Its one-shot native
 Close callback test passed with all three stage receipts, unchanged preset and

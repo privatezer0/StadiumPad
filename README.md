@@ -9,9 +9,10 @@ for the official desktop editor.
 
 ## USB development candidate
 
-Version 0.10.0 (44) has a centered **Matrix Mixer** button opening a pedal-style
+Version 0.10.0 (45) has a centered **Matrix Mixer** button opening a pedal-style
 mixer popup. The popup uses output icons for ¼-inch, XLR and Phones and remembers
-the last viewed output. Opening is local. With direct USB, Close also sends a guarded pedal-mixer close
+the last viewed output. Home and Song expand into a horizontally scrollable row;
+sideways swipes over the faders scroll without changing their values. Opening is local. With direct USB, Close also sends a guarded pedal-mixer close
 sequence. Tapping an output
 icon inside the popup selects that output’s mixer on the pedal. Repeated taps use
 a confirmed different-output step to avoid closing the pedal’s selected mixer. This is a development candidate, **not a
@@ -152,6 +153,24 @@ python3 -m venv /path/to/dev-venv
 For an external Swift build directory, use `swift test --scratch-path /path/to/build`
 and set `STADIUM_PROBE`, `STADIUM_EDIT_CHECK`, `STADIUM_LIBRARY` to its `debug/` executables and
 `STADIUM_TEST_ROOT` to a scratch directory before running Python tests.
+
+### Matrix touch regression tests
+
+The optional native UI suite uses synthetic local controls and cannot connect to
+Stadium or send MIDI. It expands Home/Song, swipes across faders to both ends,
+checks that horizontal swipes leave values unchanged, and verifies vertical dragging.
+
+```sh
+STADIUMPAD_UI_TESTS=1 STADIUMPAD_DEVELOPMENT_TEAM=YOUR_TEAM_ID \
+STADIUMPAD_BUNDLE_ID=your.unique.stadiumpad python3 Scripts/generate_project.py
+xcodebuild -project StadiumPad.xcodeproj -scheme StadiumPadScrolling \
+  -destination 'platform=iOS,id=YOUR_DEVICE_ID' \
+  -derivedDataPath /path/to/external/build test
+```
+
+An iPad simulator destination also works. Physical-device tests require the device
+to allow UI automation. The harness is compiled only into Debug and selected only
+by its explicit test launch argument; it is absent from Release.
 
 ### Local model metadata
 

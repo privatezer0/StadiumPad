@@ -175,7 +175,7 @@ struct MatrixMixerView:View {
                                 if let command=try? MatrixConsoleCommand(output:output,source:source,field:field,value:value) {model.send(command,monitor:monitor)}
                             }).frame(width:max(90,(area.size.width-24)/7))
                         }
-                    }}.padding(.horizontal,12).padding(.vertical,12)
+                    }}.fixedSize(horizontal:true,vertical:false).padding(.horizontal,12).padding(.vertical,12)
                 }.scrollIndicators(.visible)
             }else {VStack(spacing:16){ProgressView();Text(model.message).foregroundStyle(.secondary)}.frame(maxWidth:.infinity,maxHeight:.infinity)}
             HStack(spacing:12) {
@@ -271,7 +271,7 @@ private struct MatrixChannelStrip:View {
                 toggle("S",active:row.solo,color:.yellow,field:.solo)
             }
             Text(MatrixGuitarLevels.label(row.level)).font(.system(size:13).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.8)
-            MatrixVerticalFader(value:Binding(get:{draft ?? Double(position ?? MatrixGuitarLevels.estimatedMIDI(row.level))},set:{v in draft=v;changed(.level,Int(v.rounded()))}),enabled:enabled,released:{draft=nil})
+            MatrixVerticalFader(value:Binding(get:{draft ?? Double(position ?? MatrixGuitarLevels.estimatedMIDI(row.level))},set:{v in draft=v;changed(.level,Int(v.rounded()))}),enabled:enabled,released:{draft=nil}).accessibilityIdentifier("matrix-fader-\(row.id)")
             HStack(spacing:4) {
                 Image(systemName:row.id==5 ? "house":row.id==14 ? "music.note":row.id==15 ? "metronome":row.id==17 ? "cable.connector":row.id==18 ? "dot.radiowaves.left.and.right":"waveform").font(.system(size:15))
                 if row.id==5 || row.id==14 {Button(action:toggleExpanded){Image(systemName:expanded ? "minus.circle":"plus.circle").font(.system(size:23))}.buttonStyle(.plain).accessibilityLabel("\(expanded ? "Hide":"Show") \(row.id==5 ? "Home paths":"Song tracks")")}
@@ -294,7 +294,74 @@ private struct MatrixVerticalFader:View {
             VStack{ForEach(0..<9,id:\.self){_ in Rectangle().fill(.white.opacity(0.08)).frame(height:1);Spacer(minLength:0)}}
             Capsule().fill(.black).frame(width:8).padding(.vertical,14)
             Circle().fill(Color(white:0.25)).overlay(Circle().stroke(.white.opacity(0.55),lineWidth:1.5)).frame(width:30,height:30).position(x:g.size.width/2,y:15+(1-value/127)*max(1,g.size.height-30))
-        }.contentShape(Rectangle()).gesture(DragGesture(minimumDistance:0).onChanged{event in guard enabled else{return};value=min(127,max(0,127*(1-(event.location.y-15)/max(1,g.size.height-30))))}.onEnded{_ in released()})}
+        }.overlay{MatrixFaderTouchSurface(value:$value,enabled:enabled,released:released)}}
         .frame(minHeight:130).opacity(enabled ? 1:0.5).accessibilityElement().accessibilityLabel("Volume").accessibilityValue("\(Int(value)) of 127").accessibilityAdjustableAction{direction in guard enabled else{return};switch direction{case .increment:value=min(127,value+1);case .decrement:value=max(0,value-1);@unknown default:break};released()}
     }
 }
+
+/// UIKit can fail the horizontal pan before it competes with the enclosing scroll.
+private struct MatrixFaderTouchSurface:UIViewRepresentable {
+    @Binding var value:Double
+    let enabled:Bool,released:()->Void
+    func makeCoordinator()->Coordinator {Coordinator(self)}
+    func makeUIView(context:Context)->UIView {
+        let view=UIView();view.backgroundColor = .clear
+        let pan=UIPanGestureRecognizer(target:context.coordinator,action:#selector(Coordinator.pan(_:)))
+        pan.maximumNumberOfTouches=1;pan.delegate=context.coordinator
+        let tap=UITapGestureRecognizer(target:context.coordinator,action:#selector(Coordinator.tap(_:)))
+        tap.delegate=context.coordinator
+        view.addGestureRecognizer(pan);view.addGestureRecognizer(tap)
+        return view
+    }
+    func updateUIView(_ view:UIView,context:Context){context.coordinator.parent=self;view.isUserInteractionEnabled=enabled}
+    final class Coordinator:NSObject,UIGestureRecognizerDelegate {
+        var parent:MatrixFaderTouchSurface
+        init(_ parent:MatrixFaderTouchSurface){self.parent=parent}
+        func gestureRecognizerShouldBegin(_ recognizer:UIGestureRecognizer)->Bool {
+            guard parent.enabled else{return false}
+            guard let pan=recognizer as? UIPanGestureRecognizer else{return true}
+            let velocity=pan.velocity(in:pan.view)
+            return abs(velocity.y)>abs(velocity.x)
+        }
+        private func update(_ recognizer:UIGestureRecognizer){
+            guard parent.enabled,let view=recognizer.view else{return}
+            parent.value=min(127,max(0,127*(1-(recognizer.location(in:view).y-15)/max(1,view.bounds.height-30))))
+        }
+        @objc func pan(_ recognizer:UIPanGestureRecognizer){
+            switch recognizer.state {
+            case .began,.changed:update(recognizer)
+            case .ended:parent.released()
+            case .cancelled,.failed:parent.released()
+            default:break
+            }
+        }
+        @objc func tap(_ recognizer:UITapGestureRecognizer){guard recognizer.state == .ended else{return};update(recognizer);parent.released()}
+    }
+}
+
+#if DEBUG
+/// Synthetic local controls for native swipe tests. No monitor, session or MIDI sender.
+struct MatrixScrollHarness:View {
+    @State private var homeExpanded=false
+    @State private var songExpanded=false
+    @State private var positions:[Int:Int]=[:]
+    @State private var changes=0
+    private var sources:[Int] {[5]+(homeExpanded ? [1,2,3,4]:[])+[14]+(songExpanded ? Array(6...13):[])+[15,16,17,18,19]}
+    private func row(_ id:Int)->MatrixStrip {
+        let names=[5:"Home",14:"Song",15:"Click",16:"Count In",17:"USB 1/2",18:"Bluetooth",19:"AUX In"]
+        let name=names[id] ?? (id<5 ? "Path \(id)":"Track \(id-5)")
+        return try! MatrixStrip(.object(["src_":.int(Int64(id)),"name":.string(name),"enbl":.int(1),"vol_":.number(0),"pan_":.number(0),"mute":.bool(false),"solo":.bool(false)]))
+    }
+    var body:some View {
+        GeometryReader{area in VStack {
+            Text("Matrix scrolling verification").font(.title2)
+            Text("Changes: \(changes)").accessibilityIdentifier("matrix-qa-changes")
+            ScrollView(.horizontal){HStack(spacing:1){ForEach(sources,id:\.self){source in
+                MatrixChannelStrip(row:row(source),output:3,position:positions[source],panPosition:nil,enabled:source != 16,togglesEnabled:true,expanded:source==5 ? homeExpanded:songExpanded,toggleExpanded:{if source==5 {homeExpanded.toggle()}else{songExpanded.toggle()}},changed:{field,value in
+                    changes+=1;if field == .level {positions[source]=value}
+                }).frame(width:max(90,(area.size.width-24)/7))
+            }}.fixedSize(horizontal:true,vertical:false).padding(.horizontal,12).padding(.vertical,12)}.accessibilityIdentifier("matrix-qa-scroll")
+        }}.background(.black).foregroundStyle(.white).preferredColorScheme(.dark)
+    }
+}
+#endif
