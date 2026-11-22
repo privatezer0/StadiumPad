@@ -298,7 +298,7 @@ no warning. Final Release24 was installed/cold-launched; no new TestFlight uploa
 Do not replay a partial run or expose its real native data. Debug records now carry build
 and diagnostic schema; write failures retain a separate small diagnostic text file.
 
-## USB transport and Matrix guitar volume candidate (0.10.0 / 43)
+## USB transport and Matrix guitar volume candidate (0.10.0 / 44)
 
 Read docs/USB_MATRIX.md before continuing this work. Carry the discovered NWInterface
 into both editor sockets; a wired interface type alone did not qualify. USB mode
@@ -316,19 +316,21 @@ Native Phones/Home Solo and pan qualification passed; broader device coverage,
 unplug/replug and USB EQ stored confirmation remain open;
 never convert the candidate into a claimed release based only on synthetic tests.
 
-## Matrix popup (development candidate 0.10.0 build 43)
+## Matrix popup (development candidate 0.10.0 build 44)
 
 A single Matrix Mixer header button opens MatrixMixerView. Its output selector uses
-three accessible icon buttons; selection is remembered locally. Opening and closing
-never send MIDI. Explicit popup output taps use MatrixPanelCommand's distinct-output
+three accessible icon buttons; selection is remembered locally. Opening never sends MIDI. Close reads attached output and uses the closing plan
+(distinct output, original output, original output) before dismissing locally.
+Missing USB still permits local Close; errors dismiss locally with no retry or
+claim of confirmed pedal visibility. Swipe is disabled to prevent bypassing Close.
+Do not send from onDisappear. Explicit popup output taps use MatrixPanelCommand's distinct-output
 then target plan. Home0 is NOT an established absolute panel close: owner42testing
 showed same-output toggling despite it. Do not restore Home0/output batching.
-StadiumSession.showMatrixPanel serializes the two stages, checks fresh global routing,
+StadiumSession.navigateMatrixPanel serializes the two stages, checks fresh global routing,
 requires a new matching syncMixAttachedOut receipt per stage and allows the first UI
 transition to settle. MainActor USB identity/generation is checked adjacent to each
 send. No uncertain stage retries or advances. Selecting output affects screen/knob
-target only, not levels or presets. No writes from onDisappear, output observers or
-header entry. WiFi-only/preview remains local. No verified panel-visible getter/event
+target only, not levels or presets. No writes from onDisappear, output observers or header entry. WiFi-only/preview remains local. No verified panel-visible getter/event
 exists; attached-output alone must not auto-open a closed iPad popup. The one-shot
 DEBUG icon check tests repeated targets and preserves preset/mixer settings; its
 success does not constitute visual pedal-screen proof.

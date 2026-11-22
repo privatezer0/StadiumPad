@@ -35,7 +35,7 @@ class MatrixPeer(Peer):
     elif a=='/ActiveSnapshotIndexGet':reply='/getActiveSnapshotIndex';values=[rid,0]
     elif a=='/MatchingPropertyValuesGet':
      self.midi_reads+=1
-     if self.console=='panel' and self.mode not in ['no-change','route-conflict']:
+     if self.console=='panel' and self.mode not in ['no-change','route-conflict'] and not (self.mode=='missing-close' and self.midi_reads==3):
       output=2 if self.midi_reads==1 else 1
       if self.mode=='wrong-output':output=3
       with self.broadcast_lock:self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixAttachedOut',[8,-1,output]))))
@@ -113,11 +113,11 @@ class ClearSoloTransactions(unittest.TestCase):
 if __name__=='__main__':unittest.main()
 
 class PanelNavigationTransactions(unittest.TestCase):
- def run_panel(self,mode,success,sends):
+ def run_panel(self,mode,success,sends,closing=False):
   peer=MatrixPeer(mode,console='panel')
   try:
    with tempfile.TemporaryDirectory() as folder:
-    r=subprocess.run([str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',folder+'/plan','--backups',folder,'--matrix-panel-check'],capture_output=True,text=True,timeout=10)
+    r=subprocess.run([str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',folder+'/plan','--backups',folder,'--matrix-panel-check']+(['--panel-close'] if closing else []),capture_output=True,text=True,timeout=10)
    self.assertEqual(peer.errors,[])
    self.assertEqual(r.returncode==0,success,r.stdout+r.stderr)
    self.assertEqual(r.stdout.count('PANEL SEND'),sends,r.stdout+r.stderr)
@@ -127,3 +127,8 @@ class PanelNavigationTransactions(unittest.TestCase):
  def test_missing_first_receipt_stops_without_retry_or_second_send(self):self.run_panel('no-change',False,1)
  def test_other_output_receipt_does_not_allow_second_send(self):self.run_panel('wrong-output',False,1)
  def test_conflicting_global_channel_blocks_all_sends(self):self.run_panel('route-conflict',False,0)
+
+ def test_close_requires_all_three_fresh_output_receipts(self):self.run_panel('normal',True,3,True)
+ def test_close_missing_last_receipt_is_not_retried(self):self.run_panel('missing-close',False,3,True)
+ def test_close_missing_first_receipt_stops_before_target(self):self.run_panel('no-change',False,1,True)
+ def test_close_invalid_route_sends_nothing(self):self.run_panel('route-conflict',False,0,True)

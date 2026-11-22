@@ -165,7 +165,7 @@ struct MatrixMixerView:View {
                 }}.disabled(model.sending || selectingOutput)
                 Spacer(minLength:0)
                 Button {showEQ=true}label:{Label("Global EQ",systemImage:"waveform.path")}.disabled(!monitor.connected || model.sending)
-                Button("Close"){closeMixer()}.fontWeight(.semibold).padding(.leading,10)
+                Button(selectingOutput ? "Please wait…":"Close"){closeMixer()}.disabled(selectingOutput || model.sending).fontWeight(.semibold).padding(.leading,10)
             }.padding(.horizontal,18).frame(height:64).background(EditorTheme.header)
             if let state=model.state {
                 ScrollView(.horizontal) {
@@ -187,10 +187,11 @@ struct MatrixMixerView:View {
         }}.background(Color(white:0.045)).foregroundStyle(.white).preferredColorScheme(.dark)
         .task(id:"\(monitor.connectionID)-\(monitor.connected)"){if !preview {await model.observe(monitor)}}
         .onAppear{if !preview {previousIdleTimer=UIApplication.shared.isIdleTimerDisabled;UIApplication.shared.isIdleTimerDisabled=true;if matrixPresentation==nil {matrixPresentation=monitor.beginMatrixPresentation()}}}
-        .interactiveDismissDisabled(selectingOutput)
+        .interactiveDismissDisabled(!preview)
         .onDisappear{finishPresentation()}
         .onChange(of:output){_,value in model.dropPending();if !preview {lastOutput=value}}
         #if DEBUG
+        .task {if !preview,ProcessInfo.processInfo.arguments.contains("--verify-matrix-panel-close") {Task{@MainActor in await verifyMatrixPanelClose(monitor,select:selectOutput,close:closeMixerAndPedal)}}}
         .task {if !preview,ProcessInfo.processInfo.arguments.contains("--verify-matrix-output-icons") {await verifyMatrixOutputIcons(monitor,select:selectOutput)}}
         .task {
             guard !preview,!nativeMatrixTestsDisarmed() else{return}
@@ -209,24 +210,41 @@ struct MatrixMixerView:View {
         guard !preview else{output=next;return true}
         selectingOutput=true;defer{selectingOutput=false}
         do {
-            presence.refresh()
-            if presence.online,monitor.connected {
-                let connection=monitor.connectionID
-                guard let product=monitor.snapshot?.product,let id=FileCompanion.deviceID(product) else{throw ProtocolError.closed}
-                if monitor.connectionRoute == .usb,monitor.connectionInterface=="USB/Ethernet",!presence.bound(to:id) {try presence.bind(to:id)}
-                let channel=try await monitor.matrixPanelChannel()
-                guard monitor.connected,connection==monitor.connectionID else{throw CancellationError()}
-                try await monitor.showMatrixPanel(MatrixPanelCommand(output:next),channel:channel) {step in
-                    try await MainActor.run {
-                        guard monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
-                        try presence.navigate(output:step,channel:channel,networkIdentity:id)
-                    }
-                }
-            }
+            _ = try await navigateOutput(next,closing:false)
             model.dropPending();output=next;return true
         }catch {monitor.errorText=error.localizedDescription;return false}
     }
-    private func closeMixer(){guard !selectingOutput else{return};model.stop();dismiss()}
+    @MainActor private func navigateOutput(_ requested:Int,closing:Bool)async throws->Bool {
+        presence.refresh()
+        guard presence.online,monitor.connected else{return false}
+        let connection=monitor.connectionID
+        guard let product=monitor.snapshot?.product,let id=FileCompanion.deviceID(product) else{throw ProtocolError.closed}
+        if monitor.connectionRoute == .usb,monitor.connectionInterface=="USB/Ethernet",!presence.bound(to:id) {try presence.bind(to:id)}
+        let target:Int
+        if closing {
+            let current=try await monitor.readMatrixConsole()
+            guard let attached=current.property["val_"]["atto"].integer,(1...3).contains(attached) else{throw ProtocolError.invalid("The pedal's selected output is unavailable.")}
+            target=attached
+        }else{target=requested}
+        let channel=try await monitor.matrixPanelChannel()
+        guard monitor.connected,connection==monitor.connectionID else{throw CancellationError()}
+        try await monitor.navigateMatrixPanel(MatrixPanelCommand(output:target,closing:closing),channel:channel) {step in
+            try await MainActor.run {
+                guard monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
+                try presence.navigate(output:step,channel:channel,networkIdentity:id)
+            }
+        }
+        return true
+    }
+    private func closeMixer(){Task{_ = await closeMixerAndPedal()}}
+    @MainActor private func closeMixerAndPedal()async->Bool {
+        guard !selectingOutput,!model.sending else{return false}
+        if preview {model.stop();dismiss();return true}
+        selectingOutput=true;defer{selectingOutput=false}
+        var sent=false
+        do {sent=try await navigateOutput(output,closing:true)}catch{sent=false;monitor.errorText=error.localizedDescription}
+        model.stop();dismiss();return sent
+    }
     private func finishPresentation(){
         model.stop()
         if let previousIdleTimer {UIApplication.shared.isIdleTimerDisabled=previousIdleTimer}

@@ -4,10 +4,11 @@ import Foundation
 /// so the requested output opens from either visible or hidden starting state.
 public struct MatrixPanelCommand:Equatable,Sendable {
     public let output:Int
-    public var outputs:[Int] {[output%3+1,output]}
-    public init(output:Int)throws {
+    public let closing:Bool
+    public var outputs:[Int] {[output%3+1,output]+(closing ? [output]:[])}
+    public init(output:Int,closing:Bool=false)throws {
         guard (1...3).contains(output) else{throw ProtocolError.invalid("Invalid Matrix panel output.")}
-        self.output=output
+        self.output=output;self.closing=closing
     }
     public static func midiWord(output:Int,channel:Int)throws->UInt32 {
         guard (1...3).contains(output),(1...16).contains(channel) else{throw ProtocolError.invalid("Invalid Matrix panel MIDI route.")}

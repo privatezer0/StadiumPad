@@ -16,6 +16,14 @@ final class MatrixPanelCommandTests:XCTestCase {
             XCTAssertEqual(plan.outputs.count,2);XCTAssertNotEqual(plan.outputs[0],target)
         }}}
     }
+    func testCloseEndsHiddenForEveryStartingOutputAndVisibility()throws {
+        for target in 1...3 {for initial in 1...3 {for initiallyOpen in [false,true] {
+            let command=try MatrixPanelCommand(output:target,closing:true)
+            var selected=initial,open=initiallyOpen
+            for step in command.outputs {if step==selected {open.toggle()}else{selected=step;open=true}}
+            XCTAssertEqual(command.outputs,[target%3+1,target,target]);XCTAssertEqual(selected,target);XCTAssertFalse(open)
+        }}}
+    }
     func testInvalidOutputsAndChannelsNeverProducePackets()throws {
         for output in [0,4] {XCTAssertThrowsError(try MatrixPanelCommand(output:output));XCTAssertThrowsError(try MatrixPanelCommand.midiWord(output:output,channel:1))}
         for channel in [0,17] {XCTAssertThrowsError(try MatrixPanelCommand.midiWord(output:1,channel:channel))}

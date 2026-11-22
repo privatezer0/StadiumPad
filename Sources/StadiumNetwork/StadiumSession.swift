@@ -660,7 +660,7 @@ extension StadiumSession {
         await acquire();defer{release()};return try MatrixGuitarLevels(value:await matrixMixerUnlocked(),origin:connectionID)
     }
     public func matrixMIDIValue(output:Int)->Int? {matrixLastMIDI[output]?.value}
-    public func showMatrixPanel(_ command:MatrixPanelCommand,channel:Int,send:@Sendable (Int)async throws->Void)async throws {
+    public func navigateMatrixPanel(_ command:MatrixPanelCommand,channel:Int,send:@Sendable (Int)async throws->Void)async throws {
         await acquire();defer{release()};let origin=connectionID
         for (index,output) in command.outputs.enumerated() {
             try Task.checkCancellation()
@@ -675,7 +675,7 @@ extension StadiumSession {
                 try await Task.sleep(for:.milliseconds(10))
             }
             // Let the first screen transition finish before selecting the target.
-            if index==0 {try await Task.sleep(for:.milliseconds(120))}
+            if index<command.outputs.count-1 {try await Task.sleep(for:.milliseconds(120))}
         }
     }
     public func matrixPanelChannel()async throws->Int {

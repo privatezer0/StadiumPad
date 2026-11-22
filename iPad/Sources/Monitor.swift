@@ -174,10 +174,10 @@ import StadiumNetwork
         let value=try await session.matrixGuitarLevels()
         guard generation==token else{throw CancellationError()};return value
     }
-    func showMatrixPanel(_ command:MatrixPanelCommand,channel:Int,send:@Sendable @escaping (Int)async throws->Void)async throws {
+    func navigateMatrixPanel(_ command:MatrixPanelCommand,channel:Int,send:@Sendable @escaping (Int)async throws->Void)async throws {
         guard connected,!busy,let session else{throw ProtocolError.invalid("Finish the current update before selecting an output.")};let token=generation
         matrixWriting=true;defer{if generation==token {matrixWriting=false;if matrixPresentations.isEmpty {objectWillChange.send()}}}
-        try await session.showMatrixPanel(command,channel:channel,send:send)
+        try await session.navigateMatrixPanel(command,channel:channel,send:send)
         guard token==generation else{throw CancellationError()}
     }
     func matrixPanelChannel()async throws->Int {

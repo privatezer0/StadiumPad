@@ -17,7 +17,7 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
             if args.contains("--matrix-panel-check") {
                 guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic Matrix checks are loopback-only.")}
                 let listener=Task {while !Task.isCancelled {_ = try await session.event()}};defer{listener.cancel()}
-                try await session.showMatrixPanel(MatrixPanelCommand(output:1),channel:1,send:{output in print("PANEL SEND \(output)")})
+                try await session.navigateMatrixPanel(MatrixPanelCommand(output:1,closing:args.contains("--panel-close")),channel:1,send:{output in print("PANEL SEND \(output)")})
                 print("PASS sequenced output-panel receipts.");await session.disconnect();return
             }
             if args.contains("--matrix-clear-check") {

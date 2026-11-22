@@ -398,3 +398,38 @@ import StadiumNetwork
     try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:folder.appendingPathComponent("matrix-output-icons-result.json"),options:.atomic)
 }
 #endif
+
+#if DEBUG
+/// Qualifies the actual Close callback and preset/mixer preservation, not pedal pixels.
+@MainActor func verifyMatrixPanelClose(_ monitor:StadiumMonitor,select:@escaping @MainActor (Int)async->Bool,close:@escaping @MainActor ()async->Bool)async {
+    let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+    var report:[String:Any]=["passed":false]
+    do {
+        let deadline=Date().addingTimeInterval(20)
+        while !monitor.connected,Date()<deadline {try await Task.sleep(for:.milliseconds(100))}
+        guard monitor.connected,monitor.connectionRoute == .usb else{throw ProtocolError.closed}
+        let usb=MatrixUSBMIDI();usb.refresh();guard usb.online else{throw ProtocolError.invalid("Direct USB MIDI is required for the Close check.")}
+        let intent=try JSONSerialization.jsonObject(with:Data(contentsOf:folder.appendingPathComponent("matrix-panel-close-intent.json"))) as? [String:Any]
+        guard intent?["authorizeMatrixPanelClose"] as? Bool==true,let run=intent?["run"] as? String,UUID(uuidString:run) != nil else{throw ProtocolError.invalid("A reviewed Matrix Close intent is required.")}
+        let source=try await monitor.readUSBSource()
+        guard let id=source.presetID else{throw ProtocolError.closed}
+        let saved=try await monitor.readUSBSavedSource(id),before=try await monitor.readMatrixConsole()
+        try Data("started".utf8).write(to:folder.appendingPathComponent("matrix-panel-close-"+run+"-started"),options:.withoutOverwriting)
+        guard await select(3) else{throw ProtocolError.invalid("Preparing the Phones output failed.")}
+        try await Task.sleep(for:.milliseconds(500))
+        guard await close() else{throw ProtocolError.invalid("The USB Close sequence did not complete.")}
+        try await Task.sleep(for:.milliseconds(800))
+        let after=try await monitor.readMatrixConsole(),afterSource=try await monitor.readUSBSource(),afterSaved=try await monitor.readUSBSavedSource(id)
+        let untouched=source.rawEditBuffer==afterSource.rawEditBuffer && source.presetID==afterSource.presetID && source.activeSnapshot==afterSource.activeSnapshot && source.dirty==afterSource.dirty && saved==afterSaved
+        let mixerUnchanged=(1...3).allSatisfy{before.strips($0)==after.strips($0) && before.layer($0)["out_"]==after.layer($0)["out_"]} && before.linked==after.linked
+        report["presetUnchanged"]=untouched;report["mixerUnchanged"]=mixerUnchanged;report["leaseCount"]=monitor.debugMatrixPresentationCount;report["busy"]=monitor.busy
+        report["attachedOutputPreserved"]=after.property["val_"]["atto"].integer==3
+        report["passed"]=untouched && mixerUnchanged && monitor.debugMatrixPresentationCount==0 && !monitor.busy && after.property["val_"]["atto"].integer==3
+        if let window=UIApplication.shared.connectedScenes.compactMap({$0 as? UIWindowScene}).flatMap({$0.windows}).first(where:{$0.isKeyWindow}) {
+            let image=UIGraphicsImageRenderer(bounds:window.bounds).image{_ in window.drawHierarchy(in:window.bounds,afterScreenUpdates:true)}
+            try? image.pngData()?.write(to:folder.appendingPathComponent("matrix-panel-close-screen.png"),options:.atomic)
+        }
+    }catch {report["error"]=error.localizedDescription}
+    try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:folder.appendingPathComponent("matrix-panel-close-result.json"),options:.atomic)
+}
+#endif

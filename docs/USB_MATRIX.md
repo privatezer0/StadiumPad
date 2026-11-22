@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (43)**. This work is under physical-device qualification;
+Development version: **0.10.0 (44)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -29,9 +29,9 @@ Librarian, Command Center, Global EQ and Songs. It opens a dismissible mixer mod
 The modal header has three output icon buttons: ¼-inch connector, XLR connector
 and headphones. Highlighting identifies the selected output; accessible labels
 identify each icon. The last viewed output is remembered locally. Tapping the
-selected icon keeps that output open; use Close or swipe to dismiss the popup.
+selected icon keeps that output open; use Close to dismiss the popup.
 
-Opening and closing the popup are local view actions and send no MIDI. With bound
+Opening the popup is a local view action and sends no MIDI. With bound
 direct USB MIDI, an explicit output-icon tap inside the popup selects a different
 output first, then the requested output, using global-channel CC9 values7/8/9.
 Each stage waits for a fresh matching attached-output event; the first stage also
@@ -50,9 +50,24 @@ starting states; native live receipts verify each selected output, not physical
 panel pixels. The intermediate selection can cause a brief visible output change.
 No level, gain, pan, mute, solo or preset setting is changed by navigation.
 
+### Close on both devices
+
+With direct USB connected, Close reads the pedal's selected output, visits a distinct
+output, selects that original output to establish an open panel, then selects it
+again to close it. This keeps the pedal's selected output and all mixer settings.
+Each of the three stages requires a fresh matching receipt and settling between
+stages. It stops without retrying if a stage is uncertain. The sequence may briefly
+show the intermediate output. It does not use Home as an absolute close command.
+
+The Close button waits for the sequence before dismissing the iPad popup. If USB
+is absent, it still closes the iPad popup locally. If a send/confirmation fails,
+it dismisses locally and reports the error; it cannot claim the pedal panel closed.
+Swipe dismissal is disabled so it cannot bypass the Close action. onDisappear only
+cleans up local state and never sends another close command.
+
 Build 40 mixed header toggles, automatic Home navigation on dismissal and sheet
-state. Build 42 retains the single Matrix Mixer entry and limits pedal navigation
-to explicit output-icon taps inside the popup. No preset change is made. There is
+state. The single Matrix Mixer entry remains. Build 44 sends pedal navigation only for
+explicit output-icon taps and Close inside the popup. No preset change is made. There is
 still no verified pedal panel-visible getter or open/close event: attached-output
 updates identify an output but do not prove that its panel is visible. Automatic
 opening of the iPad popup from the pedal is not implemented from that ambiguous
@@ -116,7 +131,16 @@ also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 21, 2026
 
-Build 43 passes 95 Swift tests and 26 Matrix loopback tests. New loopback cases
+Build 44 passes 96 Swift tests and 30 Matrix loopback tests. Its one-shot native
+Close callback test passed with all three stage receipts, unchanged preset and
+Matrix channel/output/link settings, preserved attached output, zero presentation
+leases and no busy state after dismissal. The actual iPad closed screen was captured
+for inspection. This confirms command delivery and local dismissal; it is not an
+independent pixel-level check of the pedal screen. The native Close intent is
+disarmed after testing, and normal launch sends no test writes. Close-plan tests cover
+every starting output and visible/hidden state, while additional socket cases
+require all three fresh receipts and stop without retrying a missing close receipt.
+Build 43 passed 95 Swift tests and 26 Matrix loopback tests. New loopback cases
 require both fresh stage receipts, reject a wrong output, stop after a missing first
 receipt with no retry/second send, and block conflicting global MIDI routing.
 The reviewed one-shot native check passed1/1/1/2/2/3/3/3, including new receipts
