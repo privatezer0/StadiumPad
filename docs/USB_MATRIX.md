@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (26)**. This work is under physical-device qualification;
+Development version: **0.10.0 (27)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -121,3 +121,11 @@ a fresh reviewed intent, persist an allocation marker and never replay on restar
 - [Vheissu protocol research](https://github.com/Vheissu/helix-stadium-tools)
 
 See the project acknowledgments for the community research credit.
+
+### Popup control follow-up
+
+The owner reported pan did not respond in build 26; mute/solo behavior was unclear.
+An independent observer saw Home mute on/off but no pan or solo events during that
+check. Build 27 retains a local pan draft during dragging and adds an opt-in DEBUG
+local status report to distinguish UI requests, send failures and missing receipts.
+This is diagnostic progress, not a claim that the hardware issue has passed.

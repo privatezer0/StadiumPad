@@ -9,7 +9,7 @@ for the official desktop editor.
 
 ## USB development candidate
 
-Version 0.10.0 (26) adds USB-scoped editor transport and compact ¼-inch/XLR/Phones
+Version 0.10.0 (27) adds USB-scoped editor transport and compact ¼-inch/XLR/Phones
 buttons opening a pedal-style Matrix mixer popup, with navigation on the right. It is under device qualification;
 **it is not a released or fully qualified USB/volume build**. USB reads and Save Copy
 passed on iPad Pro, and the earlier Phones fader passed a fresh owner check.

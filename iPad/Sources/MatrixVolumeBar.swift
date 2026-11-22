@@ -40,7 +40,17 @@ struct MatrixVolumeBar:View {
     private var writer:Task<Void,Never>?
     private var token=UUID(),revision=0
     private var blocked=false
+    private var lastRequested:[String:Any]=[:]
     init(previewState:MatrixConsoleState?=nil){state=previewState;if previewState != nil {message="USB Matrix mixer · layout preview"}}
+    private func report() {
+        #if DEBUG
+        guard ProcessInfo.processInfo.environment["STADIUM_VERIFY"]=="1" else{return}
+        let root=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+        let rows=(1...3).flatMap{output in (state?.strips(output) ?? []).map{row in ["output":output,"source":row.id,"level":row.level,"pan":row.pan,"mute":row.muted,"solo":row.solo] as [String:Any]}}
+        let record:[String:Any]=["ready":ready,"sending":sending,"blocked":blocked,"message":message,"at":Date().timeIntervalSince1970,"channels":rows,"lastRequested":lastRequested]
+        try? JSONSerialization.data(withJSONObject:record).write(to:root.appendingPathComponent("matrix-console-ui.json"),options:.atomic)
+        #endif
+    }
     func observe(_ monitor:StadiumMonitor)async {
         let epoch=UUID();token=epoch;ready=false;blocked=false;state=nil;positions=[:];queue=[]
         guard monitor.connected,let product=monitor.snapshot?.product,let id=FileCompanion.deviceID(product) else{message="Connect to Stadium to read the mixer.";return}
@@ -63,6 +73,7 @@ struct MatrixVolumeBar:View {
                     }
                 }catch {guard token==epoch else{return};ready=false;message=error.localizedDescription}
             }
+            report()
             try? await Task.sleep(for:.milliseconds(300))
         }
         if token==epoch {ready=false;queue=[]}
@@ -77,6 +88,7 @@ struct MatrixVolumeBar:View {
     }
     func stop(){token=UUID();queue=[];ready=false}
     func send(_ command:MatrixConsoleCommand,monitor:StadiumMonitor) {
+        lastRequested=["output":command.output,"source":command.source,"field":command.field.rawValue,"value":command.value];report()
         guard ready,usb.online,channels.count==3 else{return}
         // Never coalesce toggles: MIDI mute/solo commands toggle, rather than set.
         if command.field == .level || command.field == .pan {queue.removeAll{$0.key==command.key}}
@@ -100,7 +112,7 @@ struct MatrixVolumeBar:View {
                     guard token==epoch else{break};state=after;positions[command.key]=command.value
                 }catch {guard token==epoch else{break};queue=[];ready=false;blocked=true;message=error.localizedDescription}
             }
-            sending=false;writer=nil
+            sending=false;writer=nil;report()
         }
     }
 }
@@ -160,10 +172,11 @@ private struct MatrixChannelStrip:View {
     let changed:(MatrixField,Int)->Void
     @State private var draft:Double?
     @State private var showPan=false
+    @State private var panDraft:Double?
     private var tint:Color {row.id<=5 ? Color(red:0.63,green:0.60,blue:0.27):row.id<=14 ? Color(red:0.15,green:0.65,blue:0.65):Color.gray}
     var body:some View {
         VStack(spacing:10) {
-            Button{showPan=true}label:{VStack(spacing:4){Text(abs(row.pan)<0.015 ? "Center":String(format:"%@ %.0f%%",row.pan<0 ? "L":"R",abs(row.pan)*100)).font(.system(size:12));GeometryReader{g in ZStack{Capsule().fill(.white.opacity(0.15)).frame(height:2);Circle().fill(.white.opacity(0.7)).frame(width:6,height:6).offset(x:row.pan*g.size.width*0.45)}}.frame(height:8)}}.disabled(!enabled)
+            Button{panDraft=nil;showPan=true}label:{VStack(spacing:4){Text(abs(row.pan)<0.015 ? "Center":String(format:"%@ %.0f%%",row.pan<0 ? "L":"R",abs(row.pan)*100)).font(.system(size:12));GeometryReader{g in ZStack{Capsule().fill(.white.opacity(0.15)).frame(height:2);Circle().fill(.white.opacity(0.7)).frame(width:6,height:6).offset(x:row.pan*g.size.width*0.45)}}.frame(height:8)}}.disabled(!enabled)
             HStack(spacing:5) {
                 toggle("M",active:row.muted,color:.red,field:.mute)
                 toggle("S",active:row.solo,color:.yellow,field:.solo)
@@ -177,7 +190,7 @@ private struct MatrixChannelStrip:View {
             Text(row.id==5 ? "Home":row.id==16 ? "Count In":row.name).font(.system(size:12,weight:.medium)).lineLimit(1).minimumScaleFactor(0.7)
         }.padding(.horizontal,9).padding(.vertical,14).background(tint.opacity(row.id==5 || row.id==14 ? 0.13:0.05)).opacity(row.enabled ? 1:0.4)
         .onChange(of:output){_,_ in draft=nil;showPan=false}
-        .popover(isPresented:$showPan){VStack(spacing:20){Text("\(row.name) · Pan").font(.headline);Slider(value:Binding(get:{row.pan<0 ? 64+row.pan*64:64+row.pan*63},set:{changed(.pan,Int($0.rounded()))}),in:0...127,step:1).frame(width:260).disabled(!enabled);HStack{Text("Left");Spacer();Button("Center"){changed(.pan,64)};Spacer();Text("Right")};Button("Done"){showPan=false}}.padding(24).presentationCompactAdaptation(.popover)}
+        .popover(isPresented:$showPan){VStack(spacing:20){Text("\(row.name) · Pan").font(.headline);Slider(value:Binding(get:{panDraft ?? (row.pan<0 ? 64+row.pan*64:64+row.pan*63)},set:{panDraft=$0;changed(.pan,Int($0.rounded()))}),in:0...127,step:1).frame(width:260).disabled(!enabled);HStack{Text("Left");Spacer();Button("Center"){panDraft=64;changed(.pan,64)};Spacer();Text("Right")};Button("Done"){showPan=false}}.padding(24).presentationCompactAdaptation(.popover)}
     }
     private func toggle(_ title:String,active:Bool,color:Color,field:MatrixField)->some View {
         Button{changed(field,127)}label:{Text(title).font(.system(size:15,weight:.medium)).frame(maxWidth:.infinity).frame(height:35).foregroundStyle(active ? .black:color).background(active ? color:Color.black.opacity(0.35),in:RoundedRectangle(cornerRadius:4)).overlay(RoundedRectangle(cornerRadius:4).stroke(color.opacity(0.55),lineWidth:1))}.buttonStyle(.plain).disabled(!enabled || !togglesEnabled).accessibilityLabel("\(row.name) \(title=="M" ? "Mute":"Solo")").accessibilityValue(active ? "On":"Off")
