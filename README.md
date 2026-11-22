@@ -9,8 +9,8 @@ for the official desktop editor.
 
 ## USB development candidate
 
-Version 0.10.0 (38) adds USB-scoped editor transport and compact ¼-inch/XLR/Phones
-buttons opening a pedal-style Matrix mixer popup, with navigation on the right. It is under device qualification;
+Version 0.10.0 (39) adds USB-scoped editor transport and compact ¼-inch/XLR/Phones
+buttons opening a pedal-style Matrix mixer popup, centered beside editor navigation. It is under device qualification;
 **it is not a released or fully qualified USB/volume build**. USB reads and Save Copy
 passed on iPad Pro. Solo on/off and a bounded production-queue pan test also pass,
 including preset preservation. USB Global EQ confirmation and the remaining mixer

@@ -16,7 +16,6 @@ struct MatrixVolumeBar:View {
                     Text(MatrixGuitarLevels.labels[output-1]).font(.system(size:10,weight:.semibold))
                 }.frame(width:58,height:46).foregroundStyle(usb.online && monitor.connected ? .white:.gray)}.buttonStyle(.plain).accessibilityLabel("Open \(MatrixGuitarLevels.labels[output-1]) Matrix mixer")
             }
-            Spacer(minLength:0)
         }
         #if DEBUG
         .task {if ProcessInfo.processInfo.arguments.contains("--show-matrix") {selected=3}}

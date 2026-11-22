@@ -298,7 +298,7 @@ no warning. Final Release24 was installed/cold-launched; no new TestFlight uploa
 Do not replay a partial run or expose its real native data. Debug records now carry build
 and diagnostic schema; write failures retain a separate small diagnostic text file.
 
-## USB transport and Matrix guitar volume candidate (0.10.0 / 38)
+## USB transport and Matrix guitar volume candidate (0.10.0 / 39)
 
 Read docs/USB_MATRIX.md before continuing this work. Carry the discovered NWInterface
 into both editor sockets; a wired interface type alone did not qualify. USB mode
@@ -316,9 +316,11 @@ Native Phones/Home Solo and pan qualification passed; broader device coverage,
 unplug/replug and USB EQ stored confirmation remain open;
 never convert the candidate into a claimed release based only on synthetic tests.
 
-## Matrix popup (development candidate 0.10.0 build 38)
+## Matrix popup (development candidate 0.10.0 build 39)
 
-The three header controls open MatrixMixerView as a modal, not inline volume faders.
+The three header controls sit beside the navigation buttons as one centered group;
+branding and connection remain at the edges. They open MatrixMixerView as a modal,
+not inline volume faders.
 MatrixConsoleState strictly parses the nineteen documented sources per output;
 source IDs differ from CC order (Home=source5/CC11, Song=source14/CC16).
 MatrixConsoleCommand exposes only typed channel fields, never arbitrary MIDI CCs.

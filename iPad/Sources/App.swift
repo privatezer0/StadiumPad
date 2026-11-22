@@ -192,9 +192,9 @@ struct StadiumView:View {
     }
     private var header:some View {
         GeometryReader {geometry in
-            HStack(spacing:10) {
-                if geometry.size.width>=1250 {Text("StadiumPad").font(.headline)}
-                MatrixVolumeBar(preview:preview).frame(maxWidth:.infinity)
+            ZStack {
+                HStack(spacing:10) {
+                MatrixVolumeBar(preview:preview)
                 Rectangle().fill(EditorTheme.border).frame(width:1,height:36)
                 HStack(spacing:2) {ForEach(EditorSection.allCases,id:\.self) {item in
                     Button {section=item} label:{VStack(spacing:2) {
@@ -202,7 +202,12 @@ struct StadiumView:View {
                         Text(item.rawValue).font(.system(size:9)).lineLimit(1).minimumScaleFactor(0.75)
                     }.frame(width:item == .commands ? 69:50,height:46).foregroundStyle(section==item ? .white:.gray).background(section==item ? .white.opacity(0.055):.clear,in:RoundedRectangle(cornerRadius:5))}.buttonStyle(.plain)
                 }}
+                }.fixedSize(horizontal:true,vertical:false)
+                HStack {
+                if geometry.size.width>=1250 {Text("StadiumPad").font(.headline)}
+                Spacer(minLength:0)
                 Button {showConnection=true} label:{Image(systemName:monitor.connected ? (monitor.connectionInterface=="USB/Ethernet" ? "cable.connector":"wifi"):"wifi.slash").font(.system(size:19)).frame(width:32,height:44)}.accessibilityLabel(monitor.connected ? "Stadium connection":"Connect to Stadium").buttonStyle(.plain).foregroundStyle(monitor.connected ? .white:.orange)
+                }
             }.padding(.horizontal,12).frame(maxWidth:.infinity,maxHeight:.infinity)
         }.frame(height:66).background(EditorTheme.header)
     }

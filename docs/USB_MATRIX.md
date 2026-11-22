@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (38)**. This work is under physical-device qualification;
+Development version: **0.10.0 (39)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -24,8 +24,8 @@ offline editing, Songs/Showcase editing or other unfinished features.
 
 ## Output buttons and the Matrix popup
 
-The main header now has compact **¼-inch, XLR and Phones** buttons, with editor
-navigation on the right. Tap an output to open a large dismissible Matrix mixer
+The main header has compact **¼-inch, XLR and Phones** buttons centered together
+with Home, Librarian, Command Center, Global EQ and Songs. Tap an output to open a large dismissible Matrix mixer
 modal over the current editor. Close returns to the same editor/preset. Opening,
 changing the local output tab and closing send no MIDI messages or preset edits.
 
@@ -86,6 +86,11 @@ is confirmed; its dB readout is not a calibrated MIDI-to-dB formula. A live even
 also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 21, 2026
+
+Build 39 changes header placement only. Its native build/install/launch passed;
+physical Pro and rendered regular landscape/portrait layouts were inspected.
+The combined output/navigation group fits centered without clipping or scrolling.
+No hardware write tests were repeated for this layout-only change.
 
 - 91 Swift tests and 22 Matrix loopback tests pass. These include stale bulk reads,
   missing/wrong-output receipts, receipt invalidation, linked/shared routing,
