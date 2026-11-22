@@ -174,6 +174,10 @@ import StadiumNetwork
         let value=try await session.matrixGuitarLevels()
         guard generation==token else{throw CancellationError()};return value
     }
+    func matrixPanelChannel()async throws->Int {
+        guard connected,let session else{throw ProtocolError.closed};let token=generation
+        let channel=try await session.matrixPanelChannel();guard generation==token else{throw CancellationError()};return channel
+    }
     func matrixChannels()async throws->[Int] {
         guard connected,let session else{throw ProtocolError.closed};let token=generation
         let channels=try await session.matrixMIDIChannels();guard generation==token else{throw CancellationError()};return channels

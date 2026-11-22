@@ -366,3 +366,35 @@ import StadiumNetwork
     }
 }
 #endif
+
+#if DEBUG
+/// Only explicit popup output taps send navigation; opening/closing never does.
+@MainActor func verifyMatrixOutputIcons(_ monitor:StadiumMonitor,select:@escaping @MainActor (Int)async->Bool)async {
+    let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+    var report:[String:Any]=["passed":false]
+    do {
+        let deadline=Date().addingTimeInterval(20)
+        while !monitor.connected,Date()<deadline {try await Task.sleep(for:.milliseconds(100))}
+        guard monitor.connected,monitor.connectionRoute == .usb else{throw ProtocolError.closed}
+        let intent=try JSONSerialization.jsonObject(with:Data(contentsOf:folder.appendingPathComponent("matrix-output-icons-intent.json"))) as? [String:Any]
+        guard intent?["authorizePopupOutputNavigation"] as? Bool==true,let run=intent?["run"] as? String,UUID(uuidString:run) != nil else{throw ProtocolError.invalid("A reviewed popup navigation intent is required.")}
+        let source=try await monitor.readUSBSource()
+        guard let id=source.presetID else{throw ProtocolError.closed}
+        let saved=try await monitor.readUSBSavedSource(id),before=try await monitor.readMatrixConsole()
+        try Data("started".utf8).write(to:folder.appendingPathComponent("matrix-output-icons-"+run+"-started"),options:.withoutOverwriting)
+        var rows:[Int]=[]
+        for output in [1,2,3,3] {
+            guard await select(output) else{throw ProtocolError.invalid("Popup output navigation failed.")}
+            try await Task.sleep(for:.milliseconds(500))
+            let state=try await monitor.readMatrixConsole()
+            guard state.property["val_"]["atto"].integer==output else{throw ProtocolError.invalid("The selected output was not confirmed.")}
+            rows.append(output)
+        }
+        let after=try await monitor.readMatrixConsole(),afterSource=try await monitor.readUSBSource(),afterSaved=try await monitor.readUSBSavedSource(id)
+        let untouched=source.rawEditBuffer==afterSource.rawEditBuffer && source.presetID==afterSource.presetID && source.activeSnapshot==afterSource.activeSnapshot && source.dirty==afterSource.dirty && saved==afterSaved
+        let mixerUnchanged=(1...3).allSatisfy{before.strips($0)==after.strips($0) && before.layer($0)["out_"]==after.layer($0)["out_"]} && before.linked==after.linked
+        report["outputs"]=rows;report["presetUnchanged"]=untouched;report["mixerUnchanged"]=mixerUnchanged;report["passed"]=untouched && mixerUnchanged
+    }catch {report["error"]=error.localizedDescription}
+    try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:folder.appendingPathComponent("matrix-output-icons-result.json"),options:.atomic)
+}
+#endif

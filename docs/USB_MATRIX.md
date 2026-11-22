@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (41)**. This work is under physical-device qualification;
+Development version: **0.10.0 (42)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -31,14 +31,22 @@ and headphones. Highlighting identifies the selected output; accessible labels
 identify each icon. The last viewed output is remembered locally. Tapping the
 selected icon keeps that output open; use Close or swipe to dismiss the popup.
 
-Opening, selecting an output and closing are local view actions. They send no
-pedal-screen commands and never change presets. Build 40's CC9/Home screen-link
-behavior was removed after the owner reported the screens became out of sync.
-There is no verified pedal panel-visible getter; do not restore that navigation
-based on an assumed remote screen state. The working channel-edit transport and
-receipt checks are unchanged. Wi-Fi-only opens the mixer for viewing; channel
-editing still needs bound direct USB MIDI. Background interaction uses the normal
-modal behavior, without the experimental header tap-through behavior.
+Opening and closing the popup are local view actions and send no MIDI. With bound
+direct USB MIDI, an explicit output-icon tap inside the popup sends global-channel
+CC9 Home0 then output7/8/9, so the pedal opens the matching mixer even if it already
+had that output selected. Re-tapping an icon keeps its mixer open; Close dismisses
+only the iPad popup. The configured global MIDI channel and USB identity are checked
+fresh; shared global/bypass/Matrix routing is rejected, and uncertain sends are not
+retried. Wi-Fi-only and previews change only the local view. Fader/pan/mute/Solo
+editing remains the separately confirmed per-channel USB path.
+
+Build 40 mixed header toggles, automatic Home navigation on dismissal and sheet
+state. Build 42 retains the single Matrix Mixer entry and limits pedal navigation
+to explicit output-icon taps inside the popup. No preset change is made. There is
+still no verified pedal panel-visible getter or open/close event: attached-output
+updates identify an output but do not prove that its panel is visible. Automatic
+opening of the iPad popup from the pedal is not implemented from that ambiguous
+signal. Do not reopen a user-dismissed popup merely on an attached-output update.
 
 The popup follows the pedal's channel-strip arrangement: Home, Song, Click, Count
 In, USB In 1/2, Bluetooth and Aux. Expand Home to reveal Path 1A/1B/2A/2B; expand
@@ -98,12 +106,13 @@ also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 21, 2026
 
-Build 41 removes the unsuccessful screen-navigation feature and simplifies the UI.
-It retains build 38's channel-control fixes. Hardware navigation qualification from
-build 40 is superseded; attached-output readback never established panel visibility.
-Build 41 passes 91 Swift tests, 22 Matrix loopback tests and native build/install/
-launch. The physical Pro main screen and regular/portrait popup renders were
-inspected. No new channel edits were sent for this navigation-only fix.
+Build 42 restores explicit popup output navigation after the owner clarified that
+this part worked. Header entry, popup dismissal and channel-control behavior stay
+separate. It passes 94 Swift tests and 22 Matrix loopback tests. Native qualification
+passed a one-shot reviewed intent, selecting 1/2/3 then 3 again, reading attached output
+and verifying preset and Matrix channel preservation. The final Pro popup was
+visually inspected. The intent was disarmed afterward. This confirms output selection,
+not independent visual proof of pedal panel visibility.
 
 - 91 Swift tests and 22 Matrix loopback tests pass. These include stale bulk reads,
   missing/wrong-output receipts, receipt invalidation, linked/shared routing,

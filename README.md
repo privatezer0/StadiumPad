@@ -9,10 +9,10 @@ for the official desktop editor.
 
 ## USB development candidate
 
-Version 0.10.0 (41) has a centered **Matrix Mixer** button opening a pedal-style
+Version 0.10.0 (42) has a centered **Matrix Mixer** button opening a pedal-style
 mixer popup. The popup uses output icons for ¼-inch, XLR and Phones and remembers
-the last viewed output. Opening, output selection and Close are local view actions;
-they do not navigate the pedal screen. This is a development candidate, **not a
+the last viewed output. Opening and Close are local view actions. With direct USB, tapping an output
+icon inside the popup also opens that output’s mixer on the pedal. This is a development candidate, **not a
 released or fully qualified USB build**. USB reads/Save Copy and bounded Phones/Home
 Solo/pan checks pass. USB Global EQ confirmation and remaining mixer coverage still
 need qualification.

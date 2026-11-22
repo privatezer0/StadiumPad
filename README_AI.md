@@ -298,7 +298,7 @@ no warning. Final Release24 was installed/cold-launched; no new TestFlight uploa
 Do not replay a partial run or expose its real native data. Debug records now carry build
 and diagnostic schema; write failures retain a separate small diagnostic text file.
 
-## USB transport and Matrix guitar volume candidate (0.10.0 / 41)
+## USB transport and Matrix guitar volume candidate (0.10.0 / 42)
 
 Read docs/USB_MATRIX.md before continuing this work. Carry the discovered NWInterface
 into both editor sockets; a wired interface type alone did not qualify. USB mode
@@ -316,13 +316,19 @@ Native Phones/Home Solo and pan qualification passed; broader device coverage,
 unplug/replug and USB EQ stored confirmation remain open;
 never convert the candidate into a claimed release based only on synthetic tests.
 
-## Matrix popup (development candidate 0.10.0 build 41)
+## Matrix popup (development candidate 0.10.0 build 42)
 
 A single Matrix Mixer header button opens MatrixMixerView. Its output selector uses
-three accessible icon buttons; the selection is remembered locally. Opening,
-selecting outputs and closing never send MIDI or pedal screen navigation commands.
-Build 40's MatrixPanelCommand/CC9 integration was removed after the owner reported
-screen mismatch; do not reintroduce it without a verified remote screen-state model.
+three accessible icon buttons; selection is remembered locally. Opening and closing
+never send MIDI. Explicit output-icon taps in the popup use MatrixPanelCommand on
+the configured global MIDI channel: Home0 then selected output7/8/9. Re-tapping keeps
+that output open. Never append a Home0 "release" after the output command, and never
+send navigation from onDisappear, output-state observers or header entry. Bound USB,
+connection generation and noncolliding MIDI routing are mandatory. WiFi-only/preview
+stays local. Build 40's combined header-toggle/dismissal behavior is intentionally
+absent. No verified panel-visible getter/event exists; syncMixAttachedOut alone must
+not auto-open a closed popup or masquerade as open/close state. The separate DEBUG
+output-icons check needs a reviewed UUID intent and exclusive run marker.
 MatrixConsoleState strictly parses the nineteen documented sources per output;
 source IDs differ from CC order (Home=source5/CC11, Song=source14/CC16).
 MatrixConsoleCommand exposes only typed channel fields, never arbitrary MIDI CCs.
