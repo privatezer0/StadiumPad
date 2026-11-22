@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (33)**. This work is under physical-device qualification;
+Development version: **0.10.0 (38)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -69,7 +69,9 @@ The device can emit `/syncMixChannelVolume` with a newer channel level while
 `server.mixer.state` still returns an older value. That bulk property must not be
 used alone to confirm a MIDI edit or claim live-level restoration. The session
 keeps a bounded overlay of device-originated level, pan, mute and solo events, scoped to the connection.
-New bulk reads cannot rewind those live values. The UI labels use the received dB
+New bulk reads cannot rewind those live values. On a new connection, before a fresh
+event arrives, an initial bulk read can still show an older stored value; no verified
+query for a fresh full DSP snapshot is established. The UI labels use the received dB
 value, and retain the confirmed MIDI thumb position after an adjustment.
 
 MIDI edits run serially with coalesced newer drag positions. A new matching live
@@ -85,36 +87,77 @@ also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 21, 2026
 
-- 84 Swift tests pass. Matrix-specific loopback tests: 21 pass, including
-  invalidating an older no-op receipt before any new send. The full integration
-  suite with TCP tuning completed 82 cases: 79 pass and 3 existing skips; the new
-  receipt and recovery regressions then passed in the 21-case Matrix suite. The Matrix
-  loopback tests deliberately keep the bulk property stale and deliver live events,
-  and reject missing/wrong-output receipts, stale contexts, linked outputs, shared
-  channels and unrelated changed fields.
+- 91 Swift tests and 22 Matrix loopback tests pass. These include stale bulk reads,
+  missing/wrong-output receipts, receipt invalidation, linked/shared routing,
+  unrelated-field preservation, gesture ordering and equivalent pan endpoints.
+  The earlier full TCP integration run completed 82 cases: 79 pass, 3 existing skips.
 - Native iPad Pro USB-only discovery/connection and product, preset, library,
-  Matrix and Global EQ reads pass. The product matches the selected Stadium.
-- Native USB Save Copy created two new empty User slots. Their contents independently
-  match the original live bytes; the saved original, unsaved source buffer, current
-  preset and snapshot stayed unchanged. Copies were not opened by that check.
-- Pro, regular landscape and portrait editor layouts were rendered natively and inspected.
-  The new popup was opened on the USB-connected Pro and read all 19 channels.
-  Native Pro/regular/portrait and expanded-channel captures were visually inspected;
-  the seven collapsed strips and Close fit without horizontal workspace scrolling.
-  Preview faders are intentionally disabled and do not send MIDI.
-- The owner confirmed the earlier live-event Phones level fader follows promptly
-  without warnings. Independent updates confirm popup Phones/Home mute on/off and
-  pan changes. A guarded native pan move/Center check passes and restores exact0.0.
-  Fresh gesture-speed acceptance, Solo, other outputs and unplug/replug checks remain
-  outstanding.
-- USB-only Global EQ sent a change but did not pass its stored-snapshot confirmation;
-  the existing Global EQ confirmation behavior needs further qualification over USB.
-  This is not a claim that every editor control has passed a USB hardware test.
+  Matrix and Global EQ reads pass. Earlier Save Copy checks created two empty User
+  slots and verified their contents without changing the source preset or edit buffer.
+- The popup's Pro/regular/portrait and expanded-channel renders were inspected.
+  Seven collapsed strips and Close fit without horizontal workspace scrolling;
+  expanded channels scroll horizontally. Preview faders cannot send MIDI.
+- Final build 38 tested Solo on/off through the actual presented production model:
+  109.5/108.1 ms, final Solo off, with new device live receipts.
+- Its 49-input pan burst had zero thumb rewinds, maximum input handling 5.1 ms,
+  final queue drain 98.1 ms and 16.7 ms maximum/p95 main-thread frame gaps at 60 Hz.
+  Full-left MIDI 0 followed by equivalent MIDI 1 also passed, then restored Center.
+- The final native tests verified saved preset bytes, live edit bytes, active preset,
+  snapshot and dirty state were unchanged. Close released the presentation lease,
+  restored the prior idle timer and left the session connected and not busy.
+- Earlier owner checks confirmed Phones level follows promptly and mute/pan events
+  reached the device. Other output/controller combinations, acoustic behavior,
+  detach/reconnect behavior and exact level calibration remain unqualified.
+- USB Global EQ sent a change but did not pass its stored-snapshot confirmation;
+  it still requires separate USB qualification. No claim of complete USB parity.
 
-Release installers and TestFlight must not be updated based only on these candidate
-builds. Keep raw captures, device identities, private addresses, presets and signing
-material outside Git. DEBUG hardware checks require a fresh reviewed intent,
-persist a marker before sending and never replay an interrupted run on restart.
+These are bounded automated production-model measurements, not human touch or
+acoustic acceptance on every device. Release installers and TestFlight remain
+0.9.6 (24); development build 38 has not replaced them.
+
+## Gesture latency and state handling
+
+The coalescing queue displays the newest level/pan thumb position immediately.
+Explicit in-flight tickets prevent an older confirmation from rewinding it. Toggle
+commands are neither coalesced nor optimistically displayed as confirmed; labels
+remain device readback. Reset invalidates old tickets, while canceling pending input
+allows an already-sent transaction to finish confirmation.
+
+While the mixer is presented, periodic preset polling and deferred editor refreshes
+wait until Close; live events and Matrix reads continue. Matrix writes retain the
+editor exclusion guard without publishing a redraw of the hidden editor. This
+reduced measured frame gaps from about 47 ms to 16.7 ms. TCP noDelay and interactive
+connection scheduling reduce small request/reply latency. Fresh identity, routing
+and confirmation checks remain mandatory.
+
+Pan uses the observed firmware 1.4 conversion clamp((MIDI−64)/63,−1,1).
+MIDI 0 and 1 share the full-left endpoint. An equivalent-pan no-op requires a prior
+fresh exact receipt still matching current state, never just a stale bulk value.
+An estimated inverse dB value never suppresses a level restoration. Each new send
+invalidates its older receipt before calling the sender, including failure paths.
+
+Solo sends a high-value press and low-value release in one MIDI event list. This
+pairing passed the native on/off checks; the underlying firmware mechanism remains
+an inference. Clear Solos is a separate absolute CC103 recovery, requiring off
+receipts for previously active strips and preservation of unrelated fields. It is
+never implemented by retrying uncertain toggles. Its recovery failure paths have
+loopback coverage; physical absolute-clear recovery still needs qualification.
+
+## Development diagnostics
+
+Normal launch sends no test writes. DEBUG hardware checks require explicit flags,
+a reviewed UUID intent and an exclusive persisted marker before sending; marked
+runs cannot replay. Combined qualification runs Solo then pan sequentially, checking
+saved/live preset preservation and restoring Solo off/pan Center. Missing or malformed
+intent stops before writes. The on-device matrix-tests-gate.json can disarm these
+helpers; malformed existing gates fail closed. The delivered iPad's gate is disarmed.
+
+--show-matrix only opens the popup. Expensive preview capture requires the separate
+--capture-matrix-layout or --verify-layout flag and must not run during timing tests.
+The optional live-event trace has a 2 MiB cap. Keep raw captures, native state,
+identities, addresses, presets and signing material outside Git.
+
+See [Apple TCP noDelay documentation](https://developer.apple.com/documentation/network/nwprotocoltcp/options/nodelay).
 
 ## References
 
@@ -124,61 +167,3 @@ persist a marker before sending and never replay an interrupted run on restart.
 - [Vheissu protocol research](https://github.com/Vheissu/helix-stadium-tools)
 
 See the project acknowledgments for the community research credit.
-
-## Gesture latency and diagnostic checks
-
-The pan popup retains a local draft while dragging. Matrix writes pause background
-preset polling, while TCP noDelay and interactive connection scheduling reduce small
-request/reply latency. Fresh routing/mixer checks remain intact. The mixer keeps the
-screen awake while open and restores the app's prior idle-timer setting on Close;
-preview rendering does not alter it.
-
-In build30, a guarded native USB Phones/Home pan move followed by Center measured
-101/106ms per transaction, compared with a prior 622ms sample. A separate listener
-observed both pan updates and final exact0.0 Center. This establishes that bounded
-check, not gesture smoothness on all devices. The opt-in DEBUG local status report
-includes requested control, readiness/error and transaction duration.
-
-Every new send clears its older MIDI/no-op receipt before calling the sender.
-Even a send error or lost event cannot leave an old confirmation eligible to suppress
-a separate restoration. The loopback regression verifies this failure path.
-
-The DEBUG native pan check requires --verify-matrix-pan and a reviewed UUID intent,
-persists its marker before sending, moves only Phones/Home pan to MIDI62, then
-separately restores Center at MIDI64. It never writes level, mute, solo or preset
-data and cannot replay the same run after restart. Raw state stays on-device.
-It is excluded from Release and is not enabled by normal launch.
-
-See [Apple TCP noDelay documentation](https://developer.apple.com/documentation/network/nwprotocoltcp/options/nodelay).
-
-## Solo and UI follow-up under qualification
-
-The owner reported build30 Solo enabled but a second tap timed out, leaving the
-stale S indicator lit after Solo was cleared on the pedal. A new build sends Solo
-as a high-value press followed by a low-value release in one MIDI event list. This
-is a device-test candidate, not established firmware behavior or a verified fix.
-
-While the mixer is presented, preset polling and deferred editor refreshes wait
-until it closes; the live event reader and Matrix reads remain active. Heartbeat
-receipt time no longer publishes a redraw of the whole editor. These changes aim
-to reduce gesture stalls; isolated 100ms transactions did not prove smooth dragging
-in the owner's earlier check. Fresh gesture and Solo acceptance remain required.
-
-An opt-in DEBUG Matrix trace filters to the live-update socket, with a2MiB cap.
-This avoids large preset-read responses exhausting the event trace before testing.
-No source traces or native mixer data are included in Git.
-
-## Absolute Solo recovery and autonomous qualification
-
-Clear Solos sends only the selected output's documented CC103. It requires fresh
-routing/identity checks and off receipts for all previously active strips; partial,
-missing and other-output events cannot claim success. All non-solo fields and other
-outputs are preserved. It does not loop through uncertain toggle commands.
-
-A DEBUG --verify-matrix-solo check is prepared for unattended qualification. A fresh
-reviewed intent and UUID marker are mandatory; it starts with Phones solos off,
-records the Matrix baseline, runs only Home Solo on/off, then verifies saved preset
-and live edit bytes stayed unchanged. If that toggle check becomes uncertain, it
-attempts one separate absolute Clear Solos restoration. An uncertain clear is never
-retried. Normal launch sends no test writes. Physical qualification of this recovery
-path remains pending while the iPad cannot launch the check.

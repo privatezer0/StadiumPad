@@ -40,7 +40,7 @@ class MatrixPeer(Peer):
        if self.console=='clear':
         for source in ([5] if self.mode=='partial' else [5,14]):
          self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixChannelSolo',[8,-1,3 if self.mode=='wrong-output' else 1,source,0]))))
-       else:self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixChannelMute' if self.console=='mute' else '/syncMixChannelPan' if self.console else '/syncMixChannelVolume',[8,-1,3 if self.mode=='wrong-output' else 1,14 if self.console else 5,1 if self.console=='mute' else -.5]))))
+       else:self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixChannelMute' if self.console=='mute' else '/syncMixChannelPan' if self.console else '/syncMixChannelVolume',[8,-1,3 if self.mode=='wrong-output' else 1,14 if self.console else 5,1 if self.console=='mute' else -1 if self.console=='endpoints' else -32/63 if self.console else -.5]))))
      reply='/getMatchingPropertyValues';rows=[{'key_':'global.midi.'+k,'val_':x} for k,x in [('channel',1),('bcchannel',2),('over.usb.c',1),('matrix.ch.qtr',3),('matrix.ch.xlr',4),('matrix.ch.phones',4 if self.mode=='shared' else 5)]]
      values=[rid,v[1],b'lavppgsm'+msgpack.packb({'vals':rows})]
     elif a=='/PropertyValueGet':
@@ -84,10 +84,12 @@ class ConsoleTransactions(unittest.TestCase):
     args=[str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',folder+'/plan','--backups',folder,'--matrix-clear-check' if console=='clear' else '--matrix-console-check']
     if console=='mute':args+=['--console-mute']
     if console=='invalidated':args+=['--console-invalidated-noop']
+    if console=='endpoints':args+=['--console-equivalent-pan']
     r=subprocess.run(args,capture_output=True,text=True,timeout=10)
    self.assertEqual(peer.errors,[]);self.assertEqual(r.returncode==0,success,r.stdout+r.stderr)
    self.assertFalse(any('Set' in a or a.startswith('/sync') for a in peer.sent))
   finally:peer.close()
+ def test_confirmed_equivalent_pan_endpoint_does_not_require_a_new_echo(self):self.run_mode('normal','endpoints',True)
  def test_uncertain_send_invalidates_previous_noop_receipt(self):self.run_mode('normal','invalidated',True)
  def test_pan_confirmed_by_live_event_with_stale_bulk(self):self.run_mode('normal','pan',True)
  def test_mute_toggle_confirmed_by_live_event(self):self.run_mode('normal','mute',True)

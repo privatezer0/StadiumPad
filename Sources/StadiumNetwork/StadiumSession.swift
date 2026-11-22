@@ -712,7 +712,13 @@ extension StadiumSession {
         guard expected.origin==origin,expected==before,before.linked==0,channels[command.output-1]==channel,
               let target=before.strip(output:command.output,source:command.source),target.enabled else{throw ProtocolError.invalid("Matrix settings changed. Refresh before editing again.")}
         let key=command.key,old=target.raw[command.field.rawValue]
-        if let prior=consoleLastMIDI[key],prior.value==command.value,prior.level==old,command.field == .level || command.field == .pan {return before}
+        if let prior=consoleLastMIDI[key],prior.level==old,command.field == .level || command.field == .pan {
+            // Pan0 and1 share the clamped left endpoint. A fresh prior receipt
+            // can confirm the same physical target without demanding a new echo.
+            var samePan=false
+            if command.field == .pan {samePan=try MatrixPan.value(forMIDI:command.value)==old.numeric}
+            if prior.value==command.value || samePan {return before}
+        }
         let watermark=matrixRevision
         // Any new send makes the prior MIDI receipt unsafe for no-op decisions,
         // even if this send subsequently fails or its live event never arrives.
@@ -730,8 +736,8 @@ extension StadiumSession {
             guard actual.raw[command.field.rawValue].boolean == !(old.boolean!) else{throw ProtocolError.invalid("The Matrix toggle was not confirmed. Nothing was retried.")}
         }
         if command.field == .pan {
-            let wanted=command.value<=64 ? Double(command.value-64)/64:Double(command.value-64)/63
-            guard abs(actual.pan-wanted)<0.025 else{throw ProtocolError.invalid("The Matrix pan was not confirmed. Nothing was retried.")}
+            let wanted=try MatrixPan.value(forMIDI:command.value)
+            guard abs(actual.pan-wanted)<0.00001 else{throw ProtocolError.invalid("The Matrix pan was not confirmed. Nothing was retried.")}
         }
         for output in 1...3 {
             for row in before.strips(output) {

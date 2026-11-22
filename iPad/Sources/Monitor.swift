@@ -18,6 +18,9 @@ import StadiumNetwork
     private var matrixPresentations:Set<UUID>=[]
     func beginMatrixPresentation()->UUID {let id=UUID();matrixPresentations.insert(id);return id}
     func endMatrixPresentation(_ id:UUID){matrixPresentations.remove(id)}
+    #if DEBUG
+    var debugMatrixPresentationCount:Int {matrixPresentations.count}
+    #endif
     @Published var focusedBlock:StadiumBlockFocus?
     private(set) var focusedPresetID:Int?
     private(set) var selectionRememberedAt=Date.distantPast
@@ -37,7 +40,9 @@ import StadiumNetwork
         return (try? JSONDecoder().decode([String:[CommandParameter]].self,from:data)) ?? [:]
     }()
     @Published var stompProperties:[String:Value]=[:]
-    @Published var busy=false
+    @Published private var editorBusy=false
+    private var matrixWriting=false
+    var busy:Bool {get{editorBusy || matrixWriting}set{editorBusy=newValue}}
     @Published var errorText:String?
     @Published var lastAction:String?
     @Published var lastCopy:PreservedPreset?
@@ -184,19 +189,19 @@ import StadiumNetwork
     }
     func setMatrixConsole(_ command:MatrixConsoleCommand,expected:MatrixConsoleState,channel:Int,send:@Sendable @escaping ()async throws->Void)async throws->MatrixConsoleState {
         guard connected,!busy,let session else{throw ProtocolError.invalid("Finish the current editor update before adjusting Matrix.")};let token=generation
-        busy=true;defer{if generation==token {busy=false}}
+        matrixWriting=true;defer{if generation==token {matrixWriting=false;if matrixPresentations.isEmpty {objectWillChange.send()}}}
         let state=try await session.setMatrixConsole(command,expected:expected,channel:channel,send:send)
         guard generation==token else{throw CancellationError()};return state
     }
     func clearMatrixSolos(_ command:MatrixClearSolosCommand,expected:MatrixConsoleState,channel:Int,send:@Sendable @escaping ()async throws->Void)async throws->MatrixConsoleState {
         guard connected,!busy,let session else{throw ProtocolError.invalid("Finish the current editor update before clearing solos.")}
-        let token=generation;busy=true;defer{if token==generation {busy=false}}
+        let token=generation;matrixWriting=true;defer{if token==generation {matrixWriting=false;if matrixPresentations.isEmpty {objectWillChange.send()}}}
         let state=try await session.clearMatrixSolos(command,expected:expected,channel:channel,send:send)
         guard token==generation else{throw CancellationError()};return state
     }
     func stop() {
         eqCommitTask?.cancel();eqCommitTask=nil
-        generation=UUID();refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;focusedPresetID=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil
+        generation=UUID();matrixWriting=false;editorBusy=false;refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;focusedPresetID=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil
         let closeTuner=tunerRequested;tunerRequested=false
         if let old=session {Task {if closeTuner {try? await old.setTuner(false)};await old.disconnect()}}
         session=nil;connected=false;connecting=false;status="Disconnected. Last received values remain visible.";report()

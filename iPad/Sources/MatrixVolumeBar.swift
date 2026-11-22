@@ -33,14 +33,17 @@ struct MatrixVolumeBar:View {
     @Published var ready=false
     @Published var message="Reading Matrix mixer…"
     @Published var sending=false
-    @Published var positions:[String:Int]=[:]
+    @Published private var gestures=MatrixGestureQueue()
+    var positions:[String:Int] {gestures.positions}
     let usb=MatrixUSBMIDI()
     private var deviceID:String?
     private var channels:[Int]=[]
-    private var queue:[MatrixConsoleCommand]=[]
     private var writer:Task<Void,Never>?
     private var token=UUID(),revision=0
     private var blocked=false
+    #if DEBUG
+    var gestureWorkPending:Bool {writer != nil || sending || !gestures.isEmpty}
+    #endif
     private var lastRequested:[String:Any]=[:]
     private var lastTransactionMilliseconds=0.0
     init(previewState:MatrixConsoleState?=nil){state=previewState;if previewState != nil {message="USB Matrix mixer · layout preview"}}
@@ -49,13 +52,13 @@ struct MatrixVolumeBar:View {
         guard ProcessInfo.processInfo.environment["STADIUM_VERIFY"]=="1" else{return}
         let root=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
         let rows=(1...3).flatMap{output in (state?.strips(output) ?? []).map{row in ["output":output,"source":row.id,"level":row.level,"pan":row.pan,"mute":row.muted,"solo":row.solo] as [String:Any]}}
-        let record:[String:Any]=["ready":ready,"sending":sending,"blocked":blocked,"message":message,"at":Date().timeIntervalSince1970,"channels":rows,"lastRequested":lastRequested,"transactionMilliseconds":lastTransactionMilliseconds]
+        let record:[String:Any]=["ready":ready,"sending":sending,"blocked":blocked,"message":message,"at":Date().timeIntervalSince1970,"channels":rows,"lastRequested":lastRequested,"transactionMilliseconds":lastTransactionMilliseconds,"version":Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "","build":Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "","usbOnline":usb.online]
         try? JSONSerialization.data(withJSONObject:record).write(to:root.appendingPathComponent("matrix-console-ui.json"),options:.atomic)
         #endif
     }
     func observe(_ monitor:StadiumMonitor)async {
-        let epoch=UUID();token=epoch;ready=false;blocked=false;state=nil;positions=[:];queue=[]
-        guard monitor.connected,let product=monitor.snapshot?.product,let id=FileCompanion.deviceID(product) else{message="Connect to Stadium to read the mixer.";return}
+        let epoch=UUID();token=epoch;ready=false;blocked=false;state=nil;gestures.reset();deviceID=nil;channels=[]
+        guard monitor.connected,let product=monitor.snapshot?.product,let id=FileCompanion.deviceID(product) else{message="Connect to Stadium to read the mixer.";report();return}
         deviceID=id
         while !Task.isCancelled,token==epoch {
             usb.refresh()
@@ -66,7 +69,7 @@ struct MatrixVolumeBar:View {
                     guard !Task.isCancelled,token==epoch else{return}
                     if stamp==revision,!sending {
                         if monitor.connectionRoute == .usb,monitor.connectionInterface=="USB/Ethernet",usb.online,!usb.bound(to:id) {try usb.bind(to:id)}
-                        if let before=state {for output in 1...3 {for row in next.strips(output) {for field in [MatrixField.level,.pan] where row.raw[field.rawValue] != before.strip(output:output,source:row.id)?.raw[field.rawValue] {positions["\(output):\(row.id):\(field.rawValue)"]=nil}}}}
+                        if let before=state {for output in 1...3 {for row in next.strips(output) {for field in [MatrixField.level,.pan] where row.raw[field.rawValue] != before.strip(output:output,source:row.id)?.raw[field.rawValue] {gestures.externalChange("\(output):\(row.id):\(field.rawValue)")}}}}
                         state=next;channels=midi;ready=usb.bound(to:id) && next.linked==0 && !blocked
                         if !usb.online {message="Connect Stadium directly to this iPad by USB-C to control the mixer."}
                         else if !usb.bound(to:id) {message="Confirm this USB Stadium to enable mixer controls."}
@@ -78,15 +81,15 @@ struct MatrixVolumeBar:View {
             report()
             try? await Task.sleep(for:.milliseconds(300))
         }
-        if token==epoch {ready=false;queue=[]}
+        if token==epoch {ready=false;gestures.reset()}
     }
     func bind() {do{guard let deviceID else{throw ProtocolError.closed};try usb.bind(to:deviceID);retry()}catch{message=error.localizedDescription}}
     func retry(){blocked=false;revision+=1}
-    func dropPending(){queue=[]}
+    func dropPending(){gestures.cancelPending()}
     func clearSolos(output:Int,monitor:StadiumMonitor){
         lastRequested=["output":output,"field":"clearSolos"];report()
         guard writer==nil,!sending,usb.online,monitor.connected,let id=deviceID else{return}
-        queue=[];revision+=1;ready=false
+        gestures.reset();revision+=1;ready=false
         let epoch=token,connection=monitor.connectionID
         writer=Task {
             sending=true
@@ -104,20 +107,19 @@ struct MatrixVolumeBar:View {
             }catch {guard token==epoch else{return};ready=false;blocked=true;message=error.localizedDescription}
         }
     }
-    func stop(){token=UUID();queue=[];ready=false}
+    func stop(){token=UUID();gestures.reset();ready=false}
     func send(_ command:MatrixConsoleCommand,monitor:StadiumMonitor) {
         lastRequested=["output":command.output,"source":command.source,"field":command.field.rawValue,"value":command.value];report()
         guard ready,usb.online,channels.count==3 else{return}
         // Never coalesce toggles: MIDI mute/solo commands toggle, rather than set.
-        if command.field == .level || command.field == .pan {queue.removeAll{$0.key==command.key}}
-        else {guard !sending,queue.isEmpty else{return}}
-        queue.append(command);revision+=1
+        if command.field == .mute || command.field == .solo {guard !sending,gestures.isEmpty else{return}}
+        gestures.enqueue(command);revision+=1
         guard writer==nil else{return}
         let epoch=token,connection=monitor.connectionID
         writer=Task {
             sending=true
-            while !queue.isEmpty,token==epoch,!blocked {
-                let command=queue.removeFirst()
+            while token==epoch,!blocked,let ticket=gestures.takeNext() {
+                let command=ticket.command
                 guard let before=state,let id=deviceID,channels.count==3 else{break}
                 let channel=channels[command.output-1]
                 do {
@@ -128,8 +130,8 @@ struct MatrixVolumeBar:View {
                             try self.usb.send(command,channel:channel,networkIdentity:id)
                         }
                     }
-                    guard token==epoch else{break};lastTransactionMilliseconds=Date().timeIntervalSince(started)*1000;state=after;positions[command.key]=command.value
-                }catch {guard token==epoch else{break};queue=[];ready=false;blocked=true;message=error.localizedDescription}
+                    guard token==epoch else{break};lastTransactionMilliseconds=Date().timeIntervalSince(started)*1000;state=after;gestures.confirmed(ticket)
+                }catch {guard token==epoch else{break};gestures.reset();ready=false;blocked=true;message=error.localizedDescription}
             }
             sending=false;writer=nil;report()
         }
@@ -161,13 +163,13 @@ struct MatrixMixerView:View {
                 Picker("Output",selection:$output){ForEach(1...3,id:\.self){n in Text(MatrixGuitarLevels.labels[n-1]).tag(n)}}.pickerStyle(.segmented).frame(maxWidth:280)
                 Spacer(minLength:0)
                 Button {showEQ=true}label:{Label("Global EQ",systemImage:"waveform.path")}.disabled(!monitor.connected || model.sending)
-                Button("Close"){model.stop();dismiss()}.fontWeight(.semibold).padding(.leading,10)
+                Button("Close"){closeMixer()}.fontWeight(.semibold).padding(.leading,10)
             }.padding(.horizontal,18).frame(height:64).background(EditorTheme.header)
             if let state=model.state {
                 ScrollView(.horizontal) {
                     HStack(spacing:1) {ForEach(sources,id:\.self){source in
                         if let row=state.strip(output:output,source:source) {
-                            MatrixChannelStrip(row:row,output:output,position:model.positions["\(output):\(source):vol_"],enabled:enabled && row.enabled,togglesEnabled:!model.sending,expanded:source==5 ? homeExpanded:songExpanded,toggleExpanded:{if source==5 {homeExpanded.toggle()}else{songExpanded.toggle()}},changed:{field,value in
+                            MatrixChannelStrip(row:row,output:output,position:model.positions["\(output):\(source):vol_"],panPosition:model.positions["\(output):\(source):pan_"],enabled:enabled && row.enabled,togglesEnabled:!model.sending,expanded:source==5 ? homeExpanded:songExpanded,toggleExpanded:{if source==5 {homeExpanded.toggle()}else{songExpanded.toggle()}},changed:{field,value in
                                 if let command=try? MatrixConsoleCommand(output:output,source:source,field:field,value:value) {model.send(command,monitor:monitor)}
                             }).frame(width:max(90,(area.size.width-24)/7))
                         }
@@ -183,14 +185,34 @@ struct MatrixMixerView:View {
         }}.background(Color(white:0.045)).foregroundStyle(.white).preferredColorScheme(.dark)
         .task(id:"\(monitor.connectionID)-\(monitor.connected)"){if !preview {await model.observe(monitor)}}
         .onAppear{if !preview {previousIdleTimer=UIApplication.shared.isIdleTimerDisabled;UIApplication.shared.isIdleTimerDisabled=true;if matrixPresentation==nil {matrixPresentation=monitor.beginMatrixPresentation()}}}
-        .onDisappear{model.stop();if let previousIdleTimer {UIApplication.shared.isIdleTimerDisabled=previousIdleTimer};if let id=matrixPresentation {monitor.endMatrixPresentation(id);matrixPresentation=nil}}
+        .onDisappear{finishPresentation()}
         .onChange(of:output){_,_ in model.dropPending()}
+        #if DEBUG
+        .task {
+            guard !preview,!nativeMatrixTestsDisarmed() else{return}
+            if ProcessInfo.processInfo.arguments.contains("--verify-matrix-all") {
+                if await verifyMatrixSoloRoundTrip(monitor,model:model) {_ = await verifyMatrixGestureTiming(model,monitor:monitor,close:closeMixer)}
+            }else {
+                if ProcessInfo.processInfo.arguments.contains("--verify-matrix-gesture") {_ = await verifyMatrixGestureTiming(model,monitor:monitor,close:closeMixer)}
+                if ProcessInfo.processInfo.arguments.contains("--verify-matrix-solo-ui") {_ = await verifyMatrixSoloRoundTrip(monitor,model:model,close:closeMixer)}
+            }
+        }
+        #endif
         .sheet(isPresented:$showEQ){NavigationStack{GlobalEQView(preview:preview,initialOutput:output==3 ? .phones:output==2 ? .xlr:.quarter).environmentObject(monitor).toolbar{ToolbarItem(placement:.confirmationAction){Button("Done"){showEQ=false}}}}}
+    }
+    private func closeMixer(){model.stop();dismiss()}
+    private func finishPresentation(){
+        model.stop()
+        if let previousIdleTimer {UIApplication.shared.isIdleTimerDisabled=previousIdleTimer}
+        if let id=matrixPresentation {monitor.endMatrixPresentation(id);matrixPresentation=nil}
+        #if DEBUG
+        if !preview {recordMatrixClose(monitor,expectedIdle:previousIdleTimer)}
+        #endif
     }
 }
 
 private struct MatrixChannelStrip:View {
-    let row:MatrixStrip,output:Int,position:Int?,enabled:Bool,togglesEnabled:Bool,expanded:Bool
+    let row:MatrixStrip,output:Int,position:Int?,panPosition:Int?,enabled:Bool,togglesEnabled:Bool,expanded:Bool
     let toggleExpanded:()->Void
     let changed:(MatrixField,Int)->Void
     @State private var draft:Double?
@@ -212,8 +234,9 @@ private struct MatrixChannelStrip:View {
             }.frame(height:30)
             Text(row.id==5 ? "Home":row.id==16 ? "Count In":row.name).font(.system(size:12,weight:.medium)).lineLimit(1).minimumScaleFactor(0.7)
         }.padding(.horizontal,9).padding(.vertical,14).background(tint.opacity(row.id==5 || row.id==14 ? 0.13:0.05)).opacity(row.enabled ? 1:0.4)
-        .onChange(of:output){_,_ in draft=nil;showPan=false}
-        .popover(isPresented:$showPan){VStack(spacing:20){Text("\(row.name) · Pan").font(.headline);Slider(value:Binding(get:{panDraft ?? (row.pan<0 ? 64+row.pan*64:64+row.pan*63)},set:{panDraft=$0;changed(.pan,Int($0.rounded()))}),in:0...127,step:1).frame(width:260).disabled(!enabled);HStack{Text("Left");Spacer();Button("Center"){panDraft=64;changed(.pan,64)};Spacer();Text("Right")};Button("Done"){showPan=false}}.padding(24).presentationCompactAdaptation(.popover)}
+        .onChange(of:output){_,_ in draft=nil;panDraft=nil;showPan=false}
+        .onChange(of:enabled){_,available in if !available {draft=nil;panDraft=nil}}
+        .popover(isPresented:$showPan){VStack(spacing:20){Text("\(row.name) · Pan").font(.headline);Slider(value:Binding(get:{panDraft ?? Double(panPosition ?? (try? MatrixPan.midi(forValue:row.pan)) ?? 64)},set:{panDraft=$0;changed(.pan,Int($0.rounded()))}),in:0...127,step:1,onEditingChanged:{active in if !active {panDraft=nil}}).frame(width:260).disabled(!enabled);HStack{Text("Left");Spacer();Button("Center"){panDraft=64;changed(.pan,64)};Spacer();Text("Right")};Button("Done"){showPan=false}}.padding(24).presentationCompactAdaptation(.popover)}
     }
     private func toggle(_ title:String,active:Bool,color:Color,field:MatrixField)->some View {
         Button{changed(field,127)}label:{Text(title).font(.system(size:15,weight:.medium)).frame(maxWidth:.infinity).frame(height:35).foregroundStyle(active ? .black:color).background(active ? color:Color.black.opacity(0.35),in:RoundedRectangle(cornerRadius:4)).overlay(RoundedRectangle(cornerRadius:4).stroke(color.opacity(0.55),lineWidth:1))}.buttonStyle(.plain).disabled(!enabled || !togglesEnabled).accessibilityLabel("\(row.name) \(title=="M" ? "Mute":"Solo")").accessibilityValue(active ? "On":"Off")

@@ -10,6 +10,7 @@ import StadiumProtocol
     @Published private(set) var deviceName="No Stadium USB MIDI connection"
     private var endpoint:MIDIEndpointRef=0
     private var usbIdentity:String?
+    private var lastRefreshMilliseconds=0.0
     private var client:MIDIClientRef=0
     private var port:MIDIPortRef=0
     init() {
@@ -21,6 +22,7 @@ import StadiumProtocol
     deinit {if port != 0 {MIDIPortDispose(port)};if client != 0 {MIDIClientDispose(client)}}
     static func hash(_ text:String)->String {SHA256.hash(data:Data(text.utf8)).map{String(format:"%02x",$0)}.joined()}
     func refresh() {
+        let started=Date();defer{lastRefreshMilliseconds=Date().timeIntervalSince(started)*1000}
         var matches:[(MIDIEndpointRef,String,String)]=[]
         for index in 0..<MIDIGetNumberOfDevices() {
             let device=MIDIGetDevice(index);var properties:Unmanaged<CFPropertyList>?
@@ -72,7 +74,7 @@ import StadiumProtocol
             }
         }
         #if DEBUG
-        let record:[String:Any]=["at":Date().timeIntervalSince1970,"channel":channel,"cc":cc,"value":value,"word":String(words[0],radix:16),"words":words.map{String($0,radix:16)},"packets":list.numPackets,"status":status]
+        let record:[String:Any]=["at":Date().timeIntervalSince1970,"channel":channel,"cc":cc,"value":value,"word":String(words[0],radix:16),"words":words.map{String($0,radix:16)},"enumerationMilliseconds":lastRefreshMilliseconds,"packets":list.numPackets,"status":status]
         if let data=try? JSONSerialization.data(withJSONObject:record) {try? data.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("matrix-last-midi.json"),options:.atomic)}
         #endif
         guard status==0 else{throw ProtocolError.invalid("USB MIDI send failed. Nothing was retried.")}

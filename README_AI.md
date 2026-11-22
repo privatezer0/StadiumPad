@@ -298,31 +298,32 @@ no warning. Final Release24 was installed/cold-launched; no new TestFlight uploa
 Do not replay a partial run or expose its real native data. Debug records now carry build
 and diagnostic schema; write failures retain a separate small diagnostic text file.
 
-## USB transport and Matrix guitar volume candidate (0.10.0 / 25)
+## USB transport and Matrix guitar volume candidate (0.10.0 / 38)
 
 Read docs/USB_MATRIX.md before continuing this work. Carry the discovered NWInterface
 into both editor sockets; a wired interface type alone did not qualify. USB mode
 must never silently use Wi-Fi. CoreMIDI volume is direct from iPad, not a Mac bridge.
 Keep USB/network device identity binding explicit and invalidate availability on
 MIDI detach. Read actual MIDI channel settings and refuse linked/conflicting outputs.
-Only CC11/Home is exposed; there is no arbitrary MIDI sender UI.
+The popup exposes only typed documented per-channel controls; there is no arbitrary MIDI sender UI.
 
 Bulk server.mixer.state can lag a device Home-level event. Use the bounded,
 connection-scoped live overlay and a new output receipt to confirm MIDI changes;
 never overwrite a mirror or use an estimated MIDI inverse to skip restoration.
 Preserve queue coalescing and current MIDI thumb position. Initial position mapping
 remains approximate. Live notifications do not prove acoustic/pedal-screen behavior.
-Device-side acceptance, unplug/replug and USB EQ stored confirmation remain open;
+Native Phones/Home Solo and pan qualification passed; broader device coverage,
+unplug/replug and USB EQ stored confirmation remain open;
 never convert the candidate into a claimed release based only on synthetic tests.
 
-## Matrix popup (development candidate 0.10.0 build 33)
+## Matrix popup (development candidate 0.10.0 build 38)
 
 The three header controls open MatrixMixerView as a modal, not inline volume faders.
 MatrixConsoleState strictly parses the nineteen documented sources per output;
 source IDs differ from CC order (Home=source5/CC11, Song=source14/CC16).
 MatrixConsoleCommand exposes only typed channel fields, never arbitrary MIDI CCs.
 Mute/solo CCs are toggles: require the opposite live state. Solo currently sends
-127 then0 as a press/release pair under device qualification. Never
+127 then0 as a press/release pair, verified on/off for Phones/Home. Never
 retry uncertain toggles. Coalesce level/pan gestures, but never toggle commands.
 Every transaction requires a new matching output/source/field live receipt and
 preserves unrelated known and unknown data. Bulk properties can stay stale after
@@ -342,3 +343,26 @@ other outputs. Do not retry an uncertain clear. The guarded DEBUG Solo qualifica
 uses a reviewed UUID, starts only with all Phones solos off, preserves saved/live
 preset bytes, tests Home on/off once, and uses one absolute clear as recovery only.
 Do not replay marked runs or enable these tests on normal launch.
+
+## Matrix gesture queue and modal rendering
+
+MatrixGestureQueue owns coalescing, in-flight tickets and visual thumb positions.
+Show the newest continuous request immediately; an older receipt cannot rewind it.
+Toggle flags always use actual device state and are never coalesced or shown as
+confirmed optimistically. Reset invalidates old tickets; canceling queued gestures
+does not abandon an already-sent transaction. dB labels remain actual readback.
+MatrixPan uses the observed1.4 mapping clamp((MIDI−64)/63,−1,1), with float tolerance.
+
+Matrix operations participate in the busy guard without publishing a redraw of the
+hidden editor behind the modal. Ordinary editor operations still publish busy;
+closing the modal or disconnecting releases the Matrix exclusion correctly.
+--show-matrix opens only the popup. Layout rendering requires the separate
+--capture-matrix-layout or --verify-layout flag; don't run heavy preview captures
+concurrently with gesture measurements. The opt-in DEBUG gesture test exercises the
+presented production model/queue, samples CADisplayLink main-thread frame pacing,
+uses small Phones/Home pan requests, restores Center and checks saved/live bytes.
+It requires its own exclusive UUID marker. Combined qualification runs Solo then pan
+sequentially, never concurrently. The on-device matrix-tests-gate.json disarms debug
+helpers after testing; malformed existing gates fail closed. The delivered gate is
+disarmed. Equivalent pan endpoints may skip a send only with a prior fresh matching
+receipt; estimated volume mappings never authorize a no-op.

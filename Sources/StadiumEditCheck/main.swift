@@ -27,9 +27,14 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
                 let listener=Task {while !Task.isCancelled {_ = try await session.event()}};defer{listener.cancel()}
                 let before=try await session.matrixConsole(),channels=try await session.matrixMIDIChannels()
                 let field:MatrixField=args.contains("--console-mute") ? .mute:.pan
-                let command=try MatrixConsoleCommand(output:1,source:14,field:field,value:field == .mute ? 127:32)
+                let command=try MatrixConsoleCommand(output:1,source:14,field:field,value:field == .mute ? 127:args.contains("--console-equivalent-pan") ? 0:32)
                 let after=try await session.setMatrixConsole(command,expected:before,channel:channels[0],send:{})
                 guard after.strip(output:1,source:14)?.raw[field.rawValue] != before.strip(output:1,source:14)?.raw[field.rawValue],try await session.matrixConsole()==after else{throw ProtocolError.invalid("Matrix live state did not remain current.")}
+                if args.contains("--console-equivalent-pan") {
+                    let equivalent=try MatrixConsoleCommand(output:1,source:14,field:.pan,value:1)
+                    let same=try await session.setMatrixConsole(equivalent,expected:after,channel:channels[0],send:{throw ProtocolError.invalid("Equivalent confirmed pan endpoint was resent.")})
+                    guard same==after else{throw ProtocolError.invalid("Equivalent pan moved the mixer.")}
+                }
                 if args.contains("--console-invalidated-noop") {
                     do {_ = try await session.setMatrixConsole(MatrixConsoleCommand(output:1,source:14,field:.pan,value:16),expected:after,channel:channels[0],send:{throw ProtocolError.invalid("uncertain-send")})}catch {}
                     var restorationSent=false

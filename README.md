@@ -9,11 +9,12 @@ for the official desktop editor.
 
 ## USB development candidate
 
-Version 0.10.0 (33) adds USB-scoped editor transport and compact ¼-inch/XLR/Phones
+Version 0.10.0 (38) adds USB-scoped editor transport and compact ¼-inch/XLR/Phones
 buttons opening a pedal-style Matrix mixer popup, with navigation on the right. It is under device qualification;
 **it is not a released or fully qualified USB/volume build**. USB reads and Save Copy
-passed on iPad Pro, and the earlier Phones fader passed a fresh owner check.
-The new popup controls and Global EQ USB confirmation still need device qualification.
+passed on iPad Pro. Solo on/off and a bounded production-queue pan test also pass,
+including preset preservation. USB Global EQ confirmation and the remaining mixer
+coverage still need qualification.
 See [USB/Matrix development status](docs/USB_MATRIX.md). The validated installer and
 TestFlight submission remain 0.9.6 (24).
 
