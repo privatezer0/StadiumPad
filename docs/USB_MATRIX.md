@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (30)**. This work is under physical-device qualification;
+Development version: **0.10.0 (32)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -84,7 +84,7 @@ also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 21, 2026
 
-- 82 Swift tests pass. Matrix-specific loopback tests: 14 pass, including
+- 83 Swift tests pass. Matrix-specific loopback tests: 14 pass, including
   invalidating an older no-op receipt before any new send. The full integration
   suite with TCP tuning completed 82 cases: 79 pass and 3 existing skips; the new
   receipt regression then passed in the 14-case Matrix suite. The Matrix
@@ -149,3 +149,20 @@ data and cannot replay the same run after restart. Raw state stays on-device.
 It is excluded from Release and is not enabled by normal launch.
 
 See [Apple TCP noDelay documentation](https://developer.apple.com/documentation/network/nwprotocoltcp/options/nodelay).
+
+## Solo and UI follow-up under qualification
+
+The owner reported build30 Solo enabled but a second tap timed out, leaving the
+stale S indicator lit after Solo was cleared on the pedal. A new build sends Solo
+as a high-value press followed by a low-value release in one MIDI event list. This
+is a device-test candidate, not established firmware behavior or a verified fix.
+
+While the mixer is presented, preset polling and deferred editor refreshes wait
+until it closes; the live event reader and Matrix reads remain active. Heartbeat
+receipt time no longer publishes a redraw of the whole editor. These changes aim
+to reduce gesture stalls; isolated 100ms transactions did not prove smooth dragging
+in the owner's earlier check. Fresh gesture and Solo acceptance remain required.
+
+An opt-in DEBUG Matrix trace filters to the live-update socket, with a2MiB cap.
+This avoids large preset-read responses exhausting the event trace before testing.
+No source traces or native mixer data are included in Git.

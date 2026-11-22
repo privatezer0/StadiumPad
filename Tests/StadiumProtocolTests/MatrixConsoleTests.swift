@@ -34,4 +34,10 @@ final class MatrixConsoleTests:XCTestCase {
         XCTAssertNil(MatrixConsoleUpdate.decode(OSCMessage(message.address,[.int(7),.int(-1),.int(2),.int(14),.number(2)])))
         XCTAssertNil(MatrixConsoleUpdate.decode(OSCMessage(message.address,[.int(7),.int(-1),.int(0),.int(14),.number(0)])))
     }
+    func testSoloPressReleaseDoesNotLeaveASustainedHighCC()throws {
+        XCTAssertEqual(try MatrixConsoleCommand(output:3,source:5,field:.solo,value:127).midiWords(channel:5),[0x20B4507F,0x20B45000])
+        XCTAssertEqual(try MatrixConsoleCommand(output:3,source:5,field:.mute,value:127).midiWords(channel:5),[0x20B4397F])
+        XCTAssertEqual(try MatrixConsoleCommand(output:3,source:5,field:.pan,value:64).midiWords(channel:5),[0x20B42240])
+    }
+
 }

@@ -9,16 +9,17 @@ private final class Gate<T>:@unchecked Sendable {
     func finish(_ body:()->Void) {lock.lock();guard !complete else{lock.unlock();return};complete=true;lock.unlock();body()}
 }
 public final class TraceRecorder:@unchecked Sendable {
-    private let handle:FileHandle;private let lock=NSLock();private let maximumBytes:Int?;private var capturedBytes=0
-    public init(path:String,maximumBytes:Int?=nil)throws {
+    private let handle:FileHandle;private let lock=NSLock();private let maximumBytes:Int?;private var capturedBytes=0;private let channels:Set<Int>?
+    public init(path:String,maximumBytes:Int?=nil,channels:Set<Int>?=nil)throws {
         guard maximumBytes.map({$0>0}) ?? true else{throw ProtocolError.invalid("Choose a positive trace size limit.")}
-        self.maximumBytes=maximumBytes
+        self.maximumBytes=maximumBytes;self.channels=channels
         let descriptor=Darwin.open(path,O_WRONLY|O_CREAT|O_EXCL,0o600)
         guard descriptor>=0 else{throw ProtocolError.invalid("Could not create a new private trace. Choose an unused filename.")}
         handle=FileHandle(fileDescriptor:descriptor,closeOnDealloc:true)
     }
 
     public func record(channel:Int,direction:String,data:Data) {
+        guard channels?.contains(channel) ?? true else{return}
         lock.lock();defer{lock.unlock()}
         if let maximumBytes,capturedBytes>=maximumBytes {return}
         let object:[String:Any]=["at":Date().timeIntervalSince1970,"channel":channel,"direction":direction,"hex":data.map{String(format:"%02x",$0)}.joined()]

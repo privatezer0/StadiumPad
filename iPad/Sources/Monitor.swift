@@ -14,7 +14,10 @@ import StadiumNetwork
     @Published var snapshot:DeviceSnapshot?
     @Published var connected=false
     @Published var connecting=false
-    @Published var lastEvent:Date?
+    private(set) var lastEvent:Date?
+    private var matrixPresentations:Set<UUID>=[]
+    func beginMatrixPresentation()->UUID {let id=UUID();matrixPresentations.insert(id);return id}
+    func endMatrixPresentation(_ id:UUID){matrixPresentations.remove(id)}
     @Published var focusedBlock:StadiumBlockFocus?
     private(set) var focusedPresetID:Int?
     private(set) var selectionRememberedAt=Date.distantPast
@@ -79,7 +82,10 @@ import StadiumNetwork
             do {
                 #if DEBUG
                 let eqTrace:TraceRecorder?
-                if ProcessInfo.processInfo.environment["STADIUM_TRACE_GLOBAL_EQ"]=="1" {
+                if ProcessInfo.processInfo.environment["STADIUM_TRACE_MATRIX"]=="1" {
+                    let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+                    eqTrace=try TraceRecorder(path:folder.appendingPathComponent("matrix-events-"+UUID().uuidString+".jsonl").path,maximumBytes:2*1024*1024,channels:[Int(port)])
+                }else if ProcessInfo.processInfo.environment["STADIUM_TRACE_GLOBAL_EQ"]=="1" {
                     let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
                     eqTrace=try TraceRecorder(path:folder.appendingPathComponent("global-eq-wire-"+UUID().uuidString+".jsonl").path,maximumBytes:8*1024*1024)
                 }else{eqTrace=nil}
@@ -110,7 +116,7 @@ import StadiumNetwork
                 }
                 while !Task.isCancelled {
                     try await Task.sleep(for:.milliseconds(750))
-                    if busy {continue}
+                    if busy || !matrixPresentations.isEmpty {continue}
                     let state=try await current.snapshot(product:state.product)
                     guard generation==token,!Task.isCancelled else{return}
                     snapshot=state
@@ -126,7 +132,7 @@ import StadiumNetwork
             do {
                 try await Task.sleep(for:.milliseconds(60))
                 for _ in 0..<3 {
-                    while busy && !Task.isCancelled {try await Task.sleep(for:.milliseconds(75))}
+                    while (busy || !matrixPresentations.isEmpty) && !Task.isCancelled {try await Task.sleep(for:.milliseconds(75))}
                     guard generation==token,!Task.isCancelled else{return}
                     let revision=liveRevision
                     let state=try await current.snapshot(product:snapshot?.product)

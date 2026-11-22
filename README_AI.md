@@ -315,7 +315,7 @@ remains approximate. Live notifications do not prove acoustic/pedal-screen behav
 Device-side acceptance, unplug/replug and USB EQ stored confirmation remain open;
 never convert the candidate into a claimed release based only on synthetic tests.
 
-## Matrix popup (development candidate 0.10.0 build 30)
+## Matrix popup (development candidate 0.10.0 build 32)
 
 The three header controls open MatrixMixerView as a modal, not inline volume faders.
 MatrixConsoleState strictly parses the nineteen documented sources per output;

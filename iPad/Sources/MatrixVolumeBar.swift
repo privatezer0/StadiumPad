@@ -130,6 +130,7 @@ struct MatrixMixerView:View {
     @State private var songExpanded=false
     @State private var showEQ=false
     @State private var previousIdleTimer:Bool?
+    @State private var matrixPresentation:UUID?
     let preview:Bool
     init(initialOutput:Int,preview:Bool=false,previewState:MatrixConsoleState?=nil,expanded:Bool=false){_output=State(initialValue:initialOutput);self.preview=preview;_model=StateObject(wrappedValue:MatrixConsoleModel(previewState:previewState));_homeExpanded=State(initialValue:expanded);_songExpanded=State(initialValue:expanded)}
     private var sources:[Int] {[5]+(homeExpanded ? [1,2,3,4]:[])+[14]+(songExpanded ? Array(6...13):[])+[15,16,17,18,19]}
@@ -164,8 +165,8 @@ struct MatrixMixerView:View {
             }.padding(.horizontal,18).frame(minHeight:42).background(Color(white:0.09))
         }}.background(Color(white:0.045)).foregroundStyle(.white).preferredColorScheme(.dark)
         .task(id:"\(monitor.connectionID)-\(monitor.connected)"){if !preview {await model.observe(monitor)}}
-        .onAppear{if !preview {previousIdleTimer=UIApplication.shared.isIdleTimerDisabled;UIApplication.shared.isIdleTimerDisabled=true}}
-        .onDisappear{model.stop();if let previousIdleTimer {UIApplication.shared.isIdleTimerDisabled=previousIdleTimer}}
+        .onAppear{if !preview {previousIdleTimer=UIApplication.shared.isIdleTimerDisabled;UIApplication.shared.isIdleTimerDisabled=true;if matrixPresentation==nil {matrixPresentation=monitor.beginMatrixPresentation()}}}
+        .onDisappear{model.stop();if let previousIdleTimer {UIApplication.shared.isIdleTimerDisabled=previousIdleTimer};if let id=matrixPresentation {monitor.endMatrixPresentation(id);matrixPresentation=nil}}
         .onChange(of:output){_,_ in model.dropPending()}
         .sheet(isPresented:$showEQ){NavigationStack{GlobalEQView(preview:preview,initialOutput:output==3 ? .phones:output==2 ? .xlr:.quarter).environmentObject(monitor).toolbar{ToolbarItem(placement:.confirmationAction){Button("Done"){showEQ=false}}}}}
     }

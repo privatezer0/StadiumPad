@@ -78,6 +78,12 @@ public struct MatrixConsoleCommand:Equatable,Sendable {
     }
     public var key:String {"\(output):\(source):\(field.rawValue)"}
     public var cc:Int {MatrixStrip.controlCC(source:source,field:field)!}
+    /// End the Solo switch gesture with a low-value release. Device qualification
+    /// remains separate; Line 6 documents toggle activation only at >=64.
+    public func midiWords(channel:Int)throws->[UInt32] {
+        let press=try midiWord(channel:channel)
+        return field == .solo ? [press,press & 0xFFFFFF00]:[press]
+    }
     public func midiWord(channel:Int)throws->UInt32 {
         guard (1...16).contains(channel) else{throw ProtocolError.invalid("Invalid Matrix MIDI channel.")}
         return UInt32(0x2)<<28 | UInt32(0xB0+channel-1)<<16 | UInt32(cc)<<8 | UInt32(value)
