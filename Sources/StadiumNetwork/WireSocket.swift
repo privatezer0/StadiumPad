@@ -29,10 +29,12 @@ public final class TraceRecorder:@unchecked Sendable {
     deinit {try? handle.close()}
 }
 actor WireSocket {
-    let connection:NWConnection;let channel:Int;let trace:TraceRecorder?;let queue=DispatchQueue(label:"stadium.wire",qos:.utility)
+    let connection:NWConnection;let channel:Int;let trace:TraceRecorder?;let queue=DispatchQueue(label:"stadium.wire",qos:.userInitiated)
     var decoder=FrameDecoder()
     init(host:String,port:UInt16,trace:TraceRecorder?,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil) {
-        let parameters=NWParameters.tcp
+        // Interactive request/reply frames must not wait behind Nagle buffering.
+        let tcp=NWProtocolTCP.Options();tcp.noDelay=true
+        let parameters=NWParameters(tls:nil,tcp:tcp)
         if let interface {parameters.requiredInterface=interface}
         if route == .usb {parameters.requiredInterfaceType = .wiredEthernet}
         if route == .wifi {parameters.requiredInterfaceType = .wifi}

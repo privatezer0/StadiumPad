@@ -714,6 +714,9 @@ extension StadiumSession {
         let key=command.key,old=target.raw[command.field.rawValue]
         if let prior=consoleLastMIDI[key],prior.value==command.value,prior.level==old,command.field == .level || command.field == .pan {return before}
         let watermark=matrixRevision
+        // Any new send makes the prior MIDI receipt unsafe for no-op decisions,
+        // even if this send subsequently fails or its live event never arrives.
+        consoleLastMIDI[key]=nil
         try await send()
         let deadline=Date().addingTimeInterval(0.8)
         while consoleReceipts[key].map({$0>watermark}) != true {

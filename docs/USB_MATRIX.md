@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (28)**. This work is under physical-device qualification;
+Development version: **0.10.0 (30)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -84,9 +84,10 @@ also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 21, 2026
 
-- 82 Swift tests pass. Matrix-specific loopback tests: 13 pass. The full
-  integration suite has 82 cases: 79 pass and 3 existing skips. Eight library cases
-  were rerun successfully after correcting their external executable path. The Matrix
+- 82 Swift tests pass. Matrix-specific loopback tests: 14 pass, including
+  invalidating an older no-op receipt before any new send. The full integration
+  suite with TCP tuning completed 82 cases: 79 pass and 3 existing skips; the new
+  receipt regression then passed in the 14-case Matrix suite. The Matrix
   loopback tests deliberately keep the bulk property stale and deliver live events,
   and reject missing/wrong-output receipts, stale contexts, linked outputs, shared
   channels and unrelated changed fields.
@@ -100,18 +101,19 @@ also not independent acoustic or pedal-screen qualification.
   Native Pro/regular/portrait and expanded-channel captures were visually inspected;
   the seven collapsed strips and Close fit without horizontal workspace scrolling.
   Preview faders are intentionally disabled and do not send MIDI.
-- An earlier polling implementation failed the owner's pedal-screen check and was
-  sluggish. The owner subsequently confirmed the live-event Phones fader follows promptly
-  with no warning. The new full-channel popup, other outputs, pan/mute/solo and
-  unplug/replug checks remain outstanding.
+- The owner confirmed the earlier live-event Phones level fader follows promptly
+  without warnings. Independent updates confirm popup Phones/Home mute on/off and
+  pan changes. A guarded native pan move/Center check passes and restores exact0.0.
+  Fresh gesture-speed acceptance, Solo, other outputs and unplug/replug checks remain
+  outstanding.
 - USB-only Global EQ sent a change but did not pass its stored-snapshot confirmation;
   the existing Global EQ confirmation behavior needs further qualification over USB.
   This is not a claim that every editor control has passed a USB hardware test.
 
 Release installers and TestFlight must not be updated based only on these candidate
 builds. Keep raw captures, device identities, private addresses, presets and signing
-material outside Git. DEBUG inspections are read-only; hardware copy checks require
-a fresh reviewed intent, persist an allocation marker and never replay on restart.
+material outside Git. DEBUG hardware checks require a fresh reviewed intent,
+persist a marker before sending and never replay an interrupted run on restart.
 
 ## References
 
@@ -122,19 +124,28 @@ a fresh reviewed intent, persist an allocation marker and never replay on restar
 
 See the project acknowledgments for the community research credit.
 
-### Popup control follow-up
+## Gesture latency and diagnostic checks
 
-The owner reported pan did not respond in build 26; mute/solo behavior was unclear.
-An independent observer saw Home mute on/off but no pan or solo events during that
-check. Build 27 retains a local pan draft during dragging and adds an opt-in DEBUG
-local status report to distinguish UI requests, send failures and missing receipts.
-This is diagnostic progress, not a claim that the hardware issue has passed.
+The pan popup retains a local draft while dragging. Matrix writes pause background
+preset polling, while TCP noDelay and interactive connection scheduling reduce small
+request/reply latency. Fresh routing/mixer checks remain intact. The mixer keeps the
+screen awake while open and restores the app's prior idle-timer setting on Close;
+preview rendering does not alter it.
 
-Build 27's focused Phones/Home drag was independently observed to reach full left
-(CC34 value0, live pan−1); the owner reported lag. No confirmation error or blocked
-state remained. Build 28 marks Matrix writes busy to pause background preset polling
-while the serialized mixer transaction runs. It retains full fresh checks and
-per-control receipts; no routing cache or unchecked stream was introduced. Its DEBUG
-report includes transaction duration. The mixer keeps the screen awake while open,
-then restores the app's prior idle-timer setting on close; previews do not change it.
-The latency improvement and centered-pan restoration still need a fresh device check.
+In build30, a guarded native USB Phones/Home pan move followed by Center measured
+101/106ms per transaction, compared with a prior 622ms sample. A separate listener
+observed both pan updates and final exact0.0 Center. This establishes that bounded
+check, not gesture smoothness on all devices. The opt-in DEBUG local status report
+includes requested control, readiness/error and transaction duration.
+
+Every new send clears its older MIDI/no-op receipt before calling the sender.
+Even a send error or lost event cannot leave an old confirmation eligible to suppress
+a separate restoration. The loopback regression verifies this failure path.
+
+The DEBUG native pan check requires --verify-matrix-pan and a reviewed UUID intent,
+persists its marker before sending, moves only Phones/Home pan to MIDI62, then
+separately restores Center at MIDI64. It never writes level, mute, solo or preset
+data and cannot replay the same run after restart. Raw state stays on-device.
+It is excluded from Release and is not enabled by normal launch.
+
+See [Apple TCP noDelay documentation](https://developer.apple.com/documentation/network/nwprotocoltcp/options/nodelay).

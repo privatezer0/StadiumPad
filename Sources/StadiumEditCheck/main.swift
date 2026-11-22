@@ -22,6 +22,13 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
                 let command=try MatrixConsoleCommand(output:1,source:14,field:field,value:field == .mute ? 127:32)
                 let after=try await session.setMatrixConsole(command,expected:before,channel:channels[0],send:{})
                 guard after.strip(output:1,source:14)?.raw[field.rawValue] != before.strip(output:1,source:14)?.raw[field.rawValue],try await session.matrixConsole()==after else{throw ProtocolError.invalid("Matrix live state did not remain current.")}
+                if args.contains("--console-invalidated-noop") {
+                    do {_ = try await session.setMatrixConsole(MatrixConsoleCommand(output:1,source:14,field:.pan,value:16),expected:after,channel:channels[0],send:{throw ProtocolError.invalid("uncertain-send")})}catch {}
+                    var restorationSent=false
+                    do {_ = try await session.setMatrixConsole(command,expected:after,channel:channels[0],send:{throw ProtocolError.invalid("restoration-send-checked")})}
+                    catch {restorationSent=error.localizedDescription=="restoration-send-checked"}
+                    guard restorationSent else{throw ProtocolError.invalid("A prior receipt incorrectly skipped restoration after an uncertain send.")}
+                }
                 print("PASS Matrix console live receipt and preserved fields.");await session.disconnect();return
             }
             if args.contains("--matrix-transaction-check") {

@@ -76,10 +76,12 @@ class ConsoleTransactions(unittest.TestCase):
    with tempfile.TemporaryDirectory() as folder:
     args=[str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',folder+'/plan','--backups',folder,'--matrix-console-check']
     if console=='mute':args+=['--console-mute']
+    if console=='invalidated':args+=['--console-invalidated-noop']
     r=subprocess.run(args,capture_output=True,text=True,timeout=10)
    self.assertEqual(peer.errors,[]);self.assertEqual(r.returncode==0,success,r.stdout+r.stderr)
    self.assertFalse(any('Set' in a or a.startswith('/sync') for a in peer.sent))
   finally:peer.close()
+ def test_uncertain_send_invalidates_previous_noop_receipt(self):self.run_mode('normal','invalidated',True)
  def test_pan_confirmed_by_live_event_with_stale_bulk(self):self.run_mode('normal','pan',True)
  def test_mute_toggle_confirmed_by_live_event(self):self.run_mode('normal','mute',True)
  def test_missing_toggle_receipt_is_not_retried(self):self.run_mode('no-change','mute',False)

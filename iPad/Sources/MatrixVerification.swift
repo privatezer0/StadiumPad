@@ -102,3 +102,52 @@ import StadiumNetwork
     }catch {try? JSONSerialization.data(withJSONObject:["readSucceeded":false,"error":error.localizedDescription]).write(to:folder.appendingPathComponent("matrix-console-inspection.json"),options:.atomic)}
 }
 #endif
+
+#if DEBUG
+/// Explicit one-shot Phones/Home pan check; no preset, level, mute or solo writes.
+@MainActor func verifyMatrixPanTiming(_ monitor:StadiumMonitor)async {
+    let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+    var report:[String:Any]=["passed":false,"restored":false]
+    var needsRestore=false
+    var steps:[[String:Any]]=[]
+    let midi=MatrixUSBMIDI()
+    var identity:String?
+    func apply(_ value:Int)async throws {
+        let state=try await monitor.readMatrixConsole(),channels=try await monitor.matrixChannels()
+        guard monitor.connected,monitor.connectionRoute == .usb,monitor.connectionInterface=="USB/Ethernet",state.linked==0,let id=identity,midi.bound(to:id) else{throw ProtocolError.invalid("USB Matrix test context changed.")}
+        let command=try MatrixConsoleCommand(output:3,source:5,field:.pan,value:value),connection=monitor.connectionID,started=Date()
+        let after=try await monitor.setMatrixConsole(command,expected:state,channel:channels[2]) {
+            try await MainActor.run {
+                guard monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
+                try midi.send(command,channel:channels[2],networkIdentity:id)
+            }
+        }
+        guard let pan=after.strip(output:3,source:5)?.pan else{throw ProtocolError.invalid("Pan readback unavailable.")}
+        steps.append(["midi":value,"pan":pan,"transactionMilliseconds":Date().timeIntervalSince(started)*1000])
+        if value==64 {guard abs(pan)<0.00001 else{throw ProtocolError.invalid("Center was not confirmed.")}}
+    }
+    do {
+        let intent=try JSONSerialization.jsonObject(with:Data(contentsOf:folder.appendingPathComponent("matrix-pan-intent.json"))) as? [String:Any]
+        guard intent?["authorizePhonesHomePanTimingAndCenter"] as? Bool==true,let run=intent?["run"] as? String,UUID(uuidString:run) != nil,
+              monitor.connected,monitor.connectionRoute == .usb,let product=monitor.snapshot?.product,let id=FileCompanion.deviceID(product) else{throw ProtocolError.invalid("A reviewed one-shot USB pan intent is required.")}
+        let marker=folder.appendingPathComponent("matrix-pan-"+run+"-started")
+        guard !FileManager.default.fileExists(atPath:marker.path) else{throw ProtocolError.invalid("Do not replay an interrupted pan test.")}
+        identity=id;midi.refresh();guard midi.bound(to:id) else{throw ProtocolError.invalid("The attached USB Stadium is not confirmed.")}
+        let before=try await monitor.readMatrixConsole()
+        try MessagePack.encode(before.property).write(to:folder.appendingPathComponent("matrix-pan-before.bin"),options:.atomic)
+        try Data("started".utf8).write(to:marker,options:.atomic)
+        needsRestore=true
+        try await apply(62)
+        try await apply(64);needsRestore=false
+        report["passed"]=true;report["restored"]=true
+    }catch {
+        report["error"]=error.localizedDescription
+        if needsRestore {
+            // Separate explicit baseline restoration, never a replay of the failed edit.
+            do {try await apply(64);report["restored"]=true}catch{report["restoreError"]=error.localizedDescription}
+        }
+    }
+    report["steps"]=steps
+    try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:folder.appendingPathComponent("matrix-pan-timing.json"),options:.atomic)
+}
+#endif
