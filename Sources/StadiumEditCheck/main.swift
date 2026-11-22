@@ -14,6 +14,12 @@ struct SparePlan:Codable {let first:PreservedPreset;let second:PreservedPreset}
             let trace=try option("--trace").map{try TraceRecorder(path:$0)}
             try await session.connect(host:host,port:UInt16(option("--port") ?? "2001") ?? 2001,trace:trace)
             let state=try await session.snapshot()
+            if args.contains("--matrix-panel-check") {
+                guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic Matrix checks are loopback-only.")}
+                let listener=Task {while !Task.isCancelled {_ = try await session.event()}};defer{listener.cancel()}
+                try await session.showMatrixPanel(MatrixPanelCommand(output:1),channel:1,send:{output in print("PANEL SEND \(output)")})
+                print("PASS sequenced output-panel receipts.");await session.disconnect();return
+            }
             if args.contains("--matrix-clear-check") {
                 guard host=="127.0.0.1" else{throw ProtocolError.invalid("Synthetic Matrix checks are loopback-only.")}
                 let listener=Task {while !Task.isCancelled {_ = try await session.event()}};defer{listener.cancel()}

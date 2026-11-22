@@ -1,6 +1,6 @@
 # USB editing and persistent guitar volume — development candidate
 
-Development version: **0.10.0 (42)**. This work is under physical-device qualification;
+Development version: **0.10.0 (43)**. This work is under physical-device qualification;
 it has not replaced the validated 0.9.6 installer or been uploaded to TestFlight.
 
 ## Standalone iPad connection
@@ -32,13 +32,23 @@ identify each icon. The last viewed output is remembered locally. Tapping the
 selected icon keeps that output open; use Close or swipe to dismiss the popup.
 
 Opening and closing the popup are local view actions and send no MIDI. With bound
-direct USB MIDI, an explicit output-icon tap inside the popup sends global-channel
-CC9 Home0 then output7/8/9, so the pedal opens the matching mixer even if it already
-had that output selected. Re-tapping an icon keeps its mixer open; Close dismisses
-only the iPad popup. The configured global MIDI channel and USB identity are checked
-fresh; shared global/bypass/Matrix routing is rejected, and uncertain sends are not
-retried. Wi-Fi-only and previews change only the local view. Fader/pan/mute/Solo
-editing remains the separately confirmed per-channel USB path.
+direct USB MIDI, an explicit output-icon tap inside the popup selects a different
+output first, then the requested output, using global-channel CC9 values7/8/9.
+Each stage waits for a fresh matching attached-output event; the first stage also
+has a short settling interval before the target stage. An uncertain stage stops
+without retrying or advancing. USB identity, connection generation and configured
+noncolliding global MIDI routing are checked before sends. Missing USB keeps output
+selection local. Channel editing uses its separately confirmed per-channel path.
+
+Build 42's Home0/output sequence was ineffective: the owner observed that repeated
+taps could close the pedal panel or do nothing. Home must not be treated as an
+absolute Matrix-panel close. Build 43 avoids that assumption. Given the observed
+hardware behavior (same output toggles visibility, a different output opens its
+mixer), a distinct intermediate output followed by the target ends on an open
+target from either visible or hidden starting state. Unit tests cover all such
+starting states; native live receipts verify each selected output, not physical
+panel pixels. The intermediate selection can cause a brief visible output change.
+No level, gain, pan, mute, solo or preset setting is changed by navigation.
 
 Build 40 mixed header toggles, automatic Home navigation on dismissal and sheet
 state. Build 42 retains the single Matrix Mixer entry and limits pedal navigation
@@ -106,13 +116,15 @@ also not independent acoustic or pedal-screen qualification.
 
 ## Qualification as of November 21, 2026
 
-Build 42 restores explicit popup output navigation after the owner clarified that
-this part worked. Header entry, popup dismissal and channel-control behavior stay
-separate. It passes 94 Swift tests and 22 Matrix loopback tests. Native qualification
-passed a one-shot reviewed intent, selecting 1/2/3 then 3 again, reading attached output
-and verifying preset and Matrix channel preservation. The final Pro popup was
-visually inspected. The intent was disarmed afterward. This confirms output selection,
-not independent visual proof of pedal panel visibility.
+Build 43 passes 95 Swift tests and 26 Matrix loopback tests. New loopback cases
+require both fresh stage receipts, reject a wrong output, stop after a missing first
+receipt with no retry/second send, and block conflicting global MIDI routing.
+The reviewed one-shot native check passed1/1/1/2/2/3/3/3, including new receipts
+for both stages each time. Saved/live preset bytes, current preset/snapshot/dirty
+state and all Matrix strip/output/link settings stayed unchanged. Independent
+listening observed each intermediate/target selection. The intent was disarmed
+after qualification. Attached-output confirmation alone must not be reported
+as independent pedal screen-visibility proof.
 
 - 91 Swift tests and 22 Matrix loopback tests pass. These include stale bulk reads,
   missing/wrong-output receipts, receipt invalidation, linked/shared routing,

@@ -1,18 +1,17 @@
 import Foundation
 
-/// Screen navigation only. CC9 values are commands, not press/release pairs:
-/// sending value0 as a release would navigate Home.
+/// CC9 output commands toggle the selected panel. Visit a different output first
+/// so the requested output opens from either visible or hidden starting state.
 public struct MatrixPanelCommand:Equatable,Sendable {
-    public let output:Int?
-    public init(output:Int?)throws {
-        guard output==nil || (1...3).contains(output!) else{throw ProtocolError.invalid("Invalid Matrix panel output.")}
+    public let output:Int
+    public var outputs:[Int] {[output%3+1,output]}
+    public init(output:Int)throws {
+        guard (1...3).contains(output) else{throw ProtocolError.invalid("Invalid Matrix panel output.")}
         self.output=output
     }
-    public func midiWords(channel:Int)throws->[UInt32] {
-        guard (1...16).contains(channel) else{throw ProtocolError.invalid("Invalid global MIDI channel.")}
-        let home=UInt32(0x2)<<28 | UInt32(0xB0+channel-1)<<16 | UInt32(9)<<8
-        // Home establishes a known closed baseline before the output's toggle.
-        return output.map{[home,home | UInt32($0+6)]} ?? [home]
+    public static func midiWord(output:Int,channel:Int)throws->UInt32 {
+        guard (1...3).contains(output),(1...16).contains(channel) else{throw ProtocolError.invalid("Invalid Matrix panel MIDI route.")}
+        return UInt32(0x2)<<28 | UInt32(0xB0+channel-1)<<16 | UInt32(9)<<8 | UInt32(output+6)
     }
     public static func globalChannel(properties:Value)throws->Int {
         let rows=properties["vals"].items
@@ -27,5 +26,16 @@ public struct MatrixPanelCommand:Equatable,Sendable {
             guard try number(key) != channel else{throw ProtocolError.invalid("Use a separate global MIDI channel for Stadium screen control.")}
         }
         return channel
+    }
+}
+
+/// Attached output is useful for selection receipts, not panel visibility.
+public struct MatrixAttachedOutput:Equatable,Sendable {
+    public let output:Int
+    public static func decode(_ message:OSCMessage)->Self? {
+        guard message.address=="/syncMixAttachedOut",message.values.count==3,
+              message.values[0].integer != nil,message.values[1].integer != nil,
+              let output=message.values[2].integer,(1...3).contains(output) else{return nil}
+        return Self(output:output)
     }
 }

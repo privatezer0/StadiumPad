@@ -35,13 +35,17 @@ class MatrixPeer(Peer):
     elif a=='/ActiveSnapshotIndexGet':reply='/getActiveSnapshotIndex';values=[rid,0]
     elif a=='/MatchingPropertyValuesGet':
      self.midi_reads+=1
-     if self.midi_reads==2 and self.mode not in ['no-change','stale','shared','linked']:
+     if self.console=='panel' and self.mode not in ['no-change','route-conflict']:
+      output=2 if self.midi_reads==1 else 1
+      if self.mode=='wrong-output':output=3
+      with self.broadcast_lock:self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixAttachedOut',[8,-1,output]))))
+     if self.console!='panel' and self.midi_reads==2 and self.mode not in ['no-change','stale','shared','linked']:
       with self.broadcast_lock:
        if self.console=='clear':
         for source in ([5] if self.mode=='partial' else [5,14]):
          self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixChannelSolo',[8,-1,3 if self.mode=='wrong-output' else 1,source,0]))))
        else:self.broadcasts.append((time.monotonic()+.06,frame(struct.pack('>Q',2**40),1)+frame(osc('/syncMixChannelMute' if self.console=='mute' else '/syncMixChannelPan' if self.console else '/syncMixChannelVolume',[8,-1,3 if self.mode=='wrong-output' else 1,14 if self.console else 5,1 if self.console=='mute' else -1 if self.console=='endpoints' else -32/63 if self.console else -.5]))))
-     reply='/getMatchingPropertyValues';rows=[{'key_':'global.midi.'+k,'val_':x} for k,x in [('channel',1),('bcchannel',2),('over.usb.c',1),('matrix.ch.qtr',3),('matrix.ch.xlr',4),('matrix.ch.phones',4 if self.mode=='shared' else 5)]]
+     reply='/getMatchingPropertyValues';rows=[{'key_':'global.midi.'+k,'val_':x} for k,x in [('channel',3 if self.mode=='route-conflict' else 1),('bcchannel',2),('over.usb.c',1),('matrix.ch.qtr',3),('matrix.ch.xlr',4),('matrix.ch.phones',4 if self.mode=='shared' else 5)]]
      values=[rid,v[1],b'lavppgsm'+msgpack.packb({'vals':rows})]
     elif a=='/PropertyValueGet':
      reply='/getPropertyValue';key=v[1]
@@ -107,3 +111,19 @@ class ClearSoloTransactions(unittest.TestCase):
  def test_clear_shared_channels_are_rejected(self):self.run_mode('shared','clear',False)
  def test_clear_linked_outputs_are_rejected(self):self.run_mode('linked','clear',False)
 if __name__=='__main__':unittest.main()
+
+class PanelNavigationTransactions(unittest.TestCase):
+ def run_panel(self,mode,success,sends):
+  peer=MatrixPeer(mode,console='panel')
+  try:
+   with tempfile.TemporaryDirectory() as folder:
+    r=subprocess.run([str(BINARY),'--host','127.0.0.1','--port',str(peer.port),'--plan',folder+'/plan','--backups',folder,'--matrix-panel-check'],capture_output=True,text=True,timeout=10)
+   self.assertEqual(peer.errors,[])
+   self.assertEqual(r.returncode==0,success,r.stdout+r.stderr)
+   self.assertEqual(r.stdout.count('PANEL SEND'),sends,r.stdout+r.stderr)
+   self.assertFalse(any('Set' in a or a.startswith('/sync') for a in peer.sent))
+  finally:peer.close()
+ def test_both_distinct_outputs_require_fresh_receipts(self):self.run_panel('normal',True,2)
+ def test_missing_first_receipt_stops_without_retry_or_second_send(self):self.run_panel('no-change',False,1)
+ def test_other_output_receipt_does_not_allow_second_send(self):self.run_panel('wrong-output',False,1)
+ def test_conflicting_global_channel_blocks_all_sends(self):self.run_panel('route-conflict',False,0)

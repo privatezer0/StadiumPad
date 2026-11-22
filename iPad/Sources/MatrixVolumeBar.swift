@@ -216,7 +216,12 @@ struct MatrixMixerView:View {
                 if monitor.connectionRoute == .usb,monitor.connectionInterface=="USB/Ethernet",!presence.bound(to:id) {try presence.bind(to:id)}
                 let channel=try await monitor.matrixPanelChannel()
                 guard monitor.connected,connection==monitor.connectionID else{throw CancellationError()}
-                try presence.navigate(MatrixPanelCommand(output:next),channel:channel,networkIdentity:id)
+                try await monitor.showMatrixPanel(MatrixPanelCommand(output:next),channel:channel) {step in
+                    try await MainActor.run {
+                        guard monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
+                        try presence.navigate(output:step,channel:channel,networkIdentity:id)
+                    }
+                }
             }
             model.dropPending();output=next;return true
         }catch {monitor.errorText=error.localizedDescription;return false}

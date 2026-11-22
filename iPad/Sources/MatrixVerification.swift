@@ -383,7 +383,7 @@ import StadiumNetwork
         let saved=try await monitor.readUSBSavedSource(id),before=try await monitor.readMatrixConsole()
         try Data("started".utf8).write(to:folder.appendingPathComponent("matrix-output-icons-"+run+"-started"),options:.withoutOverwriting)
         var rows:[Int]=[]
-        for output in [1,2,3,3] {
+        for output in [1,1,1,2,2,3,3,3] {
             guard await select(output) else{throw ProtocolError.invalid("Popup output navigation failed.")}
             try await Task.sleep(for:.milliseconds(500))
             let state=try await monitor.readMatrixConsole()

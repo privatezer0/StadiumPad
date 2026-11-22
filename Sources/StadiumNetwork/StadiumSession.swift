@@ -11,6 +11,8 @@ public actor StadiumSession {
     private var consoleLive:[String:MatrixConsoleUpdate]=[:]
     private var consoleReceipts:[String:UInt64]=[:]
     private var consoleLastMIDI:[String:(value:Int,level:Value)]=[:]
+    private var panelRevision:UInt64=0
+    private var panelReceipts:[Int:UInt64]=[:]
     private var matrixRevision:UInt64=0
     private var matrixReceipt:[Int:UInt64]=[:]
     private var matrixLastMIDI:[Int:(value:Int,level:Double)]=[:]
@@ -32,7 +34,7 @@ public actor StadiumSession {
         } catch {await sub.close();await command.close();throw error}
     }
     public func connectionInterface()async->String {await commands?.interfaceName() ?? "Disconnected"}
-    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;matrixLive=[:];consoleLive=[:];consoleReceipts=[:];consoleLastMIDI=[:];matrixRevision=0;matrixReceipt=[:];matrixLastMIDI=[:];allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0;eqWriteRevision=0;eqCommitHistory=[];eqEchoSource=nil;eqReceipts=[:];eqReceiptOrder=[]}
+    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;matrixLive=[:];panelRevision=0;panelReceipts=[:];consoleLive=[:];consoleReceipts=[:];consoleLastMIDI=[:];matrixRevision=0;matrixReceipt=[:];matrixLastMIDI=[:];allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0;eqWriteRevision=0;eqCommitHistory=[];eqEchoSource=nil;eqReceipts=[:];eqReceiptOrder=[]}
     private func exchange(_ make:(Int32)throws->OSCMessage,reply:String)async throws->OSCMessage {
         try Task.checkCancellation();guard let socket=commands else{throw ProtocolError.closed}
         let id=nextID;nextID = nextID==Int32.max ? 1:nextID+1
@@ -57,6 +59,7 @@ public actor StadiumSession {
             if frame.flags&4 != 0 || frame.more || frame.payload.isEmpty {continue}
             guard origin==connectionID else{throw ProtocolError.closed}
             let message=try OSCMessage.decode(frame.payload)
+            if let update=MatrixAttachedOutput.decode(message) {panelRevision &+= 1;panelReceipts[update.output]=panelRevision}
             if let update=MatrixConsoleUpdate.decode(message) {
                 matrixRevision &+= 1;consoleLive[update.key]=update;consoleReceipts[update.key]=matrixRevision;consoleLastMIDI[update.key]=nil
             }
@@ -657,6 +660,24 @@ extension StadiumSession {
         await acquire();defer{release()};return try MatrixGuitarLevels(value:await matrixMixerUnlocked(),origin:connectionID)
     }
     public func matrixMIDIValue(output:Int)->Int? {matrixLastMIDI[output]?.value}
+    public func showMatrixPanel(_ command:MatrixPanelCommand,channel:Int,send:@Sendable (Int)async throws->Void)async throws {
+        await acquire();defer{release()};let origin=connectionID
+        for (index,output) in command.outputs.enumerated() {
+            try Task.checkCancellation()
+            guard origin==connectionID,try MatrixPanelCommand.globalChannel(properties:await readUnlocked(.matrixMIDI))==channel else{throw ProtocolError.invalid("Matrix navigation routing changed. Nothing further was sent.")}
+            let watermark=panelRevision
+            try await send(output)
+            let deadline=Date().addingTimeInterval(1.5)
+            while (panelReceipts[output] ?? 0)<=watermark {
+                guard origin==connectionID else{throw ProtocolError.closed}
+                try Task.checkCancellation()
+                guard Date()<deadline else{throw ProtocolError.invalid("Stadium did not confirm the selected output. Nothing was retried.")}
+                try await Task.sleep(for:.milliseconds(10))
+            }
+            // Let the first screen transition finish before selecting the target.
+            if index==0 {try await Task.sleep(for:.milliseconds(120))}
+        }
+    }
     public func matrixPanelChannel()async throws->Int {
         await acquire();defer{release()}
         return try MatrixPanelCommand.globalChannel(properties:await readUnlocked(.matrixMIDI))
