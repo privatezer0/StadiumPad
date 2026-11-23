@@ -1,23 +1,12 @@
 # Maintainer TestFlight release
 
-Status, November 20, 2026: **StadiumPad 0.9.6 (build 24) is uploaded, processed and
-submitted for external Beta App Review** in StadiumPad Public Beta. App Store
-Connect visibly confirms **Waiting for Review**. This includes the verified live
-Global EQ fixes, Command Center and Librarian, in addition to the earlier editor,
-Focus, scenes, footswitch and Hype features.
+Status, November 22, 2026: **StadiumPad 1.0.0 (build 49) is uploaded, processed and Waiting for Review** in StadiumPad Public Beta. This is today's iPad editor with Matrix Mixer, the adjacent persistent toolbar, and automatic tuner entry/navigation exit, plus the earlier EQ fixes, Command Center, Librarian, Focus and performance views. Source was promoted from feature/usb-matrix-guitar-volume for this release.
 
-The public invitation is configured for **iPad with iPadOS 18 or later**, but its
-public landing page currently says it is not accepting new testers. **0.9.6 is not
-yet downloadable by external testers.** Do not advertise a live 0.9.6 download until
-Apple review and tester release are complete. The older 0.6.3 (build 13) is approved;
-that approval does not cover build 24. Automatically notify testers was disabled for this
-submission, and no tester invitations or manual notification emails were sent.
+The older **0.9.6 (24) is Approved**; that is the approval previously shown by Apple, not an approval of today's work. A 0.10.0 (48) upload had begun before the owner requested the 1.0 version label; it was not submitted or assigned to the external group. Build 49 is the new external-review candidate.
 
-After approval, verify build 24's testing/release state and activate testing if
-needed, then recheck the public invitation on a compatible iPad before publishing
-it. Do not release or expire an older build merely to make the latest link appear
-active. Beta description, What to Test and hardware review notes were updated;
-owner-approved private contact details remain in App Store Connect only.
+Public invitation: https://testflight.apple.com/join/bsmEWx8M (iPad, iPadOS 18+). This check verified review state, not a compatible-device public download. Do not claim build 49 is downloadable until Apple approval/release is verified. Automatic tester notifications remained OFF; no tester invitations or notification emails were sent. Existing approved builds were not expired.
+
+Matrix controls require the supported direct USB route; Wi-Fi editor controls remain available. Live tuner note/cents, complete desktop parity and offline preset sync remain unimplemented. Clone/IR file transfers use the optional Mac companion. Version 1.0 is a release label, not a claim that all desktop features exist.
 
 Users' simple installation steps are in INSTALL.md. A public repository does not
 produce a TestFlight invitation automatically.

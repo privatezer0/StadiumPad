@@ -7,21 +7,19 @@ for the official desktop editor.
 
 <p align="center"><img src="iPad/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.jpg" width="220" alt="StadiumPad metallic blue app icon"></p>
 
-## USB development candidate
+## Version 1.0 beta candidate
 
-Version 0.10.0 (48) has a centered **Matrix Mixer** button opening a pedal-style
+Version 1.0.0 (49) has a centered **Matrix Mixer** button opening a pedal-style
 mixer popup. The popup uses output icons for ¼-inch, XLR and Phones and remembers
 the last viewed output. Generic Song tracks 1–5 use the standard Drums, Bass,
 Guitar, Vocals and Other stem labels; specific native names take precedence. Home and Song expand into a horizontally scrollable row;
 sideways swipes over the faders scroll without changing their values. Opening is local. With direct USB, Close also sends a guarded pedal-mixer close
 sequence. Tapping an output
 icon inside the popup selects that output’s mixer on the pedal. Repeated taps use
-a confirmed different-output step to avoid closing the pedal’s selected mixer. This is a development candidate, **not a
-released or fully qualified USB build**. USB reads/Save Copy and bounded Phones/Home
+a confirmed different-output step to avoid closing the pedal’s selected mixer. This beta is **not a fully qualified USB build**. USB reads/Save Copy and bounded Phones/Home
 Solo/pan checks pass. USB Global EQ confirmation and remaining mixer coverage still
 need qualification.
-See [USB/Matrix development status](docs/USB_MATRIX.md). The validated installer and
-TestFlight submission remain 0.9.6 (24).
+See [USB/Matrix development status](docs/USB_MATRIX.md). The TestFlight submission is now 1.0.0 (49), Waiting for Review. Earlier 0.9.6 (24) is Approved; existing owner installer mirrors remain unchanged.
 
 ## What it does
 
@@ -123,8 +121,7 @@ substantial interface redesign.
 
 ## Install
 
-For nontechnical users, 0.9.6 (build 24) is uploaded to TestFlight and Waiting for Review;
-the configured public invitation is not yet accepting testers. [Installation instructions](INSTALL.md) explain the TestFlight installation
+For nontechnical users, 1.0.0 (build 49) is uploaded to TestFlight and Waiting for Review. The earlier 0.9.6 (24) is Approved; today's build has not yet been approved. [Installation instructions](INSTALL.md) explain the TestFlight installation
 route and the source-build route currently available to developers. Android uses
 a signed APK installed through Android Files; there is no Google Play listing.
 

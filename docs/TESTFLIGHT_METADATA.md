@@ -1,12 +1,6 @@
 # TestFlight beta information
 
-Updated November 20, 2026 for StadiumPad 0.9.6 (build 24). Apple has accepted the
-upload, processing completed, and build 24 was submitted for external Beta App
-Review in StadiumPad Public Beta. App Store Connect shows **Waiting for Review**.
-The earlier 0.6.3 (build 13) is approved; build 24 is not yet downloadable. The public invitation
-is configured for iPads on iPadOS 18 or later, but its landing page is not yet accepting
-new testers. Automatic tester notification is disabled; no invitations were sent. Private feedback/review contact details remain only in App
-Store Connect.
+Updated November 22, 2026: **1.0.0 (49) uploaded, processed, external group assigned, Waiting for Review.** Earlier 0.9.6 (24) is Approved; it is not today's build. Automatic tester notifications stayed off. No invitations were sent; owner-approved review contacts stay in App Store Connect only. Public download of 49 is pending approval/release.
 
 ## Beta description
 
@@ -14,7 +8,7 @@ StadiumPad is an unofficial, open-source iPad companion for Line 6 Helix Stadium
 
 Browse preset folders and Factory/User presets, select signal blocks and models, edit supported controls, and save a copy or User preset. Focus View offers supported named tones and X/Y control; Hype stays beside the selected amp/model name. Scene view provides eight snapshot buttons, and Footswitch view controls supported assigned latched effects. Tuner mode opens/closes the pedal tuner; live note/cents remain on Stadium.
 
-Global EQ includes seven colored bands, independent 1/4-inch/XLR/Phones outputs, level/bypass and Copy/Paste/Reset. Command Center edits supported controller assignments, labels and colors. Librarian offers full-width browsing; optional clone file transfers and library backups use a configured Mac companion. Normal preset, EQ and controller editing connects directly to Stadium without a Mac.
+The Matrix Mixer popup provides supported direct-USB level, pan, mute/solo and output selection controls with expandable Home/Song strips. Persistent toolbar icons open editor/performance modes; tuner activates on entry and exits with navigation. Global EQ includes seven colored bands, independent 1/4-inch/XLR/Phones outputs, level/bypass and Copy/Paste/Reset. Command Center edits supported controller assignments, labels and colors. Librarian offers full-width browsing; optional clone file transfers and library backups use a configured Mac companion. Normal preset, EQ and controller editing connects directly to Stadium without a Mac.
 
 Designed for iPadOS 18+ tablets. This is a community proof of concept with incomplete desktop parity: no phone interface, offline editing/sync, Songs/Showcase editing/transport, general routing, IR upload/assignment or clone-to-block assignment. No cloud login or payment is required. Changes are live; use spare presets and Save Copy before experimenting.
 
