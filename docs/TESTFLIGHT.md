@@ -1,3 +1,11 @@
+# Current verification — November 23, 2026
+
+App Store Connect shows **StadiumPad1.0.0(49) Approved**, assigned to StadiumPad Public Beta. Source main `447439e` matches the latest submitted build; the checkout is clean and matches GitHub. No newer feature build is missing from TestFlight. No duplicate upload, new review submission, tester notifications or invitations were sent in this check. A compatible-device public download was not performed.
+
+Public invitation: https://testflight.apple.com/join/bsmEWx8M (iPadOS18+).
+
+The earlier submission record below is historical; its Waiting for Review state has been superseded by this approval.
+
 # Maintainer TestFlight release
 
 Status, November 22, 2026: **StadiumPad 1.0.0 (build 49) is uploaded, processed and Waiting for Review** in StadiumPad Public Beta. This is today's iPad editor with Matrix Mixer, the adjacent persistent toolbar, and automatic tuner entry/navigation exit, plus the earlier EQ fixes, Command Center, Librarian, Focus and performance views. Source was promoted from feature/usb-matrix-guitar-volume for this release.

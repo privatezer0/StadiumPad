@@ -19,7 +19,7 @@ icon inside the popup selects that output’s mixer on the pedal. Repeated taps 
 a confirmed different-output step to avoid closing the pedal’s selected mixer. This beta is **not a fully qualified USB build**. USB reads/Save Copy and bounded Phones/Home
 Solo/pan checks pass. USB Global EQ confirmation and remaining mixer coverage still
 need qualification.
-See [USB/Matrix development status](docs/USB_MATRIX.md). The TestFlight submission is now 1.0.0 (49), Waiting for Review. Earlier 0.9.6 (24) is Approved; existing owner installer mirrors remain unchanged.
+See [USB/Matrix development status](docs/USB_MATRIX.md). App Store Connect verified on November 23, 2026: **1.0.0 (49) is Approved** and assigned to StadiumPad Public Beta. Existing owner installer mirrors remain unchanged.
 
 ## What it does
 
@@ -121,7 +121,7 @@ substantial interface redesign.
 
 ## Install
 
-For nontechnical users, 1.0.0 (build 49) is uploaded to TestFlight and Waiting for Review. The earlier 0.9.6 (24) is Approved; today's build has not yet been approved. [Installation instructions](INSTALL.md) explain the TestFlight installation
+For nontechnical users, **1.0.0 (build 49) is Approved** in TestFlight and assigned to StadiumPad Public Beta, verified November 23, 2026. [Installation instructions](INSTALL.md) explain the TestFlight installation
 route and the source-build route currently available to developers. Android uses
 a signed APK installed through Android Files; there is no Google Play listing.
 
