@@ -473,21 +473,24 @@ import StadiumNetwork
         } catch {print("Could not write the local verification report.")}
     }
 }
-struct StadiumDevice:Identifiable {var id:String;var host:String;var port:UInt16;var interface:NWInterface?=nil}
+struct StadiumDevice:Identifiable {var id:String;var host:String;var port:UInt16;var interface:NWInterface?=nil;var dashboardPort:UInt16?=nil;var dashboardURL:URL? {guard let dashboardPort else{return nil};var c=URLComponents();c.scheme="https";c.host=host;c.port=Int(dashboardPort);return c.url}}
 @MainActor final class StadiumDiscovery:NSObject,ObservableObject,@preconcurrency NetServiceBrowserDelegate,@preconcurrency NetServiceDelegate {
     @Published var devices:[StadiumDevice]=[]
     @Published var searching=false
     @Published var error:String?
     private let browser=NetServiceBrowser()
+    private let serviceType:String
     private var pending:[NetService]=[]
     private var timer:Task<Void,Never>?
-    override init() {super.init();browser.delegate=self}
-    func search() {stop();devices=[];error=nil;searching=true;browser.searchForServices(ofType:"_stadiumserver._tcp.",inDomain:"local.");timer=Task {try? await Task.sleep(for:.seconds(6));if !Task.isCancelled {stop()}}}
+    init(serviceType:String="_stadiumserver._tcp.") {self.serviceType=serviceType;super.init();browser.delegate=self}
+    func search() {stop();devices=[];error=nil;searching=true;browser.searchForServices(ofType:serviceType,inDomain:"local.");timer=Task {try? await Task.sleep(for:.seconds(6));if !Task.isCancelled {stop()}}}
     func stop() {timer?.cancel();timer=nil;browser.stop();for service in pending {service.stop()};pending=[];searching=false}
     func netServiceBrowser(_ browser:NetServiceBrowser,didFind service:NetService,moreComing:Bool) {pending.append(service);service.delegate=self;service.resolve(withTimeout:4)}
     func netServiceDidResolveAddress(_ sender:NetService) {
         guard let host=sender.hostName,sender.port>0,sender.port<65535 else{return}
-        let device=StadiumDevice(id:sender.name,host:host,port:UInt16(sender.port))
+        guard host.range(of:"^[A-Za-z0-9.-]+$",options:.regularExpression) != nil else{return}
+        var device=StadiumDevice(id:sender.name,host:host,port:UInt16(sender.port))
+        if serviceType=="_pedalbridge._tcp.",let data=sender.txtRecordData(),let raw=NetService.dictionary(fromTXTRecord:data)["dashboard"],let text=String(data:raw,encoding:.utf8),let port=UInt16(text),port>0 {device.dashboardPort=port}
         if !devices.contains(where:{$0.id==device.id}) {devices.append(device)}
     }
     func netServiceBrowser(_ browser:NetServiceBrowser,didNotSearch errorDict:[String:NSNumber]) {error="Search was unavailable. Allow Local Network access in Settings or enter your Stadium's address.";stop()}

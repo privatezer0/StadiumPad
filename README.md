@@ -1,3 +1,19 @@
+
+## Pi discovery — November 25, 2026
+
+StadiumPad iOS 1.1.1 (51) and Android 1.2.1 (8) discover `_pedalbridge._tcp`
+helpers from the connection screen. Pi advertisements can supply a dashboard
+port; an explicit link opens its authenticated dashboard for the private pairing
+link. Mac helpers are listed with instructions to copy their private link.
+Discovery never pairs, changes a saved TLS pin/token or sends pedal commands.
+Android cancels old resolver callbacks and timers when searches/routes change.
+
+iOS device/simulator builds and 101 Swift regression tests pass. The regular-iPad
+simulator screen was inspected: discovered Mac and dashboard-enabled helper entries
+fit inside the connection popover. Android APK compilation/signing passes. Physical
+Pi/client/AP/USB acceptance remains pending; existing hardware qualification limits
+including USB EQ confirmation remain unchanged. No TestFlight upload in this task.
+
 # StadiumPad
 
 An unofficial, open-source **iPad/tablet editor for Line 6 Helix Stadium**.

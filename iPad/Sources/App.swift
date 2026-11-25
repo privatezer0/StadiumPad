@@ -31,6 +31,7 @@ struct StadiumView:View {
     @AppStorage("stadiumConnectionRoute") private var connectionRoute:StadiumConnectionRoute = .automatic
     @StateObject private var usbDiscovery=USBStadiumDiscovery()
     @StateObject private var bridgeSettings=PedalBridgeSettings()
+    @StateObject private var bridgeDiscovery=StadiumDiscovery(serviceType:"_pedalbridge._tcp.")
     @State private var bridgeLink=""
     @State private var showSave=false
     @State private var saveID:Int?
@@ -296,6 +297,10 @@ struct StadiumView:View {
             Picker("Connection",selection:$connectionRoute){ForEach(StadiumConnectionRoute.allCases,id:\.self){Text($0.rawValue).tag($0)}}.pickerStyle(.segmented)
             if connectionRoute == .bridge {
                 Text("Run PedalBridge on your Mac or Raspberry Pi. Pair once using the link or QR code it displays. Your tablet stays wireless.").font(.callout)
+                Button(bridgeDiscovery.searching ? "Searching for helpers…":"Find PedalBridge"){bridgeDiscovery.search()}.disabled(bridgeDiscovery.searching)
+                ScrollView {VStack(alignment:.leading,spacing:8){ForEach(bridgeDiscovery.devices){helper in
+                    VStack(alignment:.leading){Text(helper.id).font(.headline);if let url=helper.dashboardURL {Link("Open dashboard to pair",destination:url)}else{Text("Open PedalBridge on \(helper.host) and copy its private pairing link.").font(.caption)}}
+                }}}.frame(maxHeight:110).task{bridgeDiscovery.search()}.onDisappear{bridgeDiscovery.stop()}
                 SecureField("Paste PedalBridge pairing link",text:$bridgeLink).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
                 HStack {
                     Button("Pair"){do{try bridgeSettings.configure(bridgeLink);bridgeLink=""}catch{monitor.errorText=error.localizedDescription}}.disabled(bridgeLink.isEmpty)
