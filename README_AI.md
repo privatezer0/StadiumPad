@@ -458,3 +458,29 @@ PedalBridgePair validates private URL fields and redacts description. PedalBridg
 Matrix callbacks use the bridge only for a bridge route, retain adjacent MainActor connection/token checks, and never fall back silently to local tablet MIDI. Helper validates actual MIDI settings, its editor lease and physical USB identity; send success is not pedal readback. Direct callbacks stay intact. Wi-Fi-only helper has no Matrix. Upstream/USB changes revoke streams; uncertain writes never replay. Android uses the equivalent TLS preface and encrypted app-only Keystore pairing; direct USB/Ethernet uses per-socket Android Network binding, not process-wide routing. Android original feature gaps remain.
 
 Validation here:101Swift tests; existing Matrix loopback suite;10helper TLS/auth/lease/Matrix-mapping tests; repeated native Swift read-only sessions through real helper; physical Pro read-only snapshot/live events plus Matrix ready with local USB MIDI false; native Android emulator read-only snapshot and3Matrixoutputs through same Mac app. No physical writes, preset/save/firmware/audio changes. No new TestFlight submission. Physical Android/native USB and bridged Matrix writes pending. See helper README/ARCHITECTURE for Pi plan, helper lifecycle and current limits.
+
+## Android 1.2.0/code7 — November 24, 2026
+
+Supersedes older Android-placeholder claims above. Native typed GlobalEQ, CommandCenter,
+Matrix engines and WorkspaceController/View/MatrixPopup now port the current tablet
+presentation and guarded transaction approach. Session update frames feed EQ/Matrix
+state with validated native numeric/Boolean flags; unrelated undecodable broadcasts
+do not tear down the editor session. Coalesced live gestures, final confirmation,
+stale-context guards and private exact backups remain separate. MatrixUSB matches
+only the selected Stadium physical endpoint and requires owner identity confirmation.
+PedalBridge sends typed authenticated Matrix operations, retaining its connection's
+resolved peer address with unchanged TLS pin/token/lease/device/generation checks.
+No automatic command replay or audio routing changes.
+
+See Android/README and docs/VALIDATION for measured scope. Physical TCL helper Matrix
+pan/M/S checks pass/restored. USB-upstream EQ persistence is still unqualified despite
+ACKs; recovery restored baseline and preset bytes. Do not remove the confirmation
+guard or write the device-owned global.eq.sync mirror to manufacture success.
+Native Canvas render/layout checks are distinct from physical screenshot acceptance.
+No new Apple build or TestFlight upload was made for this Android update.
+
+Command Center live qualification:285checks pass on one independently allocated
+spare, including assignment/parameters/snapshot flags/copy/paste/appearance and exact
+spare restoration plus unchanged original saved presets. Initial stale post-recall
+context stopped before a write; explicit reviewed continuation used the same spare
+and fresh context. No allocation or command write was blindly retried.

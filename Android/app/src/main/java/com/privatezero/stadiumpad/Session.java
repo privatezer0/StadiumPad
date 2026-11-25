@@ -4,6 +4,7 @@ import java.io.*;import java.net.*;import java.util.*;import static com.privatez
 final class Session implements Closeable {
  final UUID origin=UUID.randomUUID();final File backups;volatile Wire command,updates;volatile boolean closed=false;int sequence=1;Object product;final java.util.concurrent.ConcurrentHashMap<Integer,int[]> selectionReceipts=new java.util.concurrent.ConcurrentHashMap<>();
  PedalBridge.Connection bridge;
+ final GlobalEQ.Engine eq=new GlobalEQ.Engine(this);final Matrix.Engine matrix=new Matrix.Engine(this);
  Session(File backups){this.backups=backups;}
  void connect(String host,int port)throws Exception{connect(host,port,null,null);}
  void connect(String host,int port,PedalBridge.Pair pair,android.net.Network network)throws Exception{require(!host.trim().isEmpty()&&port>0&&port<65535,"Enter a Stadium address and port");try{if(pair!=null){bridge=new PedalBridge.Connection(pair);updates=new Wire(bridge.open("updates"));command=new Wire(bridge.open("commands"));}else{updates=new Wire(host,port,network);command=new Wire(host,port+1,network);}updates.handshake("SUB");command.handshake("DEALER");require(!closed,"Connection cancelled");}catch(Exception e){close();throw e;}}
@@ -42,5 +43,5 @@ final class Session implements Closeable {
   while(!closed&&System.nanoTime()<deadline){int[] receipt=selectionReceipts.remove(id);if(receipt!=null&&receipt[0]==context.path&&receipt[1]==context.pos){State after=snapshot();context.verify(after);return after;}Thread.sleep(20);}
   throw new IOException("Block selection was not confirmed. Nothing was retried or saved.");
  }
- OSC event()throws Exception{require(updates!=null&&!closed,"Disconnected");while(true){Wire.Frame f=updates.frame();if((f.flags&5)==0&&f.bytes.length>0){OSC event=OSC.decode(f.bytes);int[] selection=LiveSelection.decode(event);if(selection!=null){if(selectionReceipts.size()>=64)selectionReceipts.clear();selectionReceipts.put(n(event.args.get(1)),selection);}return event;}}}
+ OSC event()throws Exception{require(updates!=null&&!closed,"Disconnected");while(true){Wire.Frame f=updates.frame();if((f.flags&5)==0&&f.bytes.length>0){OSC event=OSC.decode(f.bytes);try{eq.event(event);}catch(Exception ignored){}try{matrix.event(event);}catch(Exception ignored){}int[] selection=LiveSelection.decode(event);if(selection!=null){if(selectionReceipts.size()>=64)selectionReceipts.clear();selectionReceipts.put(n(event.args.get(1)),selection);}return event;}}}
 }

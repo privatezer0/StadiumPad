@@ -25,3 +25,8 @@ save/copy prompt; back up saved/live native bytes locally first and retain stric
 internal copy/recovery guards. Keep Hype pinned beside the selected amp/model name
 whenever its native control is available, independent of parameter paging. Center
 it in the available header space between the model name and ACTIVE.
+
+Android1.2 implements EQ/Command Center/Matrix UI and typed engines; older placeholder
+notes are historical. Keep USB-upstream EQ persistence marked unqualified until an
+actual device-owned snapshot confirms a nonbaseline change. Never weaken readback
+or write global.eq.sync to claim parity. See docs/VALIDATION and Android/README.

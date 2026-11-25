@@ -7,7 +7,29 @@ for the official desktop editor.
 
 <p align="center"><img src="iPad/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.jpg" width="220" alt="StadiumPad metallic blue app icon"></p>
 
-## PedalBridge development build — 1.1.0 (50)
+## Android tablet update — 1.2.0 (code 7), November 24, 2026
+
+Android now includes the current full-width Global EQ and Command Center screens,
+pedal-style Matrix Mixer popup, centered core navigation with adjacent performance
+icons, and automatic tuner entry/exit. Existing preset/folder browsing, scenes,
+stomps, Focus, Hype, block movement and file companion remain available.
+**PedalBridge support is retained**, including typed remote USB MIDI for Matrix.
+Direct tablet USB MIDI is also available with explicit device identity confirmation.
+Wi-Fi-only connections cannot send Matrix controls.
+
+The physical TCL 12-inch tablet connects through the Mac helper. Bounded live
+Phones/Home pan, mute and Solo on/off checks passed and were restored. EQ controls
+and native transaction logic are implemented, but **EQ persistence confirmation on
+the helper's USB editor route remains unqualified**: ACKs are received while the
+native settings snapshot stays unchanged. Command Center assignment, parameters, scene flags, copy/paste and appearance
+checks passed on a new spare, whose original bytes were restored. Pre-existing saved
+User presets were independently checked unchanged. EQ test settings were restored; do not
+interpret optimistic graph movement as proof. Matrix fader calibration, every
+source/output combination and physical direct-USB Android operation are not fully
+qualified. This development update is not a TestFlight submission or a claim of
+complete desktop parity. See [validation](docs/VALIDATION.md).
+
+## Historical PedalBridge milestone — 1.1.0 (50)
 
 Connection choices now include **PedalBridge** on iPad and Android, alongside
 existing direct connections. Pair with the separately running Mac helper using

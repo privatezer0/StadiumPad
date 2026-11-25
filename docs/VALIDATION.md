@@ -1,3 +1,38 @@
+## Android 1.2.0/code7 — November 24, 2026
+
+- Signed in-place install on the physical TCL 12-inch Android tablet, existing app
+  identity/data/pairing retained. Real PedalBridge session: 11 read-only native checks
+  pass, including current preset/scene/native-byte preservation and Matrix inventory.
+- Production Java engines: 797 synthetic schema/routing checks and eight loopback
+  groups pass (normal/delayed EQ commits, native flag representation, external edits,
+  stale/missing receipts, command allocation guards and Matrix state/identity checks).
+  Existing native core instrumentation passes15checks; Swift regression passes101.
+- Native Home/EQ/Command Center views rendered at three tablet viewports; Matrix
+  popup rendered with real native Views. Locked-screen captures were black, so these
+  are layout renders, not evidence of visible unlocked physical-screen acceptance.
+- Explicit owner-approved reversible Phones/Home tests over the helper's USB MIDI:
+  pan left and Center, Mute on/off, Solo on/off independently confirmed; mixer state
+  restored. No volume CC was tested because inverse dB calibration is incomplete.
+- Command Center:285 live checks pass on the independently allocated spare. MIDI
+  assignment/subtype, snapshot flags on/off, command clipboard, labels/colors and
+  Copy All/Paste All confirmed. Exact spare stored bytes restored/reloaded; every
+  pre-existing saved User preset checked unchanged. An initial post-recall context
+  guard stopped before a write; a reviewed fresh context resumed on the same spare
+  without allocating again or weakening the guard. Owner unsaved source tone remains
+  preserved in the spare. No original was saved or overwritten.
+- Global EQ frequency/gain test received ACKs but its device-owned native settings
+  snapshot did not confirm the desired change. Separate absolute-baseline recovery
+  confirmed restoration and unchanged active preset/native bytes. No automatic retry.
+  **USB-upstream EQ persistence remains unresolved**, matching the separately noted
+  unqualified USB EQ route on iPad. Native integer flags alone did not resolve it.
+- Matrix direct Android USB, all57sources/outputs, sustained gesture latency and
+  eight-inch physical tablet acceptance remain pending. No firmware, studio audio
+  routing/default/gain changes, original preset saves or new TestFlight upload.
+
+Earlier entries below are historical and do not supersede these limits.
+
+---
+
 # Verification status
 
 Version 0.5.0, November 17, 2026. Observed hardware: Helix Stadium firmware 1.4.2;

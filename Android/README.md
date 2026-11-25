@@ -1,3 +1,53 @@
+# Android 1.2.0 / code 7
+
+## Android tablet update — 1.2.0 (code 7), November 24, 2026
+
+Android now includes the current full-width Global EQ and Command Center screens,
+pedal-style Matrix Mixer popup, centered core navigation with adjacent performance
+icons, and automatic tuner entry/exit. Existing preset/folder browsing, scenes,
+stomps, Focus, Hype, block movement and file companion remain available.
+**PedalBridge support is retained**, including typed remote USB MIDI for Matrix.
+Direct tablet USB MIDI is also available with explicit device identity confirmation.
+Wi-Fi-only connections cannot send Matrix controls.
+
+The physical TCL 12-inch tablet connects through the Mac helper. Bounded live
+Phones/Home pan, mute and Solo on/off checks passed and were restored. EQ controls
+and native transaction logic are implemented, but **EQ persistence confirmation on
+the helper's USB editor route remains unqualified**: ACKs are received while the
+native settings snapshot stays unchanged. Command Center assignment, parameters, scene flags, copy/paste and appearance
+checks passed on a new spare, whose original bytes were restored. Pre-existing saved
+User presets were independently checked unchanged. EQ test settings were restored; do not
+interpret optimistic graph movement as proof. Matrix fader calibration, every
+source/output combination and physical direct-USB Android operation are not fully
+qualified. This development update is not a TestFlight submission or a claim of
+complete desktop parity. See [validation](../docs/VALIDATION.md).
+
+Command Center includes Stomp A/B, Instants, axes, expression/external sources,
+command slots/families, metadata-defined parameters, per-scene flags, labels/colors,
+and guarded command/all-command copy/paste. Unavailable physical switches and
+unconfigured external jacks remain disabled. Songs is an inventory view; complete
+song editing is unfinished on iPad too. The Global EQ graph is a calculated preview.
+
+Matrix preserves the native source inventory and Home/Song horizontal expansion,
+with pan, level, mute, solo, Clear Solos, output selection and guarded panel Close.
+Count In is disabled when unavailable on the pedal. Level dB comes from live device
+state; initial fader position is only a MIDI estimate, not a measured inverse curve.
+Only a matched USB MIDI device or USB-capable authenticated helper enables writes.
+Linking, stale state, missing live receipts and changed identities stop transactions.
+The helper's authenticated address is retained for the connection lifetime, avoiding
+mDNS lookups per gesture; a new connection resolves again and always checks TLS pin.
+
+Synthetic regression: `Android/scripts/test-parity.sh` compiles the production Java
+engines and runs schema/routing checks plus loopback-only EQ/Command/Matrix peers.
+Native `ParityInstrumentation` performs read-only connected/layout checks. Explicit
+live/recovery instrumentation is an owner-authorized diagnostic, not part of normal
+tests; inspect its private intent and baseline before using it. Never automatically
+repeat an uncertain allocation or hardware write.
+
+---
+
+## Historical Android 1.1 milestone
+
 # PedalBridge development update — Android1.1.0, code6
 
 Connection dialog adds Automatic, Wi-Fi, USB/Ethernet and PedalBridge. Pair a helper

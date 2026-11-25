@@ -1,3 +1,14 @@
+## Android 1.2.0/code7 update — November 24, 2026
+
+Android now has the Matrix popup and both typed PedalBridge USB MIDI and guarded
+local Android USB MIDI transports. Actual helper Phones/Home pan/Mute/Solo-on/off
+checks pass and restore; direct Android USB and all other source/output combinations
+remain unqualified. Global EQ ACKs through the helper USB editor do not establish
+persistence: nonbaseline native snapshot confirmation failed and baseline restoration
+passed. Do not claim this resolves the older USB EQ limitation below.
+
+---
+
 # USB editing and persistent guitar volume — development candidate
 
 Development version: **0.10.0 (46)**. This work is under physical-device qualification;

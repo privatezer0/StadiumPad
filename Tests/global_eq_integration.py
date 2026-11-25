@@ -70,6 +70,7 @@ class EQPeer(Peer):
       if self.mode=='timeout':threading.Event().wait(6);return
      elif key=='globals.eq':
       assert self.live,'Native commit before live acknowledgement'
+      if self.mode=='native-flags':assert type(value['_qtr']['enab']) is int,'Native enable flag type was rewritten'
       assert value['_xlr']==self.eq['_xlr'] and value['_pho']==self.eq['_pho'],'Other output overwritten'
       if (self.mode=='delayed-commit' or self.mode.startswith('stream')):self.pending_commit=(time.monotonic()+.65,copy.deepcopy(value))
       elif self.mode!='readback-mismatch':self.eq=value
