@@ -30,6 +30,8 @@ struct StadiumView:View {
     @State private var showConnection=false
     @AppStorage("stadiumConnectionRoute") private var connectionRoute:StadiumConnectionRoute = .automatic
     @StateObject private var usbDiscovery=USBStadiumDiscovery()
+    @StateObject private var bridgeSettings=PedalBridgeSettings()
+    @State private var bridgeLink=""
     @State private var showSave=false
     @State private var saveID:Int?
     @State private var saveLabel=""
@@ -99,7 +101,11 @@ struct StadiumView:View {
                 }.font(.system(size:10)).padding(.horizontal,12).frame(height:22).background(Color(white:0.08))
             }.background(.black).foregroundStyle(.white)
         }
+        #if DEBUG
+        .task {if ProcessInfo.processInfo.arguments.contains("--show-connection") {showConnection=true}}
+        #endif
         .onOpenURL {url in
+            if url.scheme=="pedalbridge" {do{try bridgeSettings.configure(url.absoluteString);connectionRoute = .bridge;showConnection=true}catch{monitor.errorText=error.localizedDescription};return}
             guard url.scheme=="stadiumpad",url.host=="companion" else{return}
             pendingCompanionLink=url.absoluteString;libraryLinkRevision=UUID();section = .librarian
         }
@@ -142,11 +148,19 @@ struct StadiumView:View {
         .task(id:monitor.connected){if monitor.connected,!preview {do {try await monitor.refreshInventory()}catch is CancellationError {}catch {if monitor.connected && !Task.isCancelled {monitor.errorText=error.localizedDescription}}}}
         .task {
             guard !preview else{return}
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--connect-pedalbridge") {
+                let file=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("pedalbridge-pair-private.txt")
+                do {let link=try String(contentsOf:file,encoding:.utf8);try bridgeSettings.configure(link);try FileManager.default.removeItem(at:file);connectionRoute = .bridge}catch{monitor.errorText="Could not load the private PedalBridge test pairing.";return}
+            }
+            #endif
             let host=ProcessInfo.processInfo.environment["STADIUM_DEVICE_HOST"] ?? address
             #if DEBUG
             if let route=ProcessInfo.processInfo.environment["STADIUM_CONNECTION_ROUTE"],let selectedRoute=StadiumConnectionRoute(rawValue:route) {connectionRoute=selectedRoute}
             #endif
-            if connectionRoute == .usb {
+            if connectionRoute == .bridge {
+                if let pair=bridgeSettings.pair {monitor.connect(host:pair.host,route:.bridge,bridgePair:pair)}else{monitor.status="Pair with PedalBridge to connect."}
+            }else if connectionRoute == .usb {
                 usbDiscovery.search()
                 for _ in 0..<50 {if !usbDiscovery.devices.isEmpty || Task.isCancelled {break};try? await Task.sleep(for:.milliseconds(150))}
                 if !Task.isCancelled,let device=usbDiscovery.devices.first {address=device.host;monitor.connect(host:device.host,port:device.port,route:.usb,interface:device.interface)}
@@ -280,6 +294,16 @@ struct StadiumView:View {
             Text(monitor.status).font(.callout)
             if monitor.connected || monitor.connecting {Button("Disconnect"){monitor.stop()}.buttonStyle(.bordered).disabled(monitor.busy)}
             Picker("Connection",selection:$connectionRoute){ForEach(StadiumConnectionRoute.allCases,id:\.self){Text($0.rawValue).tag($0)}}.pickerStyle(.segmented)
+            if connectionRoute == .bridge {
+                Text("Run PedalBridge on your Mac or Raspberry Pi. Pair once using the link or QR code it displays. Your tablet stays wireless.").font(.callout)
+                SecureField("Paste PedalBridge pairing link",text:$bridgeLink).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
+                HStack {
+                    Button("Pair"){do{try bridgeSettings.configure(bridgeLink);bridgeLink=""}catch{monitor.errorText=error.localizedDescription}}.disabled(bridgeLink.isEmpty)
+                    if let pair=bridgeSettings.pair {Button("Connect via PedalBridge"){monitor.connect(host:pair.host,route:.bridge,bridgePair:pair);showConnection=false}.buttonStyle(.borderedProminent).disabled(monitor.busy)}
+                }
+                if let pair=bridgeSettings.pair {Text("Paired helper: \(pair.host)").font(.caption);Button("Forget PedalBridge"){monitor.stop();bridgeSettings.forget()}}
+                Text("Matrix control requires Stadium connected to the helper by USB. Wi-Fi-only Stadium connections support the editor without Matrix control.").font(.caption).foregroundStyle(.secondary)
+            } else {
             TextField("Stadium address",text:$address).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
             HStack {
                 Button(connectionRoute == .usb ? "Find USB Stadium":(monitor.connected ? "Switch to Address":"Connect")) {if connectionRoute == .usb {usbDiscovery.search()}else{discovery.stop();monitor.connect(host:address.trimmingCharacters(in:.whitespacesAndNewlines),route:connectionRoute);showConnection=false}}.buttonStyle(.borderedProminent).disabled(monitor.busy || (connectionRoute != .usb && address.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty))
@@ -289,6 +313,7 @@ struct StadiumView:View {
             if connectionRoute == .usb {Text(usbDiscovery.message).font(.caption).foregroundStyle(.secondary)}
             if let error=discovery.error {Text(error).font(.caption).foregroundStyle(.orange)}
             if discovery.devices.isEmpty,!discovery.searching {Text("Search for Stadium devices or enter a hostname/IP address.").font(.caption).foregroundStyle(.secondary)}
+            }
             Toggle("Follow the selected block on Stadium",isOn:$followExternal)
             Button("About StadiumPad & Acknowledgments"){showConnection=false;showAcknowledgments=true}
             Text(connectionRoute == .usb ? "Connect Stadium directly by USB-C, enable Remote Access, then Search Network and choose its hostname. USB mode requires the cable and never falls back to Wi-Fi.":"Use the same local network with Remote Access enabled.").font(.caption).foregroundStyle(.secondary)

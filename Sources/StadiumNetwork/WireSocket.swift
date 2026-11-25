@@ -1,6 +1,8 @@
 import Foundation
 import Darwin
 import Network
+import Security
+import CryptoKit
 import StadiumProtocol
 
 /// Completion gates are necessary because a timeout and NWConnection callback can race.
@@ -32,14 +34,28 @@ public final class TraceRecorder:@unchecked Sendable {
 actor WireSocket {
     let connection:NWConnection;let channel:Int;let trace:TraceRecorder?;let queue=DispatchQueue(label:"stadium.wire",qos:.userInitiated)
     var decoder=FrameDecoder()
-    init(host:String,port:UInt16,trace:TraceRecorder?,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil) {
+    private var pending=Data()
+    private let bridgeRequest:[String:Any]?
+    private(set) var bridgeReply:[String:Any]=[:]
+    init(host:String,port:UInt16,trace:TraceRecorder?,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil,bridgePair:PedalBridgePair?=nil,bridgeRequest:[String:Any]?=nil) {
         // Interactive request/reply frames must not wait behind Nagle buffering.
         let tcp=NWProtocolTCP.Options();tcp.noDelay=true
-        let parameters=NWParameters(tls:nil,tcp:tcp)
+        let tls:NWProtocolTLS.Options?
+        if let pair=bridgePair {
+            let options=NWProtocolTLS.Options()
+            sec_protocol_options_set_verify_block(options.securityProtocolOptions,{_,trust,complete in
+                let value=sec_trust_copy_ref(trust).takeRetainedValue()
+                guard let chain=SecTrustCopyCertificateChain(value) as? [SecCertificate],let certificate=chain.first else{complete(false);return}
+                let hash=SHA256.hash(data:SecCertificateCopyData(certificate) as Data).map{String(format:"%02x",$0)}.joined()
+                complete(hash==pair.pin)
+            },DispatchQueue(label:"pedalbridge.trust"))
+            tls=options
+        }else{tls=nil}
+        let parameters=NWParameters(tls:tls,tcp:tcp)
         if let interface {parameters.requiredInterface=interface}
         if route == .usb {parameters.requiredInterfaceType = .wiredEthernet}
         if route == .wifi {parameters.requiredInterfaceType = .wifi}
-        connection=NWConnection(host:NWEndpoint.Host(host),port:NWEndpoint.Port(rawValue:port)!,using:parameters);channel=Int(port);self.trace=trace
+        connection=NWConnection(host:NWEndpoint.Host(host),port:NWEndpoint.Port(rawValue:port)!,using:parameters);channel=Int(port);self.trace=trace;self.bridgeRequest=bridgeRequest
     }
     func interfaceName()->String {
         guard let path=connection.currentPath else{return "Unknown"}
@@ -56,17 +72,36 @@ actor WireSocket {
             c.start(queue:queue)
             queue.asyncAfter(deadline:.now()+5){gate.finish{c.cancel();continuation.resume(throwing:ProtocolError.timeout)}}
         }
+        try await authenticate()
+    }
+    private func authenticate()async throws {
+        guard let request=bridgeRequest else{return}
+        var data=try JSONSerialization.data(withJSONObject:request);guard data.count<8192 else{throw ProtocolError.invalid("PedalBridge request is too large.")};data.append(10)
+        try await send(data,record:false)
+        var response=Data()
+        while response.count<8192 {
+            response.append(try await receive(maximum:8192-response.count))
+            if let index=response.firstIndex(of:10) {
+                pending=Data(response.suffix(from:response.index(after:index)))
+                guard let reply=try JSONSerialization.jsonObject(with:response.prefix(upTo:index)) as? [String:Any],reply["ok"] as? Bool==true else {
+                    let reply=(try? JSONSerialization.jsonObject(with:response.prefix(upTo:index))) as? [String:Any]
+                    throw ProtocolError.invalid(reply?["error"] as? String ?? "PedalBridge refused the connection.")
+                }
+                bridgeReply=reply;return
+            }
+        };throw ProtocolError.invalid("PedalBridge reply is too large.")
     }
     func close() {connection.cancel()}
-    func send(_ data:Data)async throws {
+    func send(_ data:Data,record:Bool=true)async throws {
         let gate=Gate<Void>(),c=connection
         try await withCheckedThrowingContinuation {(continuation:CheckedContinuation<Void,Error>) in
             c.send(content:data,completion:.contentProcessed {error in gate.finish{if let error {continuation.resume(throwing:error)}else{continuation.resume()}}})
             queue.asyncAfter(deadline:.now()+5){gate.finish{c.cancel();continuation.resume(throwing:ProtocolError.timeout)}}
         }
-        trace?.record(channel:channel,direction:"sent",data:data)
+        if record {trace?.record(channel:channel,direction:"sent",data:data)}
     }
     func receive(maximum:Int=65536,timeout:Double=5)async throws->Data {
+        if !pending.isEmpty {let data=Data(pending.prefix(maximum));pending.removeFirst(data.count);return data}
         let gate=Gate<Data>(),c=connection
         return try await withCheckedThrowingContinuation {(continuation:CheckedContinuation<Data,Error>) in
             c.receive(minimumIncompleteLength:1,maximumLength:maximum){data,_,closed,error in

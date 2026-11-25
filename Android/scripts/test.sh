@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-TOOLS=${ANDROID_TOOLS_ROOT:-/Volumes/SoundStageAndroidBuild};BUILD=${STADIUMPAD_ANDROID_BUILD:?};TEST="$BUILD/tests";SDK=${ANDROID_SDK_ROOT:-$TOOLS/sdk};BT="$SDK/build-tools/35.0.0";JAR="$SDK/platforms/android-35/android.jar"
+TOOLS=${ANDROID_TOOLS_ROOT:-/Volumes/SoundStageAndroidBuild};BUILD=${STADIUMPAD_ANDROID_BUILD:?};TEST="$BUILD/tests";SDK=${ANDROID_SDK_ROOT:-$TOOLS/sdk};BT=${ANDROID_BUILD_TOOLS:-$SDK/build-tools/35.0.0};JAR=${ANDROID_JAR:-$SDK/platforms/android-35/android.jar}
 export JAVA_HOME=${JAVA_HOME:-$TOOLS/jdk-17.0.21+9/Contents/Home};export PATH="$JAVA_HOME/bin:$PATH"
 mkdir -p "$TEST/classes" "$TEST/dex"
 javac --release 8 -encoding UTF-8 -classpath "$JAR:$BUILD/classes" -d "$TEST/classes" "$ROOT/tests/"*.java

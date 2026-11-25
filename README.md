@@ -1,11 +1,31 @@
 # StadiumPad
 
 An unofficial, open-source **iPad/tablet editor for Line 6 Helix Stadium**.
-Connect directly over your local Wi-Fi network for editing and browsing. Clone
+Connect directly over your local Wi-Fi network or USB/Ethernet for editing and browsing. Clone
 file transfers and library backups use the optional Mac companion. This is an early community proof of concept, not a complete replacement
 for the official desktop editor.
 
 <p align="center"><img src="iPad/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.jpg" width="220" alt="StadiumPad metallic blue app icon"></p>
+
+## PedalBridge development build — 1.1.0 (50)
+
+Connection choices now include **PedalBridge** on iPad and Android, alongside
+existing direct connections. Pair with the separately running Mac helper using
+its private QR/link. The tablet can stay on Wi-Fi or its charger while Stadium
+connects to the helper by USB. The iPad Matrix popup uses guarded remote USB MIDI
+and retains the native transaction/readback flow. If Stadium is Wi-Fi-only at the
+helper, Matrix control is unavailable. Only one tablet owns a bridge editor lease
+at a time; disconnect it before changing tablets. Pairing is stored in iOS Keychain
+or Android app-only Keystore encryption, with pinned TLS on every helper socket.
+
+The signed Mac helper and physical Pro read-only session are checked; Android's
+native client is checked in an isolated tablet emulator against the real Stadium.
+Actual bridged Matrix write/restoration and physical Android tablets remain
+unqualified. Android retains its existing feature coverage; its full iPad Matrix,
+Global EQ and Command Center presentation is not added in this milestone. The
+existing clone-file companion is separate. Raspberry Pi/AP is planned for hardware
+qualification. This build has **not** been submitted to TestFlight in this change;
+the previously verified approved build below remains a separate release.
 
 ## Version 1.0 beta candidate
 

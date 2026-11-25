@@ -447,3 +447,14 @@ five main sections, final Home/Preset with tuner off (13 checks, 12 acknowledged
 tuner commands). This verifies command acceptance and local navigation, not pedal
 screen pixels or live pitch. Native Tuner layout inspected. Final app relaunched
 without verification flags; no preset or mixer settings changed.
+
+
+## PedalBridge — 2026-11-24 development1.1.0(50)
+
+Owner changed architecture: tablet Wi-Fi → Mac/Pi helper → Stadium USB network + MIDI, with helper Wi-Fi-only fallback and Matrix unavailable without matching USB. Quad Cortex deferred. Separate privatezer0/PedalBridge development repo. Preserve direct Wi-Fi/USB modes.
+
+PedalBridgePair validates private URL fields and redacts description. PedalBridgeConnection obtains target identity/generation then shares a random lease across pinned-TLS updates/commands; WireSocket authenticates before ZMTP, never traces the token, and preserves bytes buffered beyond the JSON newline. Native session transactions/backups/readback remain unchanged. Monitor requires bridge snapshot identity to match preflight. Keychain settings and startup routing are centralized to avoid the previous competing auto-connect task losing the pair. DEBUG private-file import is explicit, removes the file, and is not a production secret persistence path.
+
+Matrix callbacks use the bridge only for a bridge route, retain adjacent MainActor connection/token checks, and never fall back silently to local tablet MIDI. Helper validates actual MIDI settings, its editor lease and physical USB identity; send success is not pedal readback. Direct callbacks stay intact. Wi-Fi-only helper has no Matrix. Upstream/USB changes revoke streams; uncertain writes never replay. Android uses the equivalent TLS preface and encrypted app-only Keystore pairing; direct USB/Ethernet uses per-socket Android Network binding, not process-wide routing. Android original feature gaps remain.
+
+Validation here:101Swift tests; existing Matrix loopback suite;10helper TLS/auth/lease/Matrix-mapping tests; repeated native Swift read-only sessions through real helper; physical Pro read-only snapshot/live events plus Matrix ready with local USB MIDI false; native Android emulator read-only snapshot and3Matrixoutputs through same Mac app. No physical writes, preset/save/firmware/audio changes. No new TestFlight submission. Physical Android/native USB and bridged Matrix writes pending. See helper README/ARCHITECTURE for Pi plan, helper lifecycle and current limits.

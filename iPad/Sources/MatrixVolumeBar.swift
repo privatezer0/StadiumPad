@@ -65,8 +65,10 @@ struct MatrixVolumeBar:View {
                     if stamp==revision,!sending {
                         if monitor.connectionRoute == .usb,monitor.connectionInterface=="USB/Ethernet",usb.online,!usb.bound(to:id) {try usb.bind(to:id)}
                         if let before=state {for output in 1...3 {for row in next.strips(output) {for field in [MatrixField.level,.pan] where row.raw[field.rawValue] != before.strip(output:output,source:row.id)?.raw[field.rawValue] {gestures.externalChange("\(output):\(row.id):\(field.rawValue)")}}}}
-                        state=next;channels=midi;ready=usb.bound(to:id) && next.linked==0 && !blocked
-                        if !usb.online {message="Connect Stadium directly to this iPad by USB-C to control the mixer."}
+                        state=next;channels=midi;ready=(monitor.connectionRoute == .bridge ? monitor.bridgeMatrixAvailable:usb.bound(to:id)) && next.linked==0 && !blocked
+                        if next.linked != 0 {message="Outputs are linked. Unlink them on Stadium before editing independent mixes."}
+                        else if monitor.connectionRoute == .bridge {message=monitor.bridgeMatrixAvailable ? "PedalBridge USB Matrix mixer":"Connect Stadium to PedalBridge by USB to control the mixer."}
+                        else if !usb.online {message="Connect Stadium directly to this iPad by USB-C to control the mixer."}
                         else if !usb.bound(to:id) {message="Confirm this USB Stadium to enable mixer controls."}
                         else if next.linked != 0 {message="Outputs are linked. Unlink them on Stadium before editing independent mixes."}
                         else if !blocked {message="USB Matrix mixer"}
@@ -83,7 +85,7 @@ struct MatrixVolumeBar:View {
     func dropPending(){gestures.cancelPending()}
     func clearSolos(output:Int,monitor:StadiumMonitor){
         lastRequested=["output":output,"field":"clearSolos"];report()
-        guard writer==nil,!sending,usb.online,monitor.connected,let id=deviceID else{return}
+        guard writer==nil,!sending,(monitor.connectionRoute == .bridge ? monitor.bridgeMatrixAvailable:usb.online),monitor.connected,let id=deviceID else{return}
         gestures.reset();revision+=1;ready=false
         let epoch=token,connection=monitor.connectionID
         writer=Task {
@@ -93,19 +95,20 @@ struct MatrixVolumeBar:View {
                 let before=try await monitor.readMatrixConsole(),actualChannels=try await monitor.matrixChannels()
                 let command=try MatrixClearSolosCommand(output:output),channel=actualChannels[output-1]
                 let after=try await monitor.clearMatrixSolos(command,expected:before,channel:channel) {
-                    try await MainActor.run {
+                    let bridge=try await MainActor.run {guard self.token==epoch,monitor.connected,monitor.connectionID==connection else{throw CancellationError()};return monitor.bridgeConnection}
+                    if let bridge {try await bridge.clearSolos(command,channel:channel,identity:id)}else{try await MainActor.run {
                         guard self.token==epoch,monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
                         try self.usb.clearSolos(command,channel:channel,networkIdentity:id)
-                    }
+                    }}
                 }
-                guard token==epoch else{return};state=after;channels=actualChannels;blocked=false;ready=usb.bound(to:id);message="Solos cleared";lastRequested=["output":output,"field":"clearSolos"]
+                guard token==epoch else{return};state=after;channels=actualChannels;blocked=false;ready=monitor.connectionRoute == .bridge ? monitor.bridgeMatrixAvailable:usb.bound(to:id);message="Solos cleared";lastRequested=["output":output,"field":"clearSolos"]
             }catch {guard token==epoch else{return};ready=false;blocked=true;message=error.localizedDescription}
         }
     }
     func stop(){token=UUID();gestures.reset();ready=false}
     func send(_ command:MatrixConsoleCommand,monitor:StadiumMonitor) {
         lastRequested=["output":command.output,"source":command.source,"field":command.field.rawValue,"value":command.value];report()
-        guard ready,usb.online,channels.count==3 else{return}
+        guard ready,(monitor.connectionRoute == .bridge ? monitor.bridgeMatrixAvailable:usb.online),channels.count==3 else{return}
         // Never coalesce toggles: MIDI mute/solo commands toggle, rather than set.
         if command.field == .mute || command.field == .solo {guard !sending,gestures.isEmpty else{return}}
         gestures.enqueue(command);revision+=1
@@ -120,10 +123,11 @@ struct MatrixVolumeBar:View {
                 do {
                     let started=Date()
                     let after=try await monitor.setMatrixConsole(command,expected:before,channel:channel) {
-                        try await MainActor.run {
+                        let bridge=try await MainActor.run {guard self.token==epoch,monitor.connected,monitor.connectionID==connection else{throw CancellationError()};return monitor.bridgeConnection}
+                        if let bridge {try await bridge.send(command,channel:channel,identity:id)}else{try await MainActor.run {
                             guard self.token==epoch,monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
                             try self.usb.send(command,channel:channel,networkIdentity:id)
-                        }
+                        }}
                     }
                     guard token==epoch else{break};lastTransactionMilliseconds=Date().timeIntervalSince(started)*1000;state=after;gestures.confirmed(ticket)
                 }catch {guard token==epoch else{break};gestures.reset();ready=false;blocked=true;message=error.localizedDescription}
@@ -149,12 +153,12 @@ struct MatrixMixerView:View {
     let preview:Bool
     init(initialOutput:Int,preview:Bool=false,previewState:MatrixConsoleState?=nil,expanded:Bool=false){_output=State(initialValue:initialOutput);self.preview=preview;_model=StateObject(wrappedValue:MatrixConsoleModel(previewState:previewState));_homeExpanded=State(initialValue:expanded);_songExpanded=State(initialValue:expanded)}
     private var sources:[Int] {[5]+(homeExpanded ? [1,2,3,4]:[])+[14]+(songExpanded ? Array(6...13):[])+[15,16,17,18,19]}
-    private var enabled:Bool {model.ready && presence.online && !preview && !selectingOutput}
+    private var enabled:Bool {model.ready && (monitor.connectionRoute == .bridge ? monitor.bridgeMatrixAvailable:presence.online) && !preview && !selectingOutput}
     var body:some View {
         GeometryReader {area in VStack(spacing:0) {
             HStack(spacing:12) {
                 Menu {
-                    Button("Clear Solos on \(MatrixGuitarLevels.labels[output-1])"){model.clearSolos(output:output,monitor:monitor)}.disabled(!presence.online || !monitor.connected || model.state==nil || model.sending)
+                    Button("Clear Solos on \(MatrixGuitarLevels.labels[output-1])"){model.clearSolos(output:output,monitor:monitor)}.disabled((!presence.online && !monitor.bridgeMatrixAvailable) || !monitor.connected || model.state==nil || model.sending)
                 }label:{Image(systemName:"line.3.horizontal").foregroundStyle(.cyan).frame(width:30,height:44)}.accessibilityLabel("Matrix mixer options")
                 Text("Matrix Mixer").font(.system(size:26,weight:.light))
                 HStack(spacing:6){ForEach(1...3,id:\.self){n in
@@ -183,7 +187,7 @@ struct MatrixMixerView:View {
                 Circle().fill(enabled ? Color.cyan:Color.gray).frame(width:7,height:7)
                 Text(model.message).font(.system(size:12)).lineLimit(2)
                 Spacer(minLength:5)
-                if !model.ready {Button("Use this USB Stadium"){model.bind()}.disabled(!presence.online || !monitor.connected);Button("Refresh"){model.retry()}}
+                if !model.ready {Button("Use this USB Stadium"){model.bind()}.disabled((!presence.online && !monitor.bridgeMatrixAvailable) || !monitor.connected);Button("Refresh"){model.retry()}}
             }.padding(.horizontal,18).frame(minHeight:42).background(Color(white:0.09))
         }}.background(Color(white:0.045)).foregroundStyle(.white).preferredColorScheme(.dark)
         .task(id:"\(monitor.connectionID)-\(monitor.connected)"){if !preview {await model.observe(monitor)}}
@@ -217,7 +221,7 @@ struct MatrixMixerView:View {
     }
     @MainActor private func navigateOutput(_ requested:Int,closing:Bool)async throws->Bool {
         presence.refresh()
-        guard presence.online,monitor.connected else{return false}
+        guard (monitor.connectionRoute == .bridge ? monitor.bridgeMatrixAvailable:presence.online),monitor.connected else{return false}
         let connection=monitor.connectionID
         guard let product=monitor.snapshot?.product,let id=FileCompanion.deviceID(product) else{throw ProtocolError.closed}
         if monitor.connectionRoute == .usb,monitor.connectionInterface=="USB/Ethernet",!presence.bound(to:id) {try presence.bind(to:id)}
@@ -230,10 +234,11 @@ struct MatrixMixerView:View {
         let channel=try await monitor.matrixPanelChannel()
         guard monitor.connected,connection==monitor.connectionID else{throw CancellationError()}
         try await monitor.navigateMatrixPanel(MatrixPanelCommand(output:target,closing:closing),channel:channel) {step in
-            try await MainActor.run {
+            let bridge=try await MainActor.run {guard monitor.connected,monitor.connectionID==connection else{throw CancellationError()};return monitor.bridgeConnection}
+            if let bridge {try await bridge.navigate(output:step,channel:channel,identity:id)}else{try await MainActor.run {
                 guard monitor.connected,monitor.connectionID==connection else{throw CancellationError()}
                 try presence.navigate(output:step,channel:channel,networkIdentity:id)
-            }
+            }}
         }
         return true
     }

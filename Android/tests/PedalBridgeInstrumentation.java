@@ -1,0 +1,10 @@
+package com.privatezero.stadiumpad;
+import android.app.Instrumentation;import android.os.Bundle;import java.io.*;import java.nio.charset.StandardCharsets;import static com.privatezero.stadiumpad.Data.*;import static com.privatezero.stadiumpad.Models.*;
+/** Explicit read-only bridge test. Pairing is read from app-scoped storage, never argv. */
+public final class PedalBridgeInstrumentation extends Instrumentation {
+ @Override public void onCreate(Bundle b){super.onCreate(b);start();}
+ @Override public void onStart(){Bundle result=new Bundle();Session session=null;try{
+  File file=new File(getTargetContext().getExternalFilesDir(null),"pedalbridge-test-private.txt");require(file.length()>0&&file.length()<8192,"Provide the private test pairing in app-scoped storage");byte[] bytes=new byte[(int)file.length()];try(DataInputStream in=new DataInputStream(new FileInputStream(file))){in.readFully(bytes);}require(file.delete(),"Remove private pairing after loading");PedalBridge.Pair pair=new PedalBridge.Pair(new String(bytes,StandardCharsets.UTF_8));
+  session=new Session(new File(getTargetContext().getCacheDir(),"bridge-read-only"));session.connect(pair.host,2001,pair,null);State state=session.snapshot();require(session.bridge!=null&&PedalBridge.hash(s(get(state.product,"host","snum")).trim().getBytes(StandardCharsets.UTF_8)).equals(session.bridge.device),"Bridge target identity mismatch");require(!state.blocks.isEmpty(),"Expected a real live signal chain");Object matrix=session.property("server.mixer.state");require(get(matrix,"lyrs") instanceof java.util.List,"Matrix state unavailable");result.putBoolean("connected",true);result.putBoolean("readOnly",true);result.putBoolean("matrixUSBAvailable",session.bridge.matrix);result.putInt("liveBlocks",state.blocks.size());result.putInt("matrixOutputs",arr(get(matrix,"lyrs")).size());result.putString("upstream",session.bridge.upstream);finish(-1,result);
+ }catch(Throwable e){result.putString("failure",e.getClass().getSimpleName()+": "+e.getMessage());finish(0,result);}finally{if(session!=null)session.close();}}
+}

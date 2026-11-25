@@ -5,6 +5,8 @@ import StadiumNetwork
 
 @MainActor final class StadiumMonitor:ObservableObject {
     @Published var connectionID=UUID()
+    @Published private(set) var bridgeConnection:PedalBridgeConnection?
+    var bridgeMatrixAvailable:Bool {connected && bridgeConnection?.matrixAvailable==true}
     @Published var currentHost=""
     @Published var connectionRoute:StadiumConnectionRoute = .automatic
     @Published var connectionInterface="Disconnected"
@@ -81,13 +83,15 @@ import StadiumNetwork
         guard let url=Bundle.main.url(forResource:"ModelNames",withExtension:"json"),let data=try? Data(contentsOf:url),let names=try? JSONDecoder().decode([String:String].self,from:data) else{return [:]};return names
     }()
     func blockName(_ block:SignalBlock)->String {catalog[String(block.model)]?.name ?? names[String(block.model)] ?? "Effect block \(block.position)"}
-    func connect(host:String,port:UInt16=2001,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil) {
+    func connect(host:String,port:UInt16=2001,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil,bridgePair:PedalBridgePair?=nil) {
         guard !busy else{return}
         stop();connectionRoute=route;connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];commandProperties=[:];globalEQ=nil;lastCopy=nil;lastAction=nil
         let token=UUID();generation=token
         lastEvent=nil;let current=StadiumSession();session=current;connecting=true;status="Connecting…"
         worker=Task {
             do {
+                let bridge:PedalBridgeConnection?
+                if route == .bridge {guard let bridgePair else{throw ProtocolError.invalid("Pair with PedalBridge first.")};bridge=try await PedalBridgeConnection.open(bridgePair)}else{bridge=nil}
                 #if DEBUG
                 let eqTrace:TraceRecorder?
                 if ProcessInfo.processInfo.environment["STADIUM_TRACE_MATRIX"]=="1" {
@@ -97,13 +101,14 @@ import StadiumNetwork
                     let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
                     eqTrace=try TraceRecorder(path:folder.appendingPathComponent("global-eq-wire-"+UUID().uuidString+".jsonl").path,maximumBytes:8*1024*1024)
                 }else{eqTrace=nil}
-                try await current.connect(host:host,port:port,trace:eqTrace,route:route,interface:interface)
+                try await current.connect(host:host,port:port,trace:eqTrace,route:route,interface:interface,bridge:bridge)
                 #else
-                try await current.connect(host:host,port:port,route:route,interface:interface)
+                try await current.connect(host:host,port:port,route:route,interface:interface,bridge:bridge)
                 #endif
                 let state=try await current.snapshot()
+                if let bridge {guard FileCompanion.deviceID(state.product)==bridge.deviceID else{throw ProtocolError.invalid("The Stadium connected to PedalBridge changed. Reconnect before editing.")}}
                 guard generation==token,!Task.isCancelled else{await current.disconnect();return}
-                connectionInterface=await current.connectionInterface();snapshot=state;connecting=false;connected=true;status="Connected · \(connectionInterface)";report()
+                let directInterface=await current.connectionInterface();bridgeConnection=bridge;connectionInterface=bridge.map{"PedalBridge · "+$0.upstream} ?? directInterface;snapshot=state;connecting=false;connected=true;status="Connected · \(connectionInterface)";report()
                 subscriber=Task {
                     do {
                         while !Task.isCancelled {
@@ -217,7 +222,7 @@ import StadiumNetwork
         generation=UUID();matrixWriting=false;editorBusy=false;refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;focusedPresetID=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil
         let closeTuner=tunerRequested;tunerRequested=false
         if let old=session {Task {if closeTuner {try? await old.setTuner(false)};await old.disconnect()}}
-        session=nil;connected=false;connecting=false;status="Disconnected. Last received values remain visible.";report()
+        session=nil;bridgeConnection=nil;connected=false;connecting=false;status="Disconnected. Last received values remain visible.";report()
     }
     private func selectionKey(_ state:DeviceSnapshot)->String? {
         RememberedBlockSelection.storageKey(product:state.product,endpoint:"\(currentHost):\(currentPort)",presetID:state.presetID)

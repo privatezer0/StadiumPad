@@ -24,10 +24,10 @@ public actor StadiumSession {
     public init() {}
     private func acquire()async {if !occupied {occupied=true;return};await withCheckedContinuation{waiters.append($0)}}
     private func release() {if waiters.isEmpty {occupied=false}else{waiters.removeFirst().resume()}}
-    public func connect(host:String,port:UInt16=2001,trace:TraceRecorder?=nil,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil)async throws {
+    public func connect(host:String,port:UInt16=2001,trace:TraceRecorder?=nil,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil,bridge:PedalBridgeConnection?=nil)async throws {
         guard port>0,port<65535,!host.isEmpty,route != .usb || interface?.type != .wifi else{throw ProtocolError.invalid("Enter a valid Stadium address.")}
         await disconnect();connectionID=UUID();await acquire();defer{release()};try Task.checkCancellation()
-        let sub=WireSocket(host:host,port:port,trace:trace,route:route,interface:interface),command=WireSocket(host:host,port:port+1,trace:trace,route:route,interface:interface)
+        let sub=WireSocket(host:bridge?.pair.host ?? host,port:bridge?.pair.port ?? port,trace:trace,route:route,interface:interface,bridgePair:bridge?.pair,bridgeRequest:bridge?.request("updates")),command=WireSocket(host:bridge?.pair.host ?? host,port:bridge?.pair.port ?? (port+1),trace:trace,route:route,interface:interface,bridgePair:bridge?.pair,bridgeRequest:bridge?.request("commands"))
         do {
             try await sub.start();try await command.start();try await sub.handshake(type:"SUB");try await command.handshake(type:"DEALER")
             updates=sub;commands=command

@@ -1,3 +1,25 @@
+# PedalBridge development update — Android1.1.0, code6
+
+Connection dialog adds Automatic, Wi-Fi, USB/Ethernet and PedalBridge. Pair a helper
+QR/link once; pairing is encrypted with an app-only Android Keystore key. TLS checks
+the pinned helper certificate and authenticates before the existing native editor
+protocol. Bridge target identity must match the live snapshot. USB/Ethernet binds
+each editor socket to one wired Android Network and refuses Wi-Fi fallback. Direct
+USB hardware support still depends on the tablet's CDC-NCM/Ethernet support.
+
+Build and isolated native Android tablet-emulator read-only connection to the real
+Stadium through the signed Mac helper pass. Three Matrix outputs are readable over
+the relay; the Android Matrix UI itself is not implemented here. Existing Global
+EQ/Command Center and other documented Android feature gaps remain. Physical tablet
+and direct cable qualification is pending; do not claim iPad feature parity from a
+successful relay connection. Keystore/signing/history/backup identity preserved.
+
+Explicit test runner `PedalBridgeInstrumentation` reads a temporary private pairing
+from app-scoped external storage and deletes it; it only reads hardware and never
+edits presets, sends MIDI or saves. Do not pass pairing tokens through adb argv/logs.
+
+---
+
 # StadiumPad for Android tablets
 
 Native Java/Android tablet port of StadiumPad. Original dark editor
