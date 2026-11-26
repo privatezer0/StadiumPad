@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import Network
 import StadiumProtocol
 import StadiumNetwork
@@ -9,9 +10,21 @@ import StadiumNetwork
     var bridgeMatrixAvailable:Bool {connected && bridgeConnection?.matrixAvailable==true}
     private var disconnectTask:Task<Void,Never>?
     private var activeBridgePair:PedalBridgePair?
+    private var bridgeReconnectTask:Task<Void,Never>?
+    @Published private(set) var reconnectingBridge=false
+    var tabletTransport:String {
+        guard connected else{return "No connection"}
+        if activeBridgePair?.bluetooth==true{return "Bluetooth"}
+        return connectionRoute == .usb || connectionInterface.contains("USB/Ethernet") ? "USB":"Wi-Fi"
+    }
+    func waitForHelperRestart(){
+        guard activeBridgePair?.bluetooth==true else{return}
+        // The server closes the old lease; fail() reconnects with fresh state only.
+        status="PedalBridge is restarting…"
+    }
     private var bridgeResumePair:PedalBridgePair?
     func pauseForBackground() {
-        let pair=(connected || connecting) && connectionRoute == .bridge ? activeBridgePair:nil
+        let pair=connectionRoute == .bridge ? activeBridgePair:nil
         stop();bridgeResumePair=pair
     }
     func resumeFromBackground() {
@@ -235,6 +248,7 @@ import StadiumNetwork
         guard token==generation else{throw CancellationError()};return state
     }
     func stop() {
+        bridgeReconnectTask?.cancel();bridgeReconnectTask=nil;reconnectingBridge=false
         activeBridgePair=nil;bridgeResumePair=nil
         eqCommitTask?.cancel();eqCommitTask=nil
         generation=UUID();matrixWriting=false;editorBusy=false;refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;focusedPresetID=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil
@@ -487,7 +501,21 @@ import StadiumNetwork
         return try await current.benchmarkSnapshotReads()
     }
     #endif
-    private func fail(_ error:Error) {stop();status=error.localizedDescription;report()}
+    private func fail(_ error:Error) {
+        let pair=activeBridgePair?.bluetooth==true ? activeBridgePair:nil
+        stop();status=error.localizedDescription;report()
+        guard let pair else{return}
+        activeBridgePair=pair
+        guard UIApplication.shared.applicationState == .active else{bridgeResumePair=pair;return}
+        reconnectingBridge=true;let token=generation
+        status="PedalBridge disconnected. Reconnecting…";report()
+        bridgeReconnectTask=Task {
+            do {try await Task.sleep(for:.seconds(2));try Task.checkCancellation()}catch{return}
+            guard generation==token else{return}
+            bridgeReconnectTask=nil
+            connect(host:pair.host,route:.bridge,bridgePair:pair)
+        }
+    }
     private func report() {
         guard ProcessInfo.processInfo.environment["STADIUM_VERIFY"]=="1" else{return}
         let object:[String:Any]=["connected":connected,"firmware":snapshot?.firmware ?? "","blocks":snapshot?.blocks.count ?? 0,"snapshot":snapshot?.activeSnapshot ?? -1,"receivedEvent":lastEvent != nil,"dirty":snapshot?.dirty ?? false,"focusPath":focusedBlock?.path ?? -1,"focusPosition":focusedBlock?.position ?? -1,"namedParameters":snapshot?.blocks.reduce(0){$0+definitions($1).count} ?? 0,"at":Date().timeIntervalSince1970,"status":status]

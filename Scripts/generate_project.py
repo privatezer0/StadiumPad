@@ -39,7 +39,9 @@ targets=[target];attributes='LastUpgradeCheck = 1600;'
 destination=root/'StadiumPad.xcodeproj';destination.mkdir(exist_ok=True)
 if os.environ.get('STADIUMPAD_UI_TESTS')=='1':
  testfiles=[];testbuild=[]
- for path in sorted((root/'iPad/UITests').glob('*.swift')):
+ testpaths=list((root/'iPad/UITests').glob('*.swift'))
+ if os.environ.get('STADIUMPAD_BLUETOOTH_QA')=='1':testpaths+=list((root/'iPad/HardwareTests').glob('*.swift'))
+ for path in sorted(testpaths):
   rel=path.relative_to(root).as_posix();ref=obj(rel,f'isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = {q(rel)}; sourceTree = "<group>";');testfiles.append(ref);testbuild.append(obj('build:'+rel,f'isa = PBXBuildFile; fileRef = {ref};'))
  testproduct=obj('ui-product','isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = "StadiumPadScrollingTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR;')
  obj('group',f'isa = PBXGroup; children = ({",".join(files+[product]+testfiles+[testproduct])},); sourceTree = "<group>";')

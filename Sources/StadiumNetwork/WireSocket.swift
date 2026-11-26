@@ -32,12 +32,14 @@ public final class TraceRecorder:@unchecked Sendable {
     deinit {try? handle.close()}
 }
 actor WireSocket {
-    let connection:NWConnection;let channel:Int;let trace:TraceRecorder?;let queue=DispatchQueue(label:"stadium.wire",qos:.userInitiated)
+    let connection:NWConnection?;private let bluetoothPair:PedalBridgePair?;private var bluetoothStream:BluetoothEditorStream?;let channel:Int;let trace:TraceRecorder?;let queue=DispatchQueue(label:"stadium.wire",qos:.userInitiated)
     var decoder=FrameDecoder()
     private var pending=Data()
     private let bridgeRequest:[String:Any]?
     private(set) var bridgeReply:[String:Any]=[:]
     init(host:String,port:UInt16,trace:TraceRecorder?,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil,bridgePair:PedalBridgePair?=nil,bridgeRequest:[String:Any]?=nil) {
+        bluetoothPair=bridgePair?.bluetooth==true ? bridgePair:nil
+        if bridgePair?.bluetooth==true {connection=nil;channel=Int(port);self.trace=trace;self.bridgeRequest=bridgeRequest;return}
         // Interactive request/reply frames must not wait behind Nagle buffering.
         let tcp=NWProtocolTCP.Options();tcp.noDelay=true
         let tls:NWProtocolTLS.Options?
@@ -58,13 +60,18 @@ actor WireSocket {
         connection=NWConnection(host:NWEndpoint.Host(host),port:NWEndpoint.Port(rawValue:port)!,using:parameters);channel=Int(port);self.trace=trace;self.bridgeRequest=bridgeRequest
     }
     func interfaceName()->String {
-        guard let path=connection.currentPath else{return "Unknown"}
+        if bluetoothPair != nil {return "Bluetooth LE"}
+        guard let path=connection?.currentPath else{return "Unknown"}
         if path.usesInterfaceType(.wiredEthernet) {return "USB/Ethernet"}
         if path.usesInterfaceType(.wifi) {return "Wi-Fi"}
         return "Network"
     }
     func start()async throws {
-        let gate=Gate<Void>(),c=connection
+        if let pair=bluetoothPair,let id=UUID(uuidString:pair.host) {
+            bluetoothStream=try await BluetoothEditorHub.shared.open(id,psm:pair.port,pin:pair.pin)
+            try await authenticate();return
+        }
+        guard let c=connection else{throw ProtocolError.closed};let gate=Gate<Void>()
         try await withCheckedThrowingContinuation {(continuation:CheckedContinuation<Void,Error>) in
             c.stateUpdateHandler={state in
                 switch state {case .ready:gate.finish{continuation.resume()};case .failed(let e):gate.finish{continuation.resume(throwing:e)};case .cancelled:gate.finish{continuation.resume(throwing:ProtocolError.closed)};default:break}
@@ -80,7 +87,7 @@ actor WireSocket {
         try await send(data,record:false)
         var response=Data()
         while response.count<8192 {
-            response.append(try await receive(maximum:8192-response.count))
+            response.append(try await receive(maximum:8192-response.count,timeout:request["channel"] as? String == "settings" ? 110:10))
             if let index=response.firstIndex(of:10) {
                 pending=Data(response.suffix(from:response.index(after:index)))
                 guard let reply=try JSONSerialization.jsonObject(with:response.prefix(upTo:index)) as? [String:Any],reply["ok"] as? Bool==true else {
@@ -91,9 +98,10 @@ actor WireSocket {
             }
         };throw ProtocolError.invalid("PedalBridge reply is too large.")
     }
-    func close() {connection.cancel()}
+    func close()async {connection?.cancel();await bluetoothStream?.close();bluetoothStream=nil}
     func send(_ data:Data,record:Bool=true)async throws {
-        let gate=Gate<Void>(),c=connection
+        if let bluetoothStream {try await bluetoothStream.send(data);if record {trace?.record(channel:channel,direction:"sent",data:data)};return}
+        guard let c=connection else{throw ProtocolError.closed};let gate=Gate<Void>()
         try await withCheckedThrowingContinuation {(continuation:CheckedContinuation<Void,Error>) in
             c.send(content:data,completion:.contentProcessed {error in gate.finish{if let error {continuation.resume(throwing:error)}else{continuation.resume()}}})
             queue.asyncAfter(deadline:.now()+5){gate.finish{c.cancel();continuation.resume(throwing:ProtocolError.timeout)}}
@@ -102,7 +110,8 @@ actor WireSocket {
     }
     func receive(maximum:Int=65536,timeout:Double=5)async throws->Data {
         if !pending.isEmpty {let data=Data(pending.prefix(maximum));pending.removeFirst(data.count);return data}
-        let gate=Gate<Data>(),c=connection
+        if let bluetoothStream {return try await bluetoothStream.receive(maximum:maximum,timeout:timeout)}
+        guard let c=connection else{throw ProtocolError.closed};let gate=Gate<Data>()
         return try await withCheckedThrowingContinuation {(continuation:CheckedContinuation<Data,Error>) in
             c.receive(minimumIncompleteLength:1,maximumLength:maximum){data,_,closed,error in
                 gate.finish{if let data,!data.isEmpty {continuation.resume(returning:data)}else if let error {continuation.resume(throwing:error)}else{continuation.resume(throwing:ProtocolError.closed)}}

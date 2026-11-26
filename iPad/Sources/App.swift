@@ -1,8 +1,7 @@
 import SwiftUI
 import StadiumProtocol
-#if DEBUG
+import StadiumNetwork
 import UIKit
-#endif
 
 @main struct StadiumPadApp:App {
     @StateObject private var monitor=StadiumMonitor()
@@ -16,9 +15,10 @@ import UIKit
             StadiumView()
             #endif
         }.environmentObject(monitor).environmentObject(discovery).preferredColorScheme(.dark)
+            .onAppear{UIApplication.shared.isIdleTimerDisabled=true}
             .onChange(of:phase){_,value in
-                if value == .background {discovery.stop();monitor.pauseForBackground()}
-                else if value == .active {monitor.resumeFromBackground()}
+                if value == .background {UIApplication.shared.isIdleTimerDisabled=false;discovery.stop();monitor.pauseForBackground()}
+                else if value == .active {UIApplication.shared.isIdleTimerDisabled=true;monitor.resumeFromBackground()}
             }
     }}
 }
@@ -36,6 +36,9 @@ struct StadiumView:View {
     @StateObject private var bridgeSettings=PedalBridgeSettings()
     @StateObject private var bridgeDiscovery=StadiumDiscovery(serviceType:"_pedalbridge._tcp.")
     @State private var bridgeLink=""
+    @ObservedObject private var bluetoothHelpers=BluetoothEditorHub.shared
+    @State private var choosingHelper=false
+    @State private var bridgePreferencesTab=false
     @State private var showSave=false
     @State private var saveID:Int?
     @State private var saveLabel=""
@@ -108,6 +111,7 @@ struct StadiumView:View {
         #if DEBUG
         .task {if ProcessInfo.processInfo.arguments.contains("--show-connection") {showConnection=true}}
         .task {if ProcessInfo.processInfo.arguments.contains("--verify-bridge-resume") {await verifyBridgeResume(monitor)}}
+        .task {if ProcessInfo.processInfo.arguments.contains("--verify-bluetooth") {await verifyBluetooth(monitor,settings:bridgeSettings)}}
         .task {if ProcessInfo.processInfo.arguments.contains("--verify-read-timing") {await verifyReadTiming(monitor)}}
         #endif
         .onOpenURL {url in
@@ -164,8 +168,9 @@ struct StadiumView:View {
             #if DEBUG
             if let route=ProcessInfo.processInfo.environment["STADIUM_CONNECTION_ROUTE"],let selectedRoute=StadiumConnectionRoute(rawValue:route) {connectionRoute=selectedRoute}
             #endif
+            if ProcessInfo.processInfo.arguments.contains("--verify-bluetooth") {return}
             if connectionRoute == .bridge {
-                if let pair=bridgeSettings.pair {monitor.connect(host:pair.host,route:.bridge,bridgePair:pair)}else{monitor.status="Pair with PedalBridge to connect."}
+                if let pair=bridgeSettings.pair,pair.bluetooth {monitor.connect(host:pair.host,route:.bridge,bridgePair:pair)}else{monitor.status="Choose a nearby PedalBridge.";showConnection=true}
             }else if connectionRoute == .usb {
                 usbDiscovery.search()
                 for _ in 0..<50 {if !usbDiscovery.devices.isEmpty || Task.isCancelled {break};try? await Task.sleep(for:.milliseconds(150))}
@@ -252,8 +257,14 @@ struct StadiumView:View {
                 .offset(x:56)
                 HStack(spacing:10) {
                     if geometry.size.width>=1250 {Text("StadiumPad").font(.headline)}
-                    Button {showConnection=true} label:{Image(systemName:monitor.connected ? (monitor.connectionInterface=="USB/Ethernet" ? "cable.connector":"wifi"):"wifi.slash").font(.system(size:19)).frame(width:32,height:44)}.accessibilityLabel(monitor.connected ? "Stadium connection":"Connect to Stadium").buttonStyle(.plain).foregroundStyle(monitor.connected ? .white:.orange)
                     Spacer(minLength:0)
+                    Button {showConnection=true} label:{
+                        VStack(spacing:3) {
+                            if monitor.tabletTransport=="Bluetooth" {BluetoothConnectionGlyph().stroke(lineWidth:2).frame(width:18,height:22)}
+                            else {Image(systemName:monitor.tabletTransport=="USB" ? "cable.connector":monitor.tabletTransport=="Wi-Fi" ? "wifi":"circle.slash").font(.system(size:20)).frame(height:22)}
+                            Text(monitor.tabletTransport).font(.system(size:9)).lineLimit(1)
+                        }.frame(width:76,height:52)
+                    }.accessibilityLabel(monitor.tabletTransport+" connection").accessibilityValue(monitor.connected ? "Connected":"No connection").buttonStyle(.plain).foregroundStyle(monitor.connected ? Color.green:Color.orange)
                 }
             }.padding(.horizontal,12).frame(maxWidth:.infinity,maxHeight:.infinity)
         }.frame(height:66).background(EditorTheme.header)
@@ -298,21 +309,27 @@ struct StadiumView:View {
         VStack(alignment:.leading,spacing:16) {
             Text("Stadium connection").font(.title2.bold())
             Text(monitor.status).font(.callout)
-            if monitor.connected || monitor.connecting {Button("Disconnect"){monitor.stop()}.buttonStyle(.bordered).disabled(monitor.busy)}
+            if monitor.connected || monitor.connecting || monitor.reconnectingBridge {Button("Disconnect"){monitor.stop()}.buttonStyle(.bordered).disabled(monitor.busy)}
             Picker("Connection",selection:$connectionRoute){ForEach(StadiumConnectionRoute.allCases,id:\.self){Text($0.rawValue).tag($0)}}.pickerStyle(.segmented)
             if connectionRoute == .bridge {
-                Text("Run PedalBridge on your Mac or Raspberry Pi. Pair once using the link or QR code it displays. Your tablet stays wireless.").font(.callout)
-                Button(bridgeDiscovery.searching ? "Searching for helpers…":"Find PedalBridge"){bridgeDiscovery.search()}.disabled(bridgeDiscovery.searching)
-                ScrollView {VStack(alignment:.leading,spacing:8){ForEach(bridgeDiscovery.devices){helper in
-                    VStack(alignment:.leading){Text(helper.id).font(.headline);if let url=helper.dashboardURL {Link("Open dashboard to pair",destination:url)}else{Text("Open PedalBridge on \(helper.host) and copy its private pairing link.").font(.caption)}}
-                }}}.frame(maxHeight:110).task{bridgeDiscovery.search()}.onDisappear{bridgeDiscovery.stop()}
-                SecureField("Paste PedalBridge pairing link",text:$bridgeLink).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
-                HStack {
-                    Button("Pair"){do{try bridgeSettings.configure(bridgeLink);bridgeLink=""}catch{monitor.errorText=error.localizedDescription}}.disabled(bridgeLink.isEmpty)
-                    if let pair=bridgeSettings.pair {Button("Connect via PedalBridge"){monitor.connect(host:pair.host,route:.bridge,bridgePair:pair);showConnection=false}.buttonStyle(.borderedProminent).disabled(monitor.busy)}
+                Picker("PedalBridge settings",selection:$bridgePreferencesTab){Text("Connection").tag(false);Text("PedalBridge").tag(true)}.pickerStyle(.segmented).accessibilityIdentifier("pedalbridge-settings-tabs")
+                if bridgePreferencesTab,let pair=bridgeSettings.pair {
+                    PedalBridgePreferences(pair:pair,restarting:{monitor.waitForHelperRestart()})
+                }else{
+                Text("Choose a nearby PedalBridge. Your tablet can stay on home Wi-Fi.").font(.callout)
+                Button("Find PedalBridge over Bluetooth"){bluetoothHelpers.search()}
+                Text(bluetoothHelpers.message).font(.caption)
+                ScrollView {VStack(alignment:.leading,spacing:8){ForEach(bluetoothHelpers.helpers){helper in
+                    Button {Task {choosingHelper=true;defer{choosingHelper=false}
+                        do {monitor.stop();let pair=try await PedalBridgeConnection.automaticBluetooth(helper.id);try bridgeSettings.configure(pair);monitor.connect(host:pair.host,route:.bridge,bridgePair:pair);showConnection=false}
+                        catch{monitor.errorText=error.localizedDescription}
+                    }} label:{Label(helper.name,systemImage:"antenna.radiowaves.left.and.right").frame(maxWidth:.infinity,alignment:.leading)}.buttonStyle(.bordered).disabled(choosingHelper)
+                }}}.frame(maxHeight:190).task{bluetoothHelpers.search()}.onDisappear{bluetoothHelpers.stopSearch()}
+                if choosingHelper {ProgressView("Connecting…")}
+                if let pair=bridgeSettings.pair,pair.bluetooth {Button("Reconnect last PedalBridge"){monitor.connect(host:pair.host,route:.bridge,bridgePair:pair);showConnection=false}.disabled(choosingHelper || monitor.busy)}
+                Text("Matrix requires Stadium connected to PedalBridge by USB.").font(.caption)
                 }
-                if let pair=bridgeSettings.pair {Text("Paired helper: \(pair.host)").font(.caption);Button("Forget PedalBridge"){monitor.stop();bridgeSettings.forget()}}
-                Text("Matrix control requires Stadium connected to the helper by USB. Wi-Fi-only Stadium connections support the editor without Matrix control.").font(.caption).foregroundStyle(.secondary)
+
             } else {
             TextField("Stadium address",text:$address).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
             HStack {
@@ -423,3 +440,46 @@ private struct PresetFolderHarness:View {
     if let data=try? JSONSerialization.data(withJSONObject:result) {try? data.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("read-timing-check.json"),options:.atomic)}
 }
 #endif
+
+#if DEBUG
+@MainActor private func verifyBluetooth(_ monitor:StadiumMonitor,settings:PedalBridgeSettings)async {
+    let file=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("bluetooth-check.json")
+    func record(_ result:[String:Any]) {if let data=try? JSONSerialization.data(withJSONObject:result) {try? data.write(to:file,options:.atomic)}}
+    record(["stage":"discovering"]);monitor.stop();let hub=BluetoothEditorHub.shared;hub.search()
+    for _ in 0..<120 {if !hub.helpers.isEmpty {break};try? await Task.sleep(for:.milliseconds(250))}
+    try? await Task.sleep(for:.seconds(2))
+    var chosen:BluetoothHelper?
+    if let expected=ProcessInfo.processInfo.environment["STADIUM_VERIFY_HELPER_NAME"] {
+        for helper in hub.helpers {if let info=try? await hub.information(helper.id),info.name==expected {chosen=helper;break}}
+    }else if hub.helpers.count==1 {chosen=hub.helpers.first}
+    guard let helper=chosen else{record(["stage":"discovery","helpers":hub.helpers.count,"message":hub.message]);return}
+    do {
+        record(["stage":"opening Bluetooth"])
+        let pair=try await PedalBridgeConnection.automaticBluetooth(helper.id);try settings.configure(pair)
+        let helperSettings=try await PedalBridgeConnection.settings(pair)
+        UserDefaults.standard.set(StadiumConnectionRoute.bridge.rawValue,forKey:"stadiumConnectionRoute")
+        record(["stage":"reading native state"]);monitor.connect(host:pair.host,route:.bridge,bridgePair:pair)
+        for _ in 0..<240 {if monitor.connected && monitor.snapshot != nil {break};try? await Task.sleep(for:.milliseconds(250))}
+        var result:[String:Any]=["stage":"complete","connected":monitor.connected,"bluetooth":pair.bluetooth,"hasSnapshot":monitor.snapshot != nil,"error":monitor.errorText ?? "","helperKind":helperSettings["kind"] as? String ?? "","settingsOnline":helperSettings["ok"] as? Bool ?? false]
+        if monitor.connected {result["timing"]=try await monitor.benchmarkReadTiming()}
+        if ProcessInfo.processInfo.arguments.contains("--verify-bluetooth-restart") {
+            let beforeRestart=monitor.connectionID
+            result["restartAcknowledged"]=(try await PedalBridgeConnection.settings(pair,action:"restart"))["restarting"] as? Bool ?? false
+            for _ in 0..<200 {if monitor.connected,monitor.snapshot != nil,monitor.connectionID != beforeRestart{break};try await Task.sleep(for:.milliseconds(250))}
+            result["reconnectedAfterServiceRestart"]=monitor.connected && monitor.connectionID != beforeRestart
+        }
+        record(result)
+    }catch{record(["stage":"failed","error":error.localizedDescription])}
+}
+#endif
+
+
+private struct BluetoothConnectionGlyph:Shape {
+    func path(in rect:CGRect)->Path {
+        var path=Path()
+        func point(_ x:CGFloat,_ y:CGFloat)->CGPoint {CGPoint(x:rect.minX+x*rect.width/18,y:rect.minY+y*rect.height/22)}
+        path.move(to:point(8,1));path.addLine(to:point(8,21));path.addLine(to:point(15,15));path.addLine(to:point(2,5))
+        path.move(to:point(2,17));path.addLine(to:point(15,7));path.addLine(to:point(8,1))
+        return path
+    }
+}

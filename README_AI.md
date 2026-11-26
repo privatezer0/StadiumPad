@@ -1,3 +1,31 @@
+# Current direction — Bluetooth appliance (2026-11-26)
+
+This supersedes the historical manual pairing and dashboard workflow below.
+StadiumPad's normal PedalBridge route is BLE only; direct Stadium USB/Wi-Fi routes
+remain separate. Discover nearby helpers and tap one. Internal identity tokens
+are bootstrapped automatically, saved per-app and never displayed/logged; the
+native device/generation/preset guards still apply. Explicit owner direction is
+private trusted use, no login/code/link. Do not reintroduce pairing friction.
+
+`BluetoothEditor.swift` provides Core Bluetooth discovery, one shared LE CoC link,
+logical streams and bounded lossless compression; `WireSocket` keeps the native
+ZMTP client unchanged. Android's BluetoothBridge has the same framing and a Socket
+facade so existing native transactions and Matrix validation remain in place.
+Bluetooth info protocol2 is distinct from the nested helper JSON protocol1.
+
+`PedalBridgePreferences.swift` and Android's dedicated helper settings expose
+status, Pi-only Wi-Fi and dashboard, and worker restart. No arbitrary remote
+commands or pedal writes are part of helper administration. Bluetooth permission
+is the normal OS prompt; there is no pairing/login ceremony. Each app remembers
+its selected helper independently, enabling separate Stadium and QC bridges.
+
+Physical iPad/Pi/USB reads pass, including a0.93s measured batched state read;
+final switching/restart checks are ongoing. Android RF and Pi reboot remain
+unqualified. Mac/Pi helper source is in the separate private PedalBridge repo.
+Hardware-only XCTest qualification is opt-in (`STADIUMPAD_BLUETOOTH_QA=1` during
+project generation); routine UI tests do not contact a pedal. Never replay edits
+on stream loss. Do not claim QCPad's BLE client is implemented.
+
 
 ## Pi discovery — November 25, 2026
 

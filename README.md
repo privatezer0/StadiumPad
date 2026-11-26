@@ -1,3 +1,23 @@
+## Bluetooth PedalBridge — private appliance development
+
+The iPad and Android clients now select nearby Mac/Pi helpers over Bluetooth,
+without a login, QR code or pairing-link workflow. Home Wi-Fi stays available.
+The **PedalBridge** connection settings have a separate helper tab for pedal
+online/upstream status, Pi Wi-Fi configuration, optional troubleshooting web and
+worker restart without rebooting the computer. Each app keeps its own helper.
+
+Stadium uses verified USB to the helper first, otherwise a unique matching Wi-Fi
+pedal. Matrix still requires a matching USB network/MIDI Stadium. Native edit
+validation, backup/readback and no-uncertain-write-retry behavior remain intact.
+
+BLE metadata protocol2 uses one multiplexed credit-based L2CAP stream and bounded
+raw-DEFLATE frames. Real iPad/Pi/USB state reads pass; measured batched full-state
+read was about0.93s after compression versus2.01s before. This is not a complete
+edit-latency benchmark or a claim that Bluetooth avoids all2.4GHz interference.
+Mac helper switching/restart acceptance is being completed. Android1.3.0(code10)
+is signed; physical Android Bluetooth testing awaits a connected tablet. QCPad
+Bluetooth is deliberately deferred. No TestFlight upload is included here.
+
 
 ## Pi discovery — November 25, 2026
 

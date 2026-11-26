@@ -4,7 +4,12 @@ import Foundation
 public struct PedalBridgePair:Codable,Equatable,Sendable,CustomStringConvertible {
     public let host:String,token:String,pin:String
     public let port:UInt16
+    public var bluetooth:Bool {UUID(uuidString:host) != nil && port<256}
     public var description:String {"PedalBridge pairing (private)"}
+    public init(host:String,port:UInt16,pin:String,token:String)throws {
+        var url=URLComponents();url.scheme="pedalbridge";url.host="pair";url.queryItems=[URLQueryItem(name:"host",value:host),URLQueryItem(name:"port",value:String(port)),URLQueryItem(name:"pin",value:pin),URLQueryItem(name:"token",value:token)]
+        try self.init(link:url.string ?? "")
+    }
     public init(link:String)throws {
         guard let url=URLComponents(string:link.trimmingCharacters(in:.whitespacesAndNewlines)),url.scheme=="pedalbridge",url.host=="pair" else{throw ProtocolError.invalid("Paste the pairing link shown by PedalBridge.")}
         let items=url.queryItems ?? []

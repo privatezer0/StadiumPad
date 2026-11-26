@@ -273,3 +273,16 @@ tests, and its gray navigation was inspected on the emulator. The physical Andro
 tablet was not available for this install. No live Matrix write test or TestFlight
 upload was performed. Physical iPad read-only diagnostics confirm a PedalBridge
 Wi-Fi connection,20 blocks and incoming events after the helper recovery.
+
+
+## Bluetooth helper — 1.3.0 (10)
+
+Connection → PedalBridge lists nearby Mac/Pi BLE helpers. Tap to connect without
+copying a link. Bluetooth editor transport requires Android10+; older supported
+Android versions retain direct Stadium networking. Android12+ requests Nearby
+Devices; Android10/11 requires its legacy discovery permission. Wi-Fi is unchanged.
+One LE CoC link multiplexes native SUB/DEALER, Matrix and helper settings. Expanded
+frames/queues are bounded; compressed native bytes stay lossless. Settings has
+Status/Pi Wi-Fi/Troubleshooting sections and worker restart, with Mac networking
+left to macOS. APK/signature/codec checks pass. No physical Android BLE qualification
+is claimed while neither owner tablet is connected. QCPad is a separate future step.

@@ -36,3 +36,13 @@ Device latency measurements must use an optimized build (Release, or Debug with
 SWIFT_OPTIMIZATION_LEVEL=-O for the explicit read-only timing harness). Do not
 attribute development-build timings to the transport without measuring it. Keep
 timing diagnostics private and distinguish state reads from full edit actions.
+
+
+Owner appliance override (2026-11-26): normal PedalBridge selection is Bluetooth,
+no login/pairing code/link. Keep home Wi-Fi independent; each app saves its own
+helper. Dedicated PedalBridge tab reports pedal online/USB/Wi-Fi state and offers
+Pi-only Wi-Fi/dashboard controls plus helper-worker restart. Internal native
+identity, typed transaction, backup/readback and no-replay guards remain mandatory.
+Do not silently fall back from a Bluetooth helper to the LAN helper transport.
+StadiumPad first; QCPad Bluetooth is deferred by the owner. BLE also shares2.4GHz;
+measure actual latency. Physical Android and reboot claims require actual checks.
