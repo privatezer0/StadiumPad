@@ -13,6 +13,12 @@ import StadiumNetwork
             try await session.connect(host:host,port:UInt16(option("--port") ?? "2001") ?? 2001,trace:trace)
             let state=try await session.snapshot()
             print("Connected • firmware \(state.firmware) • preset read • snapshot \(state.activeSnapshot+1) • \(state.blocks.count) signal blocks")
+            #if DEBUG
+            if args.contains("--benchmark-state-reads") {
+                let timings=try await session.benchmarkSnapshotReads()
+                print(String(data:try JSONSerialization.data(withJSONObject:timings,options:.sortedKeys),encoding:.utf8)!)
+            }
+            #endif
             if args.contains("--tuner-settings") {let values=try await session.read(.tunerProperties);print("Tuner settings read: \(values["vals"].items.count)")}
             if args.contains("--assignments") {
                 print("Scenes: \(state.snapshots.filter(\.defined).count) defined, \(state.snapshots.count) slots")

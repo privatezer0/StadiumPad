@@ -480,6 +480,13 @@ import StadiumNetwork
         do {let state=try await current.loadPreset(id,expectedID:expected,discardingChangesWith:backups);guard generation==token else{return false};snapshot=state;lastAction="Opened \(preset.label) · \(preset.name)";report();return true}
         catch {if generation==token {errorText=error.localizedDescription};return false}
     }
+    #if DEBUG
+    func benchmarkReadTiming()async throws->[String:Double] {
+        guard connected,!busy,let current=session else{throw ProtocolError.closed}
+        busy=true;defer{busy=false}
+        return try await current.benchmarkSnapshotReads()
+    }
+    #endif
     private func fail(_ error:Error) {stop();status=error.localizedDescription;report()}
     private func report() {
         guard ProcessInfo.processInfo.environment["STADIUM_VERIFY"]=="1" else{return}

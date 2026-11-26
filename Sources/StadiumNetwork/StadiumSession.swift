@@ -4,6 +4,7 @@ import StadiumProtocol
 
 public actor StadiumSession {
     private var commands:WireSocket?;private var updates:WireSocket?;private var nextID:Int32=1
+    private var batchSnapshotReads=false
     private var occupied=false;private var waiters:[CheckedContinuation<Void,Never>]=[]
     private var allocated:Set<Int>=[]
     private var connectionID=UUID()
@@ -30,7 +31,7 @@ public actor StadiumSession {
         let sub=WireSocket(host:bridge?.pair.host ?? host,port:bridge?.pair.port ?? port,trace:trace,route:route,interface:interface,bridgePair:bridge?.pair,bridgeRequest:bridge?.request("updates")),command=WireSocket(host:bridge?.pair.host ?? host,port:bridge?.pair.port ?? (port+1),trace:trace,route:route,interface:interface,bridgePair:bridge?.pair,bridgeRequest:bridge?.request("commands"))
         do {
             try await sub.start();try await command.start();try await sub.handshake(type:"SUB");try await command.handshake(type:"DEALER")
-            updates=sub;commands=command
+            updates=sub;commands=command;batchSnapshotReads = bridge != nil
         } catch {await sub.close();await command.close();throw error}
     }
     public func connectionInterface()async->String {await commands?.interfaceName() ?? "Disconnected"}
@@ -48,6 +49,35 @@ public actor StadiumSession {
             if message.address=="/error" {throw ProtocolError.invalid("The Stadium rejected the request. No success was confirmed.")}
             if message.address==reply {return message}
         };throw ProtocolError.timeout
+    }
+    /// Pipeline only independent read requests inside the already-held FIFO
+    /// transaction. Every reply is matched by request ID AND typed reply address.
+    /// No edit is pipelined, retried, or allowed between snapshot guard phases.
+    private func readBatchUnlocked(_ requests:[ReadCommand])async throws->[Value] {
+        try Task.checkCancellation()
+        guard !requests.isEmpty,requests.count<=8,let socket=commands else{throw ProtocolError.closed}
+        var pending:[Int32:Int]=[:],packet=Data(),results=[Value?](repeating:nil,count:requests.count)
+        for (index,request) in requests.enumerated() {
+            let id=nextID;nextID = nextID==Int32.max ? 1:nextID+1
+            pending[id]=index
+            packet.append(try Frame(payload:request.message(id:id).encode()).encode())
+        }
+        try await socket.send(packet)
+        let deadline=Date().addingTimeInterval(5)
+        while !pending.isEmpty,deadline.timeIntervalSinceNow>0 {
+            try Task.checkCancellation()
+            let frame=try await socket.frame(timeout:deadline.timeIntervalSinceNow)
+            if frame.flags&4 != 0 || frame.more || frame.payload.isEmpty {continue}
+            let message=try OSCMessage.decode(frame.payload)
+            guard let value=message.values.first?.integer,let id=Int32(exactly:value),let index=pending[id] else{continue}
+            if message.address=="/error" {throw ProtocolError.invalid("The Stadium rejected a state read. Nothing further was sent.")}
+            guard message.address==requests[index].replyAddress else{continue}
+            results[index]=try requests[index].decode(message);pending[id]=nil
+        }
+        guard pending.isEmpty else{throw ProtocolError.timeout}
+        let values=results.compactMap{$0}
+        guard values.count==requests.count else{throw ProtocolError.invalid("Incomplete Stadium state read.")}
+        return values
     }
     private func readUnlocked(_ command:ReadCommand)async throws->Value {try command.decode(await exchange(command.message,reply:command.replyAddress))}
     private func editUnlocked(_ command:EditCommand)async throws->OSCMessage {try await exchange(command.message,reply:"/status")}
@@ -113,6 +143,27 @@ public actor StadiumSession {
     }
     public func snapshot(product:Value?=nil)async throws->DeviceSnapshot {await acquire();defer{release()};return try await snapshotUnlocked(product:product)}
     private func snapshotUnlocked(product:Value?=nil)async throws->DeviceSnapshot {
+        if batchSnapshotReads {return try await batchedSnapshotUnlocked(product:product)}
+        return try await sequentialSnapshotUnlocked(product:product)
+    }
+    private func batchedSnapshotUnlocked(product:Value?=nil)async throws->DeviceSnapshot {
+        var productValue=product
+        for _ in 0..<3 {
+            let before=try await readBatchUnlocked(productValue == nil ? [.activePreset,.activeSnapshot,.product]:[.activePreset,.activeSnapshot])
+            if productValue == nil {productValue=before[2]}
+            guard let id=before[0]["val_"].integer,let productValue else{throw ProtocolError.invalid("Missing active preset reference.")}
+            let body=try await readBatchUnlocked([.editBufferBytes,.contentRef(id),.dirty])
+            guard let raw=body[0].data else{throw ProtocolError.invalid("Missing edit buffer.")}
+            let edit=try MessagePack.decode(raw)
+            let after=try await readBatchUnlocked([.activeSnapshot,.activePreset])
+            guard let edited=body[2]["val_"].boolean else{throw ProtocolError.invalid("Could not verify unsaved changes.")}
+            if after[1]["val_"].integer==id,after[0]==before[1] {
+                return DeviceSnapshot(product:productValue,editBuffer:edit,preset:body[1],activeSnapshot:after[0].integer ?? 0,rawEditBuffer:raw,dirty:edited,origin:connectionID)
+            }
+        }
+        throw ProtocolError.invalid("The preset changed during reading. Try again.")
+    }
+    private func sequentialSnapshotUnlocked(product:Value?=nil)async throws->DeviceSnapshot {
         let productValue:Value
         if let product {productValue=product}else{productValue=try await readUnlocked(.product)}
         for _ in 0..<3 {
@@ -125,11 +176,33 @@ public actor StadiumSession {
             if after["val_"].integer==id,index==beforeSnapshot {return DeviceSnapshot(product:productValue,editBuffer:edit,preset:preset,activeSnapshot:index.integer ?? 0,rawEditBuffer:raw,dirty:edited,origin:connectionID)}
         };throw ProtocolError.invalid("The preset changed during reading. Try again.")
     }
+    #if DEBUG
+    /// Read-only timing check; validates both guarded reads before opting in.
+    public func benchmarkSnapshotReads()async throws->[String:Double] {
+        await acquire();defer{release()}
+        let product=try await readUnlocked(.product)
+        var sequential=0.0,batched=0.0
+        for _ in 0..<2 {
+            let start=Date();let before=try await sequentialSnapshotUnlocked(product:product)
+            sequential += Date().timeIntervalSince(start)*1000
+            let next=Date();let after=try await batchedSnapshotUnlocked(product:product)
+            batched += Date().timeIntervalSince(next)*1000
+            guard before.presetID==after.presetID,before.activeSnapshot==after.activeSnapshot,before.rawEditBuffer==after.rawEditBuffer,before.dirty==after.dirty else{throw ProtocolError.invalid("The preset changed during the read-only timing check.")}
+        }
+        batchSnapshotReads=true
+        return ["sequentialMilliseconds":sequential/2,"batchedMilliseconds":batched/2]
+    }
+    #endif
     private func verify(_ context:EditContext,in state:DeviceSnapshot)throws->SignalBlock {
         try context.validate()
         guard context.origin==connectionID,state.presetID==context.presetID,state.activeSnapshot==context.snapshot,let block=state.blocks.first(where:{$0.path-1==context.path && $0.blockID==context.blockID && $0.position==context.position && $0.slot==context.slot}),block.model==context.modelID else{throw ProtocolError.invalid("The preset, snapshot or block changed. Close and reopen this editor.")};return block
     }
     private func confirmIdentity(_ state:DeviceSnapshot)async throws {
+        if batchSnapshotReads {
+            let identity=try await readBatchUnlocked([.activePreset,.activeSnapshot])
+            guard let id=state.presetID,identity[0]["val_"].integer==id,identity[1].integer==state.activeSnapshot else{throw ProtocolError.invalid("The active preset or snapshot changed. Nothing further was sent.")}
+            return
+        }
         guard let id=state.presetID,try await readUnlocked(.activePreset)["val_"].integer==id,try await readUnlocked(.activeSnapshot).integer==state.activeSnapshot else{throw ProtocolError.invalid("The active preset or snapshot changed. Nothing further was sent.")}
     }
     private func backup(_ state:DeviceSnapshot,to backups:PresetBackupStore)async throws {

@@ -108,6 +108,7 @@ struct StadiumView:View {
         #if DEBUG
         .task {if ProcessInfo.processInfo.arguments.contains("--show-connection") {showConnection=true}}
         .task {if ProcessInfo.processInfo.arguments.contains("--verify-bridge-resume") {await verifyBridgeResume(monitor)}}
+        .task {if ProcessInfo.processInfo.arguments.contains("--verify-read-timing") {await verifyReadTiming(monitor)}}
         #endif
         .onOpenURL {url in
             if url.scheme=="pedalbridge" {do{try bridgeSettings.configure(url.absoluteString);connectionRoute = .bridge;showConnection=true}catch{monitor.errorText=error.localizedDescription};return}
@@ -411,5 +412,14 @@ private struct PresetFolderHarness:View {
     let after=before ? await waitForConnection():false
     let result:[String:Any]=["connectedBefore":before,"connectedAfter":after,"freshConnection":monitor.connectionID != oldConnection,"presetUnchanged":preset != nil && preset==monitor.snapshot?.presetID]
     if let data=try? JSONSerialization.data(withJSONObject:result) {try? data.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("bridge-resume-check.json"),options:.atomic)}
+}
+#endif
+
+#if DEBUG
+@MainActor private func verifyReadTiming(_ monitor:StadiumMonitor)async {
+    for _ in 0..<160 {if monitor.connected {break};try? await Task.sleep(for:.milliseconds(250))}
+    var result:[String:Double]=[:]
+    do {result=try await monitor.benchmarkReadTiming()}catch{result=["failed":1]}
+    if let data=try? JSONSerialization.data(withJSONObject:result) {try? data.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("read-timing-check.json"),options:.atomic)}
 }
 #endif

@@ -542,3 +542,27 @@ background/resume handlers: connected before/after, connection identity changed,
 preset unchanged. It does not simulate every iPadOS suspension condition. No
 preset write test or TestFlight upload. The reported preset-switch latency has
 not been independently timed on a live switch; required backup/readback remains.
+
+
+## PedalBridge read latency — iPad build54, November26,2026
+
+Bridge connections group independent state reads inside the existing FIFO
+transaction. Snapshot phases remain before-ID/snapshot → native edit bytes,
+reference and dirty flag → after-ID/snapshot. Every reply must match its own
+request ID and typed response address. Preset/snapshot changes still reject the
+read, native bytes remain unmodified, and edits are never batched or retried.
+Identity confirmation also groups its two read-only checks. Direct tablet
+connections keep their existing read path. No mode or preference was added.
+
+A physical Pro read-only comparison on the same unedited preset measured about
+900ms before transport tuning,707ms after the Pi TCP acknowledgment hint, then
+663ms sequential versus554ms grouped in a paired check. Both guarded reads returned
+the same raw edit bytes, preset ID, snapshot and dirty flag. These measure state
+reads, not a complete preset/model/move write. Real action latency still needs
+user confirmation; saved/live backups and post-edit verification remain intact.
+
+105 Swift tests and3 additional loopback cases pass (reversed replies with stale
+IDs, preset changes, missing replies). iOS build54 installs on the Pro. The timing
+harness is DEBUG-only and stores durations without native preset contents. Android
+has not yet received the grouped client-read optimization; the Pi transport hint
+benefits either client. No TestFlight upload or live preset edits during testing.
