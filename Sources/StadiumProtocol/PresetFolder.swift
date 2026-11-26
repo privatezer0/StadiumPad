@@ -18,3 +18,17 @@ public struct PresetFolder:Identifiable,Equatable,Sendable {
         }.sorted{($0.position ?? 0)<($1.position ?? 0)}
     }
 }
+
+/// Sidebar choices use folder membership without changing a pedal's preset state.
+public enum PresetFolderSelection {
+    public static func restore(folders:[PresetFolder],remembered:Int?,presetID:Int?)->Int {
+        if let remembered,remembered == -2 || folders.contains(where:{$0.id==remembered}) {return remembered}
+        return follow(folders:folders,preferred:nil,presetID:presetID)
+    }
+    public static func follow(folders:[PresetFolder],preferred:Int?,presetID:Int?)->Int {
+        guard let presetID else{return -2}
+        let matches=folders.filter{$0.presets.contains{$0.contentID==presetID}}
+        if let preferred,matches.contains(where:{$0.id==preferred}) {return preferred}
+        return matches.first?.id ?? -2
+    }
+}

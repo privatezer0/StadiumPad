@@ -11,12 +11,15 @@ import UIKit
     var body:some Scene {WindowGroup {
         Group {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--matrix-scroll-harness") {MatrixScrollHarness()}else{StadiumView()}
+            if ProcessInfo.processInfo.arguments.contains("--preset-folder-harness") {PresetFolderHarness()}else if ProcessInfo.processInfo.arguments.contains("--matrix-scroll-harness") {MatrixScrollHarness()}else{StadiumView()}
             #else
             StadiumView()
             #endif
         }.environmentObject(monitor).environmentObject(discovery).preferredColorScheme(.dark)
-            .onChange(of:phase){_,value in if value != .active {discovery.stop();monitor.stop()}}
+            .onChange(of:phase){_,value in
+                if value == .background {discovery.stop();monitor.pauseForBackground()}
+                else if value == .active {monitor.resumeFromBackground()}
+            }
     }}
 }
 struct StadiumView:View {
@@ -104,6 +107,7 @@ struct StadiumView:View {
         }
         #if DEBUG
         .task {if ProcessInfo.processInfo.arguments.contains("--show-connection") {showConnection=true}}
+        .task {if ProcessInfo.processInfo.arguments.contains("--verify-bridge-resume") {await verifyBridgeResume(monitor)}}
         #endif
         .onOpenURL {url in
             if url.scheme=="pedalbridge" {do{try bridgeSettings.configure(url.absoluteString);connectionRoute = .bridge;showConnection=true}catch{monitor.errorText=error.localizedDescription};return}
@@ -376,3 +380,36 @@ struct StadiumView:View {
         if let block {applySelection(block,remember:false)}else{selected=nil}
     }
 }
+
+#if DEBUG
+/// Synthetic folder loading only; no device connection or preset writes.
+private struct PresetFolderHarness:View {
+    @EnvironmentObject var monitor:StadiumMonitor
+    private let key="PresetSidebar.Tests.FolderMemory"
+    var body:some View {
+        PresetSidebar(refreshID:0,debugFolderMemoryKey:key).frame(width:300)
+            .task {
+                if ProcessInfo.processInfo.arguments.contains("--reset-folder-memory") {UserDefaults.standard.removeObject(forKey:key)}
+                try? await Task.sleep(for:.milliseconds(200))
+                monitor.presetFolders=[(101,"Practice"),(202,"Working")].compactMap {id,name in
+                    PresetFolder(reference:.object(["type":.int(1003),"cid_":.int(Int64(id)),"name":.string(name)]),contents:.array([]))
+                }
+            }
+    }
+}
+#endif
+
+#if DEBUG
+@MainActor private func verifyBridgeResume(_ monitor:StadiumMonitor)async {
+    func waitForConnection()async->Bool {
+        for _ in 0..<160 {if monitor.connected {return true};try? await Task.sleep(for:.milliseconds(250))}
+        return false
+    }
+    let before=await waitForConnection(),preset=monitor.snapshot?.presetID
+    let oldConnection=monitor.connectionID
+    if before,monitor.connectionRoute == .bridge {monitor.pauseForBackground();monitor.resumeFromBackground()}
+    let after=before ? await waitForConnection():false
+    let result:[String:Any]=["connectedBefore":before,"connectedAfter":after,"freshConnection":monitor.connectionID != oldConnection,"presetUnchanged":preset != nil && preset==monitor.snapshot?.presetID]
+    if let data=try? JSONSerialization.data(withJSONObject:result) {try? data.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("bridge-resume-check.json"),options:.atomic)}
+}
+#endif

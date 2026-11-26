@@ -518,3 +518,27 @@ tests, and its gray navigation was inspected on the emulator. The physical Andro
 tablet was not available for this install. No live Matrix write test or TestFlight
 upload was performed. Physical iPad read-only diagnostics confirm a PedalBridge
 Wi-Fi connection,20 blocks and incoming events after the helper recovery.
+
+
+## iPad folder memory and foreground reconnect — November 26, 2026
+
+Build1.1.1(53) remembers the last opened user folder separately for each Stadium.
+When folder inventory arrives, it expands that folder and collapses the others,
+including All User Presets. Without a valid saved folder it uses the folder
+containing the active preset, then All User Presets. Duplicate membership retains
+the preferred folder. Folder expansion and successful row selection save the
+preference; search can temporarily reveal matches without erasing it. No folder,
+preset or pedal setting is changed by this preference.
+
+Brief inactive states no longer close the editor. Backgrounding releases the
+connection; returning resumes only a previously active PedalBridge connection,
+with a fresh lease/snapshot after prior disconnect completes. Explicit disconnects
+remain disconnected. Interrupted edits are never replayed.
+
+105 Swift regression tests pass. A synthetic iPad UI test verifies delayed folder
+loading, single-folder expansion and remembered restoration across termination/
+relaunch. Device build/install pass. A bounded physical Pro check called the
+background/resume handlers: connected before/after, connection identity changed,
+preset unchanged. It does not simulate every iPadOS suspension condition. No
+preset write test or TestFlight upload. The reported preset-switch latency has
+not been independently timed on a live switch; required backup/readback remains.

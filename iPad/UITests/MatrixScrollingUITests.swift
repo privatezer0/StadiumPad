@@ -52,4 +52,18 @@ import XCTest
         alert.buttons["OK"].tap()
         XCTAssertFalse(app.buttons["Close"].exists)
     }
+    func testLastUserFolderRestoresAfterReloadAndOtherFoldersCollapse() {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchArguments=["--preset-folder-harness","--reset-folder-memory"];app.launch()
+        let working=app.buttons["Working, 0 presets, collapsed"]
+        XCTAssertTrue(working.waitForExistence(timeout:10));working.tap()
+        XCTAssertTrue(app.buttons["Working, 0 presets, expanded"].exists)
+        XCTAssertTrue(app.buttons["All User Presets, 0 presets, collapsed"].exists)
+        app.terminate();app.launchArguments=["--preset-folder-harness"];app.launch()
+        XCTAssertTrue(app.buttons["Working, 0 presets, expanded"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.buttons["Practice, 0 presets, collapsed"].exists)
+        app.buttons["Practice, 0 presets, collapsed"].tap()
+        XCTAssertTrue(app.buttons["Practice, 0 presets, expanded"].exists)
+        XCTAssertTrue(app.buttons["Working, 0 presets, collapsed"].exists)
+    }
 }

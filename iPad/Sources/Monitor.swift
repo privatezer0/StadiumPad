@@ -7,6 +7,20 @@ import StadiumNetwork
     @Published var connectionID=UUID()
     @Published private(set) var bridgeConnection:PedalBridgeConnection?
     var bridgeMatrixAvailable:Bool {connected && bridgeConnection?.matrixAvailable==true}
+    private var disconnectTask:Task<Void,Never>?
+    private var activeBridgePair:PedalBridgePair?
+    private var bridgeResumePair:PedalBridgePair?
+    func pauseForBackground() {
+        let pair=(connected || connecting) && connectionRoute == .bridge ? activeBridgePair:nil
+        stop();bridgeResumePair=pair
+    }
+    func resumeFromBackground() {
+        guard let pair=bridgeResumePair else{return}
+        bridgeResumePair=nil
+        guard !connected,!connecting else{return}
+        // A new lease and fresh snapshot only. Interrupted edits never replay.
+        connect(host:pair.host,route:.bridge,bridgePair:pair)
+    }
     @Published var currentHost=""
     @Published var connectionRoute:StadiumConnectionRoute = .automatic
     @Published var connectionInterface="Disconnected"
@@ -85,11 +99,14 @@ import StadiumNetwork
     func blockName(_ block:SignalBlock)->String {catalog[String(block.model)]?.name ?? names[String(block.model)] ?? "Effect block \(block.position)"}
     func connect(host:String,port:UInt16=2001,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil,bridgePair:PedalBridgePair?=nil) {
         guard !busy else{return}
-        stop();connectionRoute=route;connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];commandProperties=[:];globalEQ=nil;lastCopy=nil;lastAction=nil
+        stop();activeBridgePair=bridgePair;connectionRoute=route;connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];commandProperties=[:];globalEQ=nil;lastCopy=nil;lastAction=nil
         let token=UUID();generation=token
         lastEvent=nil;let current=StadiumSession();session=current;connecting=true;status="Connecting…"
+        let previousDisconnect=disconnectTask
         worker=Task {
             do {
+                await previousDisconnect?.value
+                try Task.checkCancellation()
                 let bridge:PedalBridgeConnection?
                 if route == .bridge {guard let bridgePair else{throw ProtocolError.invalid("Pair with PedalBridge first.")};bridge=try await PedalBridgeConnection.open(bridgePair)}else{bridge=nil}
                 #if DEBUG
@@ -218,10 +235,11 @@ import StadiumNetwork
         guard token==generation else{throw CancellationError()};return state
     }
     func stop() {
+        activeBridgePair=nil;bridgeResumePair=nil
         eqCommitTask?.cancel();eqCommitTask=nil
         generation=UUID();matrixWriting=false;editorBusy=false;refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;focusedPresetID=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil
         let closeTuner=tunerRequested;tunerRequested=false
-        if let old=session {Task {if closeTuner {try? await old.setTuner(false)};await old.disconnect()}}
+        if let old=session {let previous=disconnectTask;disconnectTask=Task {await previous?.value;if closeTuner {try? await old.setTuner(false)};await old.disconnect()}}
         session=nil;bridgeConnection=nil;connected=false;connecting=false;status="Disconnected. Last received values remain visible.";report()
     }
     private func selectionKey(_ state:DeviceSnapshot)->String? {
