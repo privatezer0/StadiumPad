@@ -30,3 +30,9 @@ Android1.2 implements EQ/Command Center/Matrix UI and typed engines; older place
 notes are historical. Keep USB-upstream EQ persistence marked unqualified until an
 actual device-owned snapshot confirms a nonbaseline change. Never weaken readback
 or write global.eq.sync to claim parity. See docs/VALIDATION and Android/README.
+
+
+Device latency measurements must use an optimized build (Release, or Debug with
+SWIFT_OPTIMIZATION_LEVEL=-O for the explicit read-only timing harness). Do not
+attribute development-build timings to the transport without measuring it. Keep
+timing diagnostics private and distinguish state reads from full edit actions.

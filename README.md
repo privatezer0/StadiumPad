@@ -368,3 +368,19 @@ IDs, preset changes, missing replies). iOS build54 installs on the Pro. The timi
 harness is DEBUG-only and stores durations without native preset contents. Android
 has not yet received the grouped client-read optimization; the Pi transport hint
 benefits either client. No TestFlight upload or live preset edits during testing.
+
+
+## Physical Pi USB check and optimized iPad build55 — November26,2026
+
+Build1.1.1(55) is installed as an optimized device build of the same source. For
+performance qualification, use Release or pass `SWIFT_OPTIMIZATION_LEVEL=-O` to
+xcodebuild Debug (which retains the explicit read-only DEBUG timing harness).
+The ordinary generated Debug configuration remains suitable for debugging.
+105 Swift tests pass in Release. No UI/protocol change or TestFlight upload.
+
+The Pi reports a verified USB editor route and matching MIDI Matrix availability.
+An initial helper MIDI resource leak/fallback was corrected in PedalBridge; see
+its live-Pi validation. Current iPad state reads over USB still average roughly
+0.6–0.7sec. The optimized build has not demonstrated an action-latency improvement;
+full preset/model/reorder response remains pending owner feedback. No live preset,
+parameter, mixer or save write was performed during this qualification.
