@@ -9,12 +9,18 @@ import StadiumNetwork
     @Published private(set) var bridgeConnection:PedalBridgeConnection?
     var bridgeMatrixAvailable:Bool {connected && bridgeConnection?.matrixAvailable==true}
     private var disconnectTask:Task<Void,Never>?
+    private var lastStopReason=""
     private var activeBridgePair:PedalBridgePair?
+    private let hybridDiscovery=StadiumDiscovery()
+    private var matrixLease:PedalBridgeMatrixSession?
+    private var matrixLeaseTask:Task<Void,Never>?
+    private var hybridDirect=false
     private var bridgeReconnectTask:Task<Void,Never>?
     @Published private(set) var reconnectingBridge=false
     var tabletTransport:String {
         guard connected else{return "No connection"}
-        if activeBridgePair?.bluetooth==true{return "Bluetooth"}
+        if hybridDirect{return "Hybrid"}
+        if !hybridDirect,activeBridgePair != nil{return "Full PedalBridge"}
         return connectionRoute == .usb || connectionInterface.contains("USB/Ethernet") ? "USB":"Wi-Fi"
     }
     func waitForHelperRestart(){
@@ -24,15 +30,15 @@ import StadiumNetwork
     }
     private var bridgeResumePair:PedalBridgePair?
     func pauseForBackground() {
-        let pair=connectionRoute == .bridge ? activeBridgePair:nil
-        stop();bridgeResumePair=pair
+        let pair=connectionRoute.usesHelper ? activeBridgePair:nil
+        stop(reason:"background");bridgeResumePair=pair
     }
     func resumeFromBackground() {
         guard let pair=bridgeResumePair else{return}
         bridgeResumePair=nil
         guard !connected,!connecting else{return}
         // A new lease and fresh snapshot only. Interrupted edits never replay.
-        connect(host:pair.host,route:.bridge,bridgePair:pair)
+        connect(host:pair.host,route:connectionRoute,bridgePair:pair)
     }
     @Published var currentHost=""
     @Published var connectionRoute:StadiumConnectionRoute = .automatic
@@ -44,6 +50,9 @@ import StadiumNetwork
     #endif
     @Published var status="Connect to your Stadium to view its current preset."
     @Published var snapshot:DeviceSnapshot?
+    // Presentation only. Native transaction contexts always use snapshot.
+    @Published private(set) var pendingPreset:PresetSlot?
+    @Published private(set) var pendingBlockOrder:[SignalBlock]?
     @Published var connected=false
     @Published var connecting=false
     private(set) var lastEvent:Date?
@@ -72,6 +81,8 @@ import StadiumNetwork
         return (try? JSONDecoder().decode([String:[CommandParameter]].self,from:data)) ?? [:]
     }()
     @Published var stompProperties:[String:Value]=[:]
+    @Published private(set) var parameterEditing=false
+    private var parameterIntents=ParameterIntentBuffer()
     @Published private var editorBusy=false
     private var matrixWriting=false
     var busy:Bool {get{editorBusy || matrixWriting}set{editorBusy=newValue}}
@@ -112,7 +123,7 @@ import StadiumNetwork
     func blockName(_ block:SignalBlock)->String {catalog[String(block.model)]?.name ?? names[String(block.model)] ?? "Effect block \(block.position)"}
     func connect(host:String,port:UInt16=2001,route:StadiumConnectionRoute = .automatic,interface:NWInterface?=nil,bridgePair:PedalBridgePair?=nil) {
         guard !busy else{return}
-        stop();activeBridgePair=bridgePair;connectionRoute=route;connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];commandProperties=[:];globalEQ=nil;lastCopy=nil;lastAction=nil
+        stop(reason:"new connection");activeBridgePair=bridgePair;connectionRoute=route;connectionID=UUID();currentHost=host;currentPort=port;snapshot=nil;presets=[];presetFolders=[];factoryPresets=[];libraryEntries=[:];stompProperties=[:];commandProperties=[:];globalEQ=nil;lastCopy=nil;lastAction=nil
         let token=UUID();generation=token
         lastEvent=nil;let current=StadiumSession();session=current;connecting=true;status="Connecting…"
         let previousDisconnect=disconnectTask
@@ -121,7 +132,9 @@ import StadiumNetwork
                 await previousDisconnect?.value
                 try Task.checkCancellation()
                 let bridge:PedalBridgeConnection?
-                if route == .bridge {guard let bridgePair else{throw ProtocolError.invalid("Pair with PedalBridge first.")};bridge=try await PedalBridgeConnection.open(bridgePair)}else{bridge=nil}
+                if route.usesHelper {guard let bridgePair else{throw ProtocolError.invalid("Choose PedalBridge first.")};bridge=try await PedalBridgeConnection.open(bridgePair)}else{bridge=nil}
+                var directState:DeviceSnapshot?
+                if route == .hybrid,let bridge {directState=try await connectDirectHybrid(current,bridge:bridge)}
                 #if DEBUG
                 let eqTrace:TraceRecorder?
                 if ProcessInfo.processInfo.environment["STADIUM_TRACE_MATRIX"]=="1" {
@@ -131,14 +144,17 @@ import StadiumNetwork
                     let folder=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
                     eqTrace=try TraceRecorder(path:folder.appendingPathComponent("global-eq-wire-"+UUID().uuidString+".jsonl").path,maximumBytes:8*1024*1024)
                 }else{eqTrace=nil}
-                try await current.connect(host:host,port:port,trace:eqTrace,route:route,interface:interface,bridge:bridge)
+                if directState==nil {try await current.connect(host:host,port:port,trace:eqTrace,route:route,interface:interface,bridge:bridge)}
                 #else
-                try await current.connect(host:host,port:port,route:route,interface:interface,bridge:bridge)
+                if directState==nil {try await current.connect(host:host,port:port,route:route,interface:interface,bridge:bridge)}
                 #endif
-                let state=try await current.snapshot()
+                let state:DeviceSnapshot
+                if let directState {state=directState}else{state=try await current.snapshot()}
                 if let bridge {guard FileCompanion.deviceID(state.product)==bridge.deviceID else{throw ProtocolError.invalid("The Stadium connected to PedalBridge changed. Reconnect before editing.")}}
                 guard generation==token,!Task.isCancelled else{await current.disconnect();return}
-                let directInterface=await current.connectionInterface();bridgeConnection=bridge;connectionInterface=bridge.map{"PedalBridge · "+$0.upstream} ?? directInterface;snapshot=state;connecting=false;connected=true;status="Connected · \(connectionInterface)";report()
+                hybridDirect=directState != nil
+                let directInterface=await current.connectionInterface();bridgeConnection=hybridDirect ? nil:bridge;connectionInterface=hybridDirect ? "Hybrid · direct Stadium Wi-Fi":bridge.map{"Full PedalBridge · "+$0.upstream} ?? directInterface;snapshot=state;connecting=false;connected=true;status="Connected · \(connectionInterface)";report()
+                if hybridDirect,let pair=bridgePair {maintainMatrixBridge(pair:pair,identity:FileCompanion.deviceID(state.product) ?? "",token:token)}
                 subscriber=Task {
                     do {
                         while !Task.isCancelled {
@@ -158,7 +174,7 @@ import StadiumNetwork
                     } catch {if generation==token,!Task.isCancelled {fail(error)}}
                 }
                 while !Task.isCancelled {
-                    try await Task.sleep(for:.milliseconds(750))
+                    try await Task.sleep(for:.seconds(5))
                     if busy || !matrixPresentations.isEmpty {continue}
                     let state=try await current.snapshot(product:state.product)
                     guard generation==token,!Task.isCancelled else{return}
@@ -167,6 +183,45 @@ import StadiumNetwork
                     report()
                 }
             } catch {if generation==token,!Task.isCancelled {fail(error)}}
+        }
+    }
+    private func connectDirectHybrid(_ current:StadiumSession,bridge:PedalBridgeConnection)async throws->DeviceSnapshot? {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--verify-hybrid-no-wifi") {return nil}
+        #endif
+        status="Looking for direct Stadium Wi-Fi…";hybridDiscovery.search()
+        defer{hybridDiscovery.stop()}
+        for _ in 0..<12 {try Task.checkCancellation();if !hybridDiscovery.devices.isEmpty {break};try await Task.sleep(for:.milliseconds(150))}
+        for device in hybridDiscovery.devices.prefix(4) {
+            do {
+                try await current.connect(host:device.host,port:device.port,route:.wifi)
+                let state=try await current.snapshot()
+                guard FileCompanion.deviceID(state.product)==bridge.deviceID else{await current.disconnect();continue}
+                return state
+            }catch is CancellationError {throw CancellationError()}
+            catch {await current.disconnect()}
+        }
+        status="Stadium Wi-Fi unavailable · using Full PedalBridge…";return nil
+    }
+    private func maintainMatrixBridge(pair:PedalBridgePair,identity:String,token:UUID) {
+        matrixLeaseTask=Task {
+            while generation==token,!Task.isCancelled {
+                var ownedLease:PedalBridgeMatrixSession?
+                do {
+                    let bridge=try await PedalBridgeConnection.open(pair)
+                    guard generation==token,!Task.isCancelled else{return}
+                    guard bridge.deviceID==identity else{throw ProtocolError.invalid("PedalBridge is connected to another Stadium.")}
+                    if !bridge.matrixAvailable {bridgeConnection=nil;try await Task.sleep(for:.seconds(3));continue}
+                    let lease=try await bridge.matrixSession(identity:identity)
+                    ownedLease=lease
+                    guard generation==token,!Task.isCancelled else{await lease.close();return}
+                    matrixLease=lease;bridgeConnection=bridge;report()
+                    try await lease.waitForDisconnect()
+                }catch {}
+                await ownedLease?.close()
+                guard generation==token,!Task.isCancelled else{return}
+                matrixLease=nil;bridgeConnection=nil;report();try? await Task.sleep(for:.seconds(2))
+            }
         }
     }
     private func refreshFromEvent(_ current:StadiumSession,token:UUID) {
@@ -247,13 +302,18 @@ import StadiumNetwork
         let state=try await session.clearMatrixSolos(command,expected:expected,channel:channel,send:send)
         guard token==generation else{throw CancellationError()};return state
     }
-    func stop() {
+    func stop(reason:String="requested") {
+        parameterIntents.clear();parameterEditing=false;pendingPreset=nil;pendingBlockOrder=nil
+        lastStopReason=reason
+        hybridDiscovery.stop();matrixLeaseTask?.cancel();matrixLeaseTask=nil
+        let oldMatrixLease=matrixLease;matrixLease=nil;hybridDirect=false
         bridgeReconnectTask?.cancel();bridgeReconnectTask=nil;reconnectingBridge=false
         activeBridgePair=nil;bridgeResumePair=nil
         eqCommitTask?.cancel();eqCommitTask=nil
         generation=UUID();matrixWriting=false;editorBusy=false;refreshTask?.cancel();refreshTask=nil;pendingFocus=nil;focusedBlock=nil;focusedPresetID=nil;worker?.cancel();worker=nil;subscriber?.cancel();subscriber=nil
         let closeTuner=tunerRequested;tunerRequested=false
-        if let old=session {let previous=disconnectTask;disconnectTask=Task {await previous?.value;if closeTuner {try? await old.setTuner(false)};await old.disconnect()}}
+        let old=session;let previous=disconnectTask
+        disconnectTask=Task {await previous?.value;await oldMatrixLease?.close();if let old {if closeTuner {try? await old.setTuner(false)};await old.disconnect()}}
         session=nil;bridgeConnection=nil;connected=false;connecting=false;status="Disconnected. Last received values remain visible.";report()
     }
     private func selectionKey(_ state:DeviceSnapshot)->String? {
@@ -281,19 +341,29 @@ import StadiumNetwork
     }
     func definitions(_ block:SignalBlock)->[ParameterDefinition] {catalog[String(block.model)]?.parameters.filter{$0.focusOnly != true && block.value($0) != nil} ?? []}
     func edit(context:EditContext,definition:ParameterDefinition,value:Value,expected:Value) async {
-        guard !busy,connected,let current=session else{return};busy=true;defer{busy=false}
-        let token=generation
-        do {
-            let state=try await current.setParameter(context:context,definition:definition,value:value,expected:expected,backups:backups)
-            guard generation==token else{return};snapshot=state;lastAction="\(definition.name) updated · unsaved";report()
-        } catch {if generation==token {errorText=error.localizedDescription;lastAction=nil;stop()}}
+        guard connected,let current=session,!busy || parameterEditing else{return}
+        do {try parameterIntents.append(context:context,definition:definition,value:value,expected:expected)}
+        catch {errorText=error.localizedDescription;return}
+        if parameterEditing {return}
+        busy=true;parameterEditing=true;let token=generation
+        defer{if generation==token {parameterIntents.clear();parameterEditing=false;busy=false}}
+        while let intent=parameterIntents.take() {
+            do {
+                let state=try await current.setParameter(context:intent.context,definition:intent.definition,value:intent.value,expected:intent.expected,backups:backups)
+                guard generation==token else{return}
+                parameterIntents.confirmed(intent);snapshot=state;lastAction="\(intent.definition.name) updated · unsaved";report()
+            }catch {
+                if generation==token {parameterIntents.clear();errorText=error.localizedDescription;lastAction=nil;stop(reason:"unconfirmed edit")}
+                return
+            }
+        }
     }
     func save(expectedID:Int?=nil)async {
         guard !busy,connected,let current=session,let currentID=snapshot?.presetID else{return};let id=expectedID ?? currentID
         guard currentID==id else{errorText="The preset changed after you opened Save. Review the current preset before saving.";return}
         busy=true;defer{busy=false};let token=generation
         do {let state=try await current.savePreset(expectedID:id,backups:backups);guard generation==token else{return};snapshot=state;lastAction="Saved to \(state.location.label) · \(state.presetName)";report()}
-        catch {if generation==token {errorText=error.localizedDescription;lastAction=nil;stop()}}
+        catch {if generation==token {errorText=error.localizedDescription;lastAction=nil;stop(reason:"unconfirmed edit")}}
     }
     func copy(name:String,expectedID:Int?=nil)async {
         guard !busy,connected,let current=session,let id=snapshot?.presetID else{return}
@@ -318,9 +388,12 @@ import StadiumNetwork
     }
 #endif
     func reorder(context:EditContext,to:Int)async->SignalBlock? {
-        guard !busy,connected,let current=session else{return nil};busy=true;defer{busy=false};let token=generation
+        guard !busy,connected,let current=session,let before=snapshot else{return nil}
+        let definitions=Dictionary(uniqueKeysWithValues:catalog.values.map{($0.id,$0)})
+        do {pendingBlockOrder=try BlockReorderPlan(state:before,context:context,to:to,models:definitions).expected}
+        catch {errorText=error.localizedDescription;return nil}
+        let token=generation;busy=true;defer{if generation==token {pendingBlockOrder=nil;busy=false}}
         do {
-            let definitions=Dictionary(uniqueKeysWithValues:catalog.values.map{($0.id,$0)})
             let after=try await current.reorderBlock(context:context,to:to,models:definitions,backups:backups)
             guard generation==token else{return nil};snapshot=after;lastAction="Block rearranged · unsaved";report()
             return after.blocks.first{$0.path-1==context.path && $0.position==to && $0.blockID==context.blockID && $0.slot==0}
@@ -333,7 +406,7 @@ import StadiumNetwork
             let state=try await current.replaceModel(context:context,source:source,destination:destination,backups:backups)
             guard generation==token else{return nil};snapshot=state;lastAction="\(destination.name) selected · unsaved";report()
             return state.blocks.first{$0.path-1==context.path && $0.position==context.position && $0.slot==context.slot}
-        } catch {if generation==token {errorText=error.localizedDescription;lastAction=nil;stop()};return nil}
+        } catch {if generation==token {errorText=error.localizedDescription;lastAction=nil;stop(reason:"unconfirmed edit")};return nil}
     }
     func activate(_ index:Int,expectedID:Int?=nil,expectedSnapshot:Int?=nil)async {
         guard !busy,connected,let current=session,let state=snapshot,let id=state.presetID else{return}
@@ -458,7 +531,7 @@ import StadiumNetwork
     func press(_ plan:StompPlan)async->Bool {
         guard !busy,connected,let current=session else{return false};busy=true;defer{busy=false};let token=generation
         do {let state=try await current.pressStomp(plan,backups:backups);guard generation==token else{return false};snapshot=state;lastAction="Stomp \(plan.bank.uppercased())\(plan.number) · assigned effects updated";report();return true}
-        catch {if generation==token {errorText=error.localizedDescription;lastAction=nil;stop()};return false}
+        catch {if generation==token {errorText=error.localizedDescription;lastAction=nil;stop(reason:"unconfirmed edit")};return false}
     }
     func readLibraryFolder(_ id:Int)async throws {
         guard connected,let session else{throw ProtocolError.closed};let token=generation
@@ -490,7 +563,7 @@ import StadiumNetwork
     }
     func load(_ preset:PresetSlot)async->Bool {
         guard !busy,connected,let current=session,let id=preset.contentID,let expected=snapshot?.presetID else{return false}
-        busy=true;defer{busy=false};let token=generation
+        let token=generation;pendingPreset=preset;busy=true;defer{if generation==token {pendingPreset=nil;busy=false}}
         do {let state=try await current.loadPreset(id,expectedID:expected,discardingChangesWith:backups);guard generation==token else{return false};snapshot=state;lastAction="Opened \(preset.label) · \(preset.name)";report();return true}
         catch {if generation==token {errorText=error.localizedDescription};return false}
     }
@@ -502,8 +575,9 @@ import StadiumNetwork
     }
     #endif
     private func fail(_ error:Error) {
+        let requestedRoute=connectionRoute
         let pair=activeBridgePair?.bluetooth==true ? activeBridgePair:nil
-        stop();status=error.localizedDescription;report()
+        stop(reason:"transport failure");status=error.localizedDescription;report()
         guard let pair else{return}
         activeBridgePair=pair
         guard UIApplication.shared.applicationState == .active else{bridgeResumePair=pair;return}
@@ -513,12 +587,12 @@ import StadiumNetwork
             do {try await Task.sleep(for:.seconds(2));try Task.checkCancellation()}catch{return}
             guard generation==token else{return}
             bridgeReconnectTask=nil
-            connect(host:pair.host,route:.bridge,bridgePair:pair)
+            connect(host:pair.host,route:requestedRoute,bridgePair:pair)
         }
     }
     private func report() {
         guard ProcessInfo.processInfo.environment["STADIUM_VERIFY"]=="1" else{return}
-        let object:[String:Any]=["connected":connected,"firmware":snapshot?.firmware ?? "","blocks":snapshot?.blocks.count ?? 0,"snapshot":snapshot?.activeSnapshot ?? -1,"receivedEvent":lastEvent != nil,"dirty":snapshot?.dirty ?? false,"focusPath":focusedBlock?.path ?? -1,"focusPosition":focusedBlock?.position ?? -1,"namedParameters":snapshot?.blocks.reduce(0){$0+definitions($1).count} ?? 0,"at":Date().timeIntervalSince1970,"status":status]
+        let object:[String:Any]=["presetID":snapshot?.presetID ?? -1,"presetName":snapshot?.presetName ?? "","lastAction":lastAction ?? "","stopReason":lastStopReason,"error":errorText ?? "","captureRequested":ProcessInfo.processInfo.arguments.contains("--capture-bluetooth-ui"),"verifyBluetoothRequested":ProcessInfo.processInfo.arguments.contains("--verify-bluetooth"),"connected":connected,"connectionID":connectionID.uuidString,"tabletTransport":tabletTransport,"applicationState":UIApplication.shared.applicationState.rawValue,"firmware":snapshot?.firmware ?? "","blocks":snapshot?.blocks.count ?? 0,"snapshot":snapshot?.activeSnapshot ?? -1,"receivedEvent":lastEvent != nil,"dirty":snapshot?.dirty ?? false,"focusPath":focusedBlock?.path ?? -1,"focusPosition":focusedBlock?.position ?? -1,"namedParameters":snapshot?.blocks.reduce(0){$0+definitions($1).count} ?? 0,"at":Date().timeIntervalSince1970,"status":status]
         do {
             let root=FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("StadiumRemote")
             try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true)

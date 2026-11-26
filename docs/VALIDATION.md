@@ -1,3 +1,40 @@
+## Hybrid / Full PedalBridge — November 26, 2026
+
+- iPad1.2.0(60), Android1.3.1(11): explicit Hybrid, Full PedalBridge, direct Wi-Fi
+  and USB choices; mode-specific active badge and remembered helper/mode. No startup
+  settings popup after a successful saved-helper connection. Pi reverse GATT discovery
+  and automatic Bluetooth MIDI were causing system pairing requests; the dedicated
+  Pi now disables those and explicitly uses a nonbonding BLE control listener.
+- Actual iPad → Pi BLE → Stadium USB and iPad → Mac BLE → Stadium Wi-Fi native
+  snapshots/settings pass. Pi service restart and automatic fresh reconnect pass.
+  Actual Hybrid direct Wi-Fi state + Pi USB Matrix-only lease pass. A DEBUG harness
+  suppressing direct discovery confirms fallback to Full PedalBridge; this is not
+  a claim that the physical Wi-Fi radio was disabled during qualification. In Hybrid,
+  restarting the Pi worker kept the direct editor connected and automatically
+  restored the USB Matrix-only lease.
+- Three opt-in on-iPad XCTest checks pass: landscape home capture; switch Full↔Hybrid, relaunch with remembered
+  Hybrid and no connection popup; synthetic four-second rejection shows immediate
+  switch state followed by rollback. Early UI-test taps/hit targets were corrected;
+  use named controls, not root normalized coordinates, to dismiss a popover.
+-112 Swift tests pass, including coalescing/latest-value, acknowledged expected value,
+  preset scope and failure clearing for unsent parameter gestures. Java815 schema/
+  routing/intent checks +8 transaction loopbacks,25 selection/memory checks +6 native
+  selection loopbacks (including pipelined snapshot equivalence) and BLE codec pass.
+  Signed Android build installs/launches in emulator. No physical Android is currently
+  connected; do not claim Android BLE, discovery, Matrix or new UI physical acceptance.
+- Full-state polling changed750ms→5s; live updates still trigger prompt refreshes.
+  Bridge snapshots pipeline fresh identity/native bytes/reference/dirty reads plus a
+  trailing identity guard; cached ID/product never authorizes a tone edit. One read
+  check was~0.81s pipelined vs~1.18s sequential. These are full-state read timings,
+  not touch-to-pedal write latency guarantees. Pending title/order/parameter display
+  remains separate from authoritative native data, backup and transaction checks.
+-89 helper tests pass, including exclusive Matrix-only lease, no native edit stream
+  attached to that lease, matching USB identity/channel checks and USB absence refusal.
+  These transport checks did not save existing presets or write mixer settings; they
+  do not replace live write qualification of every feature. QCPad BLE remains deferred.
+  No TestFlight upload in this task. Pi on official PSU reports no undervoltage, but
+  historical SD filesystem checksum damage remains unresolved; no mounted repair.
+
 
 ## Pi discovery — November 25, 2026
 

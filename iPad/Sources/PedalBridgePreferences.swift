@@ -26,7 +26,7 @@ struct PedalBridgePreferences:View {
                 ForEach([("stadium","Helix Stadium"),("quadCortex","Quad Cortex")],id:\.0) {key,name in
                     let pedal=status[key] as? [String:Any] ?? [:]
                     let online=pedal["connected"] as? Bool==true
-                    HStack {Image(systemName:online ? "checkmark.circle.fill":"circle").foregroundStyle(online ? Color.green:Color.secondary);Text(name);Spacer();Text(online ? "Online · \(pedal["upstream"] as? String ?? "USB")":"Offline")}
+                    HStack {Image(systemName:online ? "checkmark.circle.fill":"circle").foregroundStyle(online ? Color.green:Color.secondary);Text(name);Spacer();Text(online ? "Online · \(pedal["upstream"] as? String ?? "USB")":pedal["usbPresent"] as? Bool==true ? "USB detected · editor unavailable":"Offline")}
                 }
                 Button("Refresh status"){perform("status")}.disabled(busy)
             }else if page==1,isPi {

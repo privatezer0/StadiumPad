@@ -80,7 +80,7 @@ struct PresetSidebar:View {
     }
     private func presetRow(_ preset:PresetSlot,in folder:Int)->some View {
         Button {Task {if await monitor.load(preset) {if folder != -1 {remember(folder);expanded=[folder]};error=nil}}} label:{
-            HStack(spacing:6) {Image(systemName:"doc").font(.caption).opacity(0.6);Text(preset.label).font(.callout.monospacedDigit().weight(.semibold)).frame(width:34,alignment:.leading);Text(preset.name).font(.callout).lineLimit(1);Spacer(minLength:0)}.padding(.leading,folder>0 ? 26:12).padding(.trailing,8).frame(height:44).background(monitor.snapshot?.presetID==preset.contentID ? EditorTheme.gold.opacity(0.24):.clear).overlay(alignment:.bottom){Rectangle().fill(EditorTheme.gold.opacity(0.12)).frame(height:0.5)}
+            HStack(spacing:6) {Image(systemName:"doc").font(.caption).opacity(0.6);Text(preset.label).font(.callout.monospacedDigit().weight(.semibold)).frame(width:34,alignment:.leading);Text(preset.name).font(.callout).lineLimit(1);Spacer(minLength:0);if monitor.pendingPreset?.contentID==preset.contentID {ProgressView().controlSize(.small)}}.padding(.leading,folder>0 ? 26:12).padding(.trailing,8).frame(height:44).background((monitor.pendingPreset?.contentID ?? monitor.snapshot?.presetID)==preset.contentID ? EditorTheme.gold.opacity(0.24):.clear).overlay(alignment:.bottom){Rectangle().fill(EditorTheme.gold.opacity(0.12)).frame(height:0.5)}
         }.buttonStyle(.plain).id("\(folder)-\(preset.contentID ?? 0)").disabled(monitor.busy || !monitor.connected)
     }
 }

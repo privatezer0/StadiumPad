@@ -5,6 +5,7 @@ import StadiumProtocol
 public actor StadiumSession {
     private var commands:WireSocket?;private var updates:WireSocket?;private var nextID:Int32=1
     private var batchSnapshotReads=false
+    private var snapshotHeader:(id:Int,product:Value)?
     private var occupied=false;private var waiters:[CheckedContinuation<Void,Never>]=[]
     private var allocated:Set<Int>=[]
     private var connectionID=UUID()
@@ -35,7 +36,7 @@ public actor StadiumSession {
         } catch {await sub.close();await command.close();throw error}
     }
     public func connectionInterface()async->String {await commands?.interfaceName() ?? "Disconnected"}
-    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;matrixLive=[:];panelRevision=0;panelReceipts=[:];consoleLive=[:];consoleReceipts=[:];consoleLastMIDI=[:];matrixRevision=0;matrixReceipt=[:];matrixLastMIDI=[:];allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0;eqWriteRevision=0;eqCommitHistory=[];eqEchoSource=nil;eqReceipts=[:];eqReceiptOrder=[]}
+    public func disconnect()async {await commands?.close();await updates?.close();commands=nil;updates=nil;snapshotHeader=nil;matrixLive=[:];panelRevision=0;panelReceipts=[:];consoleLive=[:];consoleReceipts=[:];consoleLastMIDI=[:];matrixRevision=0;matrixReceipt=[:];matrixLastMIDI=[:];allocated=[];selectionReceipts=[:];eqShadow=nil;eqLastRead=nil;eqPending=[];eqRevision=0;eqWriteRevision=0;eqCommitHistory=[];eqEchoSource=nil;eqReceipts=[:];eqReceiptOrder=[]}
     private func exchange(_ make:(Int32)throws->OSCMessage,reply:String)async throws->OSCMessage {
         try Task.checkCancellation();guard let socket=commands else{throw ProtocolError.closed}
         let id=nextID;nextID = nextID==Int32.max ? 1:nextID+1
@@ -143,12 +144,25 @@ public actor StadiumSession {
     }
     public func snapshot(product:Value?=nil)async throws->DeviceSnapshot {await acquire();defer{release()};return try await snapshotUnlocked(product:product)}
     private func snapshotUnlocked(product:Value?=nil)async throws->DeviceSnapshot {
-        if batchSnapshotReads {return try await batchedSnapshotUnlocked(product:product)}
-        return try await sequentialSnapshotUnlocked(product:product)
+        let result=try await (batchSnapshotReads ? batchedSnapshotUnlocked(product:product):sequentialSnapshotUnlocked(product:product))
+        if let id=result.presetID {snapshotHeader=(id,result.product)}
+        return result
     }
     private func batchedSnapshotUnlocked(product:Value?=nil)async throws->DeviceSnapshot {
         var productValue=product
         for _ in 0..<3 {
+            if let header=snapshotHeader {
+                // The cached ID only addresses a FRESH content-reference read.
+                // Identity, native bytes, dirty flag and trailing identity are
+                // still read every time. No cached tone data authorizes edits.
+                let body=try await readBatchUnlocked([.activePreset,.activeSnapshot,.editBufferBytes,.contentRef(header.id),.dirty])
+                let after=try await readBatchUnlocked([.activeSnapshot,.activePreset])
+                if body[0]["val_"].integer==header.id,after[1]["val_"].integer==header.id,body[1]==after[0] {
+                    guard let raw=body[2].data,body[3]["cid_"].integer==header.id,let dirty=body[4]["val_"].boolean else{throw ProtocolError.invalid("Incomplete native state read.")}
+                    return DeviceSnapshot(product:productValue ?? header.product,editBuffer:try MessagePack.decode(raw),preset:body[3],activeSnapshot:after[0].integer ?? 0,rawEditBuffer:raw,dirty:dirty,origin:connectionID)
+                }
+                snapshotHeader=nil // A preset change uses the general discovery path.
+            }
             let before=try await readBatchUnlocked(productValue == nil ? [.activePreset,.activeSnapshot,.product]:[.activePreset,.activeSnapshot])
             if productValue == nil {productValue=before[2]}
             guard let id=before[0]["val_"].integer,let productValue else{throw ProtocolError.invalid("Missing active preset reference.")}

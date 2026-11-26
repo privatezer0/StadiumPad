@@ -46,3 +46,12 @@ identity, typed transaction, backup/readback and no-replay guards remain mandato
 Do not silently fall back from a Bluetooth helper to the LAN helper transport.
 StadiumPad first; QCPad Bluetooth is deferred by the owner. BLE also shares2.4GHz;
 measure actual latency. Physical Android and reboot claims require actual checks.
+
+
+Owner Hybrid direction supersedes the older helper-only transport instruction:
+Hybrid edits directly over verified same-Stadium Wi-Fi, reserving a USB Matrix-only
+helper lease over BLE. Full PedalBridge remains forceable and never silently takes
+a direct LAN path. Hybrid fallback makes a fresh connection; uncertain edits never
+replay. Display Hybrid/Full PedalBridge badges rather than a generic Bluetooth icon.
+Remember helper and mode without opening startup settings. Pending presentation and
+unsent gesture coalescing never replace native context, backup or readback checks.

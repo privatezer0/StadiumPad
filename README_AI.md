@@ -1,3 +1,19 @@
+# Current direction — Hybrid and Full PedalBridge (2026-11-26)
+
+This section supersedes the older BLE-only direction below. Keep explicit Hybrid
+and Full PedalBridge choices. Hybrid native SUB/DEALER traffic goes directly over
+Wi-Fi after matching the selected helper's native Stadium identity; only typed
+Matrix MIDI uses its exclusive USB-verified matrix-session lease. Missing direct
+Wi-Fi falls back read-only to Full PedalBridge on connect. Full mode never silently
+switches to direct Wi-Fi. Reconnection does not replay uncertain edits.
+
+`ParameterIntentBuffer` / Android `ParameterIntents` coalesce only unsent explicit
+user gestures. Own acknowledged values can become the expected value of a later
+same-control intent. Every other context and parameter guard remains in the native
+session. Pending UI order/title/values must never mutate the authoritative snapshot
+or authorize a save. Clear all pending work on failure/disconnect; preserve unknown
+native data. Remember helper + mode, and do not open settings on a normal launch.
+
 # Current direction — Bluetooth appliance (2026-11-26)
 
 This supersedes the historical manual pairing and dashboard workflow below.

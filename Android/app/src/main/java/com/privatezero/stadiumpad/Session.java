@@ -2,13 +2,31 @@ package com.privatezero.stadiumpad;
 import java.io.*;import java.net.*;import java.util.*;import static com.privatezero.stadiumpad.Data.*;import static com.privatezero.stadiumpad.Models.*;
 /** All public transactions run on the monitor's single FIFO worker. No uncertain write is retried. */
 final class Session implements Closeable {
- final UUID origin=UUID.randomUUID();final File backups;volatile Wire command,updates;volatile boolean closed=false;int sequence=1;Object product;final java.util.concurrent.ConcurrentHashMap<Integer,int[]> selectionReceipts=new java.util.concurrent.ConcurrentHashMap<>();
- PedalBridge.Connection bridge;
+ final UUID origin=UUID.randomUUID();final File backups;volatile Wire command,updates;volatile boolean closed=false;int sequence=1;Object product;int lastSnapshotID=0;final java.util.concurrent.ConcurrentHashMap<Integer,int[]> selectionReceipts=new java.util.concurrent.ConcurrentHashMap<>();
+ PedalBridge.Connection bridge;volatile PedalBridge.Connection matrixBridge;volatile Socket matrixLease;boolean hybridDirect=false;long matrixChecked=0;
  final GlobalEQ.Engine eq=new GlobalEQ.Engine(this);final Matrix.Engine matrix=new Matrix.Engine(this);
  Session(File backups){this.backups=backups;}
  void connect(String host,int port)throws Exception{connect(host,port,null,null);}
  void connect(String host,int port,PedalBridge.Pair pair,android.net.Network network)throws Exception{require(!host.trim().isEmpty()&&port>0&&port<65535,"Enter a Stadium address and port");try{if(pair!=null){bridge=new PedalBridge.Connection(pair);updates=new Wire(bridge.open("updates"));command=new Wire(bridge.open("commands"));}else{updates=new Wire(host,port,network);command=new Wire(host,port+1,network);}updates.handshake("SUB");command.handshake("DEALER");require(!closed,"Connection cancelled");}catch(Exception e){close();throw e;}}
- public void close(){closed=true;if(command!=null)command.close();if(updates!=null)updates.close();}
+ public void close(){closed=true;Socket lease=matrixLease;matrixLease=null;matrixBridge=null;if(lease!=null)try{lease.close();}catch(Exception ignored){}if(command!=null)command.close();if(updates!=null)updates.close();}
+ State connectHybrid(android.content.Context context,PedalBridge.Pair pair)throws Exception {
+  PedalBridge.Connection helper=new PedalBridge.Connection(pair);
+  try {
+   android.net.Network network=PedalBridge.directNetwork(context,"wifi");
+   for(HybridDiscovery.Endpoint endpoint:HybridDiscovery.find(context)) {
+    require(!closed,"Connection cancelled");
+    try {updates=new Wire(endpoint.host,endpoint.port,network);command=new Wire(endpoint.host,endpoint.port+1,network);updates.handshake("SUB");command.handshake("DEALER");require(!closed,"Connection cancelled");State candidate=snapshot();require(PedalBridge.hash(s(get(candidate.product,"host","snum")).trim().getBytes(java.nio.charset.StandardCharsets.UTF_8)).equals(helper.device),"Different Stadium");hybridDirect=true;try{attachMatrix(helper);}catch(Exception ignored){}return candidate;}
+    catch(Exception e){if(command!=null)command.close();if(updates!=null)updates.close();command=updates=null;product=null;lastSnapshotID=0;}
+   }
+  }catch(Exception e){require(!closed,"Connection cancelled");}
+  require(!closed,"Connection cancelled");connect(pair.host,2001,pair,null);return snapshot();
+ }
+ void attachMatrix(PedalBridge.Connection helper)throws Exception {
+  matrixChecked=System.nanoTime();if(!helper.matrix)return;
+  Socket lease=helper.open("matrix-session");lease.setSoTimeout(12000);if(closed){lease.close();return;}matrixLease=lease;matrixBridge=helper;
+  Thread observer=new Thread(()->{try{while(!closed){int value=lease.getInputStream().read();if(value!=0)break;}}catch(Exception ignored){}finally{try{lease.close();}catch(Exception ignored){}if(matrixLease==lease){matrixLease=null;matrixBridge=null;}}},"StadiumPad Matrix helper lease");observer.setDaemon(true);observer.start();
+ }
+ PedalBridge.Connection matrixRoute(){return bridge!=null?bridge:matrixBridge;}
  OSC exchange(String address,String reply,Object... args)throws Exception{require(!closed&&command!=null,"Disconnected");int id=sequence++;List<Object> values=new ArrayList<>();values.add(id);values.addAll(Arrays.asList(args));command.send(0,new OSC(address,values.toArray()).encode());long deadline=System.nanoTime()+5_000_000_000L;while(System.nanoTime()<deadline){Wire.Frame f=command.frame();if((f.flags&5)!=0||f.bytes.length==0)continue;OSC m=OSC.decode(f.bytes);if(m.args.isEmpty()||n(m.args.get(0))!=id)continue;require(!m.address.equals("/error"),"Stadium rejected the request; no success confirmed");if(m.address.equals(reply))return m;}throw new IOException("Stadium request timed out; do not retry an uncertain write");}
  Object read(String address,String reply,int position,Object... args)throws Exception{OSC m=exchange(address,reply,args);require(m.args.size()>position,"Missing reply");Object v=m.args.get(position);return v instanceof byte[]?MP.decode((byte[])v):v;}
  byte[] raw(String address,String reply,int position,Object... args)throws Exception{OSC m=exchange(address,reply,args);require(m.args.size()>position&&m.args.get(position) instanceof byte[],"Missing native data");return (byte[])m.args.get(position);}
@@ -17,7 +35,22 @@ final class Session implements Closeable {
  Object ref(int id)throws Exception{require(id>0,"Invalid preset reference");return read("/GetContentRef","/GetContentRef",1,id);}
  byte[] stored(int id)throws Exception{require(id>0,"Invalid saved destination");return raw("/GetContentData","/GetContentData",1,id);}
  List<Object> container(int id)throws Exception{return arr(read("/GetContainerContents","/GetContainerContents",1,id));}
- State snapshot()throws Exception{if(product==null)product=read("/ProductInfoGet","/getProductInfo",1);for(int retry=0;retry<3;retry++){int id=active(),index=scene();require(id>0,"Missing active preset");byte[] bytes=raw("/EditBufferStateGet","/getEditBufferState",2);Object preset=ref(id);int after=scene();Object edited=property("volatile.preset.edited");require(edited instanceof Boolean||n(edited)==0||n(edited)==1,"Unsaved state unavailable");if(active()==id&&after==index)return new State(origin,product,bytes,preset,index,b(edited));}throw new IOException("Preset changed during reading");}
+ static final class ReadSpec {final String address,reply;final int position;final boolean raw;final Object[] args;ReadSpec(String a,String r,int p,boolean raw,Object...args){address=a;reply=r;position=p;this.raw=raw;this.args=args;}}
+ Object[] batch(ReadSpec...specs)throws Exception {
+  require(!closed&&command!=null&&specs.length<=8,"Disconnected");Map<Integer,Integer> waiting=new HashMap<>();Object[] result=new Object[specs.length];
+  for(int i=0;i<specs.length;i++){int id=sequence++;waiting.put(id,i);List<Object> values=new ArrayList<>();values.add(id);values.addAll(Arrays.asList(specs[i].args));command.send(0,new OSC(specs[i].address,values.toArray()).encode());}
+  long deadline=System.nanoTime()+5_000_000_000L;
+  while(!waiting.isEmpty()&&System.nanoTime()<deadline){Wire.Frame frame=command.frame();if((frame.flags&5)!=0||frame.bytes.length==0)continue;OSC message=OSC.decode(frame.bytes);if(message.args.isEmpty())continue;int id=n(message.args.get(0));Integer index=waiting.get(id);if(index==null)continue;require(!message.address.equals("/error"),"Stadium rejected a state read");ReadSpec spec=specs[index];if(!message.address.equals(spec.reply))continue;require(message.args.size()>spec.position,"Incomplete state read");Object value=message.args.get(spec.position);result[index]=spec.raw?value:value instanceof byte[]?MP.decode((byte[])value):value;waiting.remove(id);}
+  require(waiting.isEmpty(),"Stadium state read timed out");return result;
+ }
+ State fastSnapshot()throws Exception {
+  int expected=lastSnapshotID;
+  Object[] body=batch(new ReadSpec("/PropertyValueGet","/getPropertyValue",2,false,"server.active.preset.id"),new ReadSpec("/ActiveSnapshotIndexGet","/getActiveSnapshotIndex",1,false),new ReadSpec("/EditBufferStateGet","/getEditBufferState",2,true),new ReadSpec("/GetContentRef","/GetContentRef",1,false,expected),new ReadSpec("/PropertyValueGet","/getPropertyValue",2,false,"volatile.preset.edited"));
+  Object[] after=batch(new ReadSpec("/ActiveSnapshotIndexGet","/getActiveSnapshotIndex",1,false),new ReadSpec("/PropertyValueGet","/getPropertyValue",2,false,"server.active.preset.id"));
+  if(n(get(body[0],"val_"))!=expected||n(get(after[1],"val_"))!=expected||n(body[1])!=n(after[0])){lastSnapshotID=0;return null;}
+  require(body[2] instanceof byte[]&&n(get(body[3],"cid_"))==expected,"Incomplete native state");Object dirty=get(body[4],"val_");require(dirty instanceof Boolean||n(dirty)==0||n(dirty)==1,"Unsaved state unavailable");return new State(origin,product,(byte[])body[2],body[3],n(after[0]),b(dirty));
+ }
+ State snapshot()throws Exception{if(bridge!=null&&lastSnapshotID>0){State fast=fastSnapshot();if(fast!=null)return fast;}if(product==null)product=read("/ProductInfoGet","/getProductInfo",1);for(int retry=0;retry<3;retry++){int id=active(),index=scene();require(id>0,"Missing active preset");byte[] bytes=raw("/EditBufferStateGet","/getEditBufferState",2);Object preset=ref(id);int after=scene();Object edited=property("volatile.preset.edited");require(edited instanceof Boolean||n(edited)==0||n(edited)==1,"Unsaved state unavailable");if(active()==id&&after==index){lastSnapshotID=id;return new State(origin,product,bytes,preset,index,b(edited));}}throw new IOException("Preset changed during reading");}
  void identity(State before)throws Exception{require(active()==before.id&&scene()==before.scene,"Active preset or scene changed; nothing further sent");}
  void backup(State s)throws Exception{int id=n(get(s.preset,"rcid"));if(id<=0)id=s.id;byte[] saved=stored(id);for(int i=0;i<2;i++){byte[] bytes=i==0?saved:s.bytes;File f=new File(backups,id+"-"+(i==0?"saved-":"live-")+hash(bytes)+".bin");if(!f.exists())atomic(f,bytes);require(Arrays.equals(java.nio.file.Files.readAllBytes(f.toPath()),bytes),"Backup verification failed");}}
  OSC edit(String address,Object...args)throws Exception{OSC m=exchange(address,"/status",args);ack(m,false);return m;}

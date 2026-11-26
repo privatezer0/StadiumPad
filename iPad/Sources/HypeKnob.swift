@@ -6,14 +6,16 @@ struct HypeKnob:View {
     let definition:ParameterDefinition
     let value:Value
     let enabled:Bool
+    var working=false
     let color:Color
     let submit:(Value,Value)->Void
     @State private var draft=0.0
     @State private var anchor:Double?
     @State private var expected:Value?
     @State private var lastPoint:CGPoint?
+    @State private var pending:Value?
     @GestureState private var dragging=false
-    private var number:Double {value.numeric ?? definition.minimum}
+    private var number:Double {(pending ?? value).numeric ?? definition.minimum}
     private var fraction:Double {max(0,min(1,((dragging ? draft:number)-definition.minimum)/(definition.maximum-definition.minimum)))}
     var body:some View {
         HStack(spacing:6) {
@@ -25,7 +27,7 @@ struct HypeKnob:View {
             }.frame(width:36,height:36)
             VStack(alignment:.leading,spacing:1) {
                 Text("HYPE").font(.system(size:10,weight:.bold)).tracking(0.6).foregroundStyle(color)
-                Text(definition.display(dragging ? .number(draft):value)).font(.system(size:12,weight:.medium)).monospacedDigit().foregroundStyle(.white)
+                Text(definition.display(dragging ? .number(draft):(pending ?? value))).font(.system(size:12,weight:.medium)).monospacedDigit().foregroundStyle(.white)
             }
         }.frame(minWidth:80,minHeight:44).fixedSize(horizontal:true,vertical:false).contentShape(Rectangle()).opacity(enabled ? 1:0.5)
         .gesture(DragGesture(minimumDistance:0)
@@ -39,11 +41,12 @@ struct HypeKnob:View {
                 guard enabled,let old=expected,anchor != nil else{return}
                 let desired=adjusted(v.translation);anchor=nil;expected=nil;lastPoint=nil
                 guard !sameParameterValue(old,.number(desired)) else{return}
-                submit(.number(desired),old)
+                pending = .number(desired);submit(.number(desired),old)
             })
         // Gesture reset clears only presentation state. onEnded still needs
         // the captured expected value even when reset arrives first.
         .onChange(of:dragging){_,active in if !active {lastPoint=nil}}
+        .onChange(of:working){_,active in if !active {pending=nil}}
         .accessibilityElement(children:.ignore).accessibilityLabel("Hype")
         .accessibilityValue(definition.display(value))
         .accessibilityAdjustableAction {direction in

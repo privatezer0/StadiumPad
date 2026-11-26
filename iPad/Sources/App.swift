@@ -10,7 +10,7 @@ import UIKit
     var body:some Scene {WindowGroup {
         Group {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--preset-folder-harness") {PresetFolderHarness()}else if ProcessInfo.processInfo.arguments.contains("--matrix-scroll-harness") {MatrixScrollHarness()}else{StadiumView()}
+            if ProcessInfo.processInfo.arguments.contains("--optimistic-controls-harness") {OptimisticControlsHarness()}else if ProcessInfo.processInfo.arguments.contains("--preset-folder-harness") {PresetFolderHarness()}else if ProcessInfo.processInfo.arguments.contains("--matrix-scroll-harness") {MatrixScrollHarness()}else{StadiumView()}
             #else
             StadiumView()
             #endif
@@ -60,7 +60,7 @@ struct StadiumView:View {
     let preview:Bool
     let libraryCategory:LibraryCategory
     init(initialSelection:BlockSelection?=nil,preview:Bool=false,initialSection:EditorSection = .home,initialMode:EditorMode = .preset,initialFocus:Bool=false,initialLibraryCategory:LibraryCategory = .presets) {_showFocus=State(initialValue:initialFocus);_mode=State(initialValue:initialMode);_selected=State(initialValue:initialSelection);_section=State(initialValue:initialSection);self.preview=preview;self.libraryCategory=initialLibraryCategory}
-    var body:some View {
+    private var editorCanvas:some View {
         GeometryReader {geometry in
             VStack(spacing:0) {
                 header
@@ -108,12 +108,29 @@ struct StadiumView:View {
                 }.font(.system(size:10)).padding(.horizontal,12).frame(height:22).background(Color(white:0.08))
             }.background(.black).foregroundStyle(.white)
         }
+    }
+    private var presentationCanvas:some View {
+        editorCanvas
         #if DEBUG
         .task {if ProcessInfo.processInfo.arguments.contains("--show-connection") {showConnection=true}}
+        .task {
+            if ProcessInfo.processInfo.arguments.contains("--capture-bluetooth-ui") {
+                for _ in 0..<160 {if monitor.connected{break};try? await Task.sleep(for:.milliseconds(250))}
+                guard monitor.connected else{return}
+                try? await Task.sleep(for:.seconds(2));captureBluetoothScreen("bluetooth-home.png")
+                if ProcessInfo.processInfo.arguments.contains("--capture-bridge-settings") {
+                    bridgePreferencesTab=true;showConnection=true
+                    try? await Task.sleep(for:.seconds(3));captureBluetoothScreen("bluetooth-settings.png")
+                }
+            }
+        }
         .task {if ProcessInfo.processInfo.arguments.contains("--verify-bridge-resume") {await verifyBridgeResume(monitor)}}
         .task {if ProcessInfo.processInfo.arguments.contains("--verify-bluetooth") {await verifyBluetooth(monitor,settings:bridgeSettings)}}
         .task {if ProcessInfo.processInfo.arguments.contains("--verify-read-timing") {await verifyReadTiming(monitor)}}
         #endif
+        .onChange(of:connectionRoute){old,new in if !ProcessInfo.processInfo.arguments.contains("--verify-bluetooth"),old != new,new.usesHelper,let pair=bridgeSettings.pair,!monitor.busy {monitor.connect(host:pair.host,route:new,bridgePair:pair)}}
+        .onReceive(NotificationCenter.default.publisher(for:UIApplication.didBecomeActiveNotification)){_ in bridgeSettings.reload()}
+        .onChange(of:bridgeSettings.pair){(old:PedalBridgePair?,new:PedalBridgePair?) in rememberedHelperChanged(old,new)}
         .onOpenURL {url in
             if url.scheme=="pedalbridge" {do{try bridgeSettings.configure(url.absoluteString);connectionRoute = .bridge;showConnection=true}catch{monitor.errorText=error.localizedDescription};return}
             guard url.scheme=="stadiumpad",url.host=="companion" else{return}
@@ -125,7 +142,7 @@ struct StadiumView:View {
             Button("Replace Model") {if let pendingSelection,let pendingModel {Task {if let block=await monitor.replace(context:pendingSelection.context,destination:pendingModel) {select(block)}}}}
         } message:{Text("The new model starts with its own settings. The current preset is backed up before replacement; choose Save to keep the change.")}
         .popover(isPresented:$showInfo){presetInfo.frame(width:360).padding(20).presentationCompactAdaptation(.popover)}
-        .popover(isPresented:$showConnection,arrowEdge:.top){connection.frame(width:420).padding(20).presentationCompactAdaptation(.popover)}
+        .popover(isPresented:$showConnection,arrowEdge:.top){connection.frame(width:560).padding(20).presentationCompactAdaptation(.popover)}
         .confirmationDialog("Save changes to \(saveLabel)?",isPresented:$showSave,titleVisibility:.visible) {
             Button("Save Preset"){if let saveID {Task {await monitor.save(expectedID:saveID)}}}
         } message:{Text("The previous saved contents are backed up locally.")}
@@ -135,6 +152,9 @@ struct StadiumView:View {
             Button("Save Copy"){Task {await monitor.copy(name:copyName,expectedID:copySourceID);libraryRevision+=1;chooseInitialBlock()}}
         } message:{Text("Creates a verified copy in an empty User location and opens it.")}
         .alert("StadiumPad",isPresented:Binding(get:{monitor.errorText != nil},set:{if !$0 {monitor.errorText=nil}})) {Button("OK"){monitor.errorText=nil}} message:{Text(monitor.errorText ?? "")}
+    }
+    var body:some View {
+        presentationCanvas
         .onChange(of:mode){old,new in
             guard !preview else{return}
             if old == .tuner || new == .tuner {Task {await monitor.setTuner(new == .tuner)}}
@@ -155,8 +175,16 @@ struct StadiumView:View {
             }
         }
         .onChange(of:monitor.lastCopy?.preset.contentID){_,_ in libraryRevision+=1}
-        .task(id:monitor.connected){if monitor.connected,!preview {do {try await monitor.refreshInventory()}catch is CancellationError {}catch {if monitor.connected && !Task.isCancelled {monitor.errorText=error.localizedDescription}}}}
-        .task {
+        .task(id:monitor.connected){await refreshInventoryForConnection()}
+        .task {await startEditor()}
+    }
+    @MainActor private func refreshInventoryForConnection()async {
+        guard monitor.connected,!preview else{return}
+        do {try await monitor.refreshInventory()}
+        catch is CancellationError {}
+        catch {if monitor.connected && !Task<Never,Never>.isCancelled {monitor.errorText=error.localizedDescription}}
+    }
+    @MainActor private func startEditor()async {
             guard !preview else{return}
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--connect-pedalbridge") {
@@ -169,8 +197,9 @@ struct StadiumView:View {
             if let route=ProcessInfo.processInfo.environment["STADIUM_CONNECTION_ROUTE"],let selectedRoute=StadiumConnectionRoute(rawValue:route) {connectionRoute=selectedRoute}
             #endif
             if ProcessInfo.processInfo.arguments.contains("--verify-bluetooth") {return}
-            if connectionRoute == .bridge {
-                if let pair=bridgeSettings.pair,pair.bluetooth {monitor.connect(host:pair.host,route:.bridge,bridgePair:pair)}else{monitor.status="Choose a nearby PedalBridge.";showConnection=true}
+            if connectionRoute.usesHelper {
+                bridgeSettings.reload()
+                if let pair=bridgeSettings.pair,pair.bluetooth {monitor.connect(host:pair.host,route:connectionRoute,bridgePair:pair)}else{monitor.status="Choose a nearby PedalBridge using the connection button."}
             }else if connectionRoute == .usb {
                 usbDiscovery.search()
                 for _ in 0..<50 {if !usbDiscovery.devices.isEmpty || Task.isCancelled {break};try? await Task.sleep(for:.milliseconds(150))}
@@ -222,7 +251,20 @@ struct StadiumView:View {
                 if !ProcessInfo.processInfo.arguments.contains("--show-matrix") || ProcessInfo.processInfo.arguments.contains("--verify-layout") {await captureEditorLayouts(monitor:monitor,discovery:discovery,selection:selected)}
             }
 #endif
-        }
+    }
+
+    private func rememberedHelperChanged(_ old:PedalBridgePair?,_ new:PedalBridgePair?) {
+        guard old==nil,let pair=new else{return}
+        if ProcessInfo.processInfo.arguments.contains("--verify-bluetooth") {return}
+        guard pair.bluetooth,connectionRoute.usesHelper else{return}
+        guard !monitor.connected,!monitor.connecting,!monitor.reconnectingBridge else{return}
+        showConnection=false;monitor.connect(host:pair.host,route:connectionRoute,bridgePair:pair)
+    }
+    private var connectionHelp:String {
+        if connectionRoute == .hybrid {return "Direct Stadium Wi-Fi for editing; PedalBridge USB for Matrix. Falls back to Full PedalBridge when direct Wi-Fi is unavailable."}
+        if connectionRoute == .bridge {return "All editing uses PedalBridge, even when direct Stadium Wi-Fi is available."}
+        if connectionRoute == .usb {return "Connect Stadium directly by USB-C and enable Remote Access. USB mode requires the cable."}
+        return "Use the same local network with Remote Access enabled."
     }
     private func selectSection(_ item:EditorSection) {
         // Home is already selected while tuning, so a section change alone would
@@ -260,10 +302,11 @@ struct StadiumView:View {
                     Spacer(minLength:0)
                     Button {showConnection=true} label:{
                         VStack(spacing:3) {
-                            if monitor.tabletTransport=="Bluetooth" {BluetoothConnectionGlyph().stroke(lineWidth:2).frame(width:18,height:22)}
+                            if monitor.tabletTransport=="Hybrid" {Image(systemName:"arrow.triangle.branch").font(.system(size:20)).frame(height:22)}
+                            else if monitor.tabletTransport=="Full PedalBridge" {Image(systemName:"externaldrive").font(.system(size:20)).frame(height:22)}
                             else {Image(systemName:monitor.tabletTransport=="USB" ? "cable.connector":monitor.tabletTransport=="Wi-Fi" ? "wifi":"circle.slash").font(.system(size:20)).frame(height:22)}
-                            Text(monitor.tabletTransport).font(.system(size:9)).lineLimit(1)
-                        }.frame(width:76,height:52)
+                            Text(monitor.tabletTransport).font(.system(size:9)).lineLimit(1).minimumScaleFactor(0.7)
+                        }.frame(width:90,height:52).contentShape(Rectangle())
                     }.accessibilityLabel(monitor.tabletTransport+" connection").accessibilityValue(monitor.connected ? "Connected":"No connection").buttonStyle(.plain).foregroundStyle(monitor.connected ? Color.green:Color.orange)
                 }
             }.padding(.horizontal,12).frame(maxWidth:.infinity,maxHeight:.infinity)
@@ -283,7 +326,7 @@ struct StadiumView:View {
                 ZStack {
                     HStack(spacing:8) {
                         Text(monitor.snapshot?.location.label ?? "—").font(.title3.monospacedDigit().bold()).foregroundStyle(EditorTheme.gold)
-                        Text(monitor.snapshot?.presetName ?? "No preset loaded").font(.title3.weight(.medium)).lineLimit(1).frame(maxWidth:.infinity,alignment:.leading)
+                        Text(monitor.pendingPreset?.name ?? monitor.snapshot?.presetName ?? "No preset loaded").font(.title3.weight(.medium)).lineLimit(1).frame(maxWidth:.infinity,alignment:.leading)
                         if monitor.snapshot?.dirty==true {Circle().fill(.orange).frame(width:6,height:6)}
                         Spacer()
                         Button {showInfo=true} label:{Image(systemName:"info.circle").font(.title3).frame(width:40,height:38)}.accessibilityLabel("Preset information")
@@ -310,8 +353,8 @@ struct StadiumView:View {
             Text("Stadium connection").font(.title2.bold())
             Text(monitor.status).font(.callout)
             if monitor.connected || monitor.connecting || monitor.reconnectingBridge {Button("Disconnect"){monitor.stop()}.buttonStyle(.bordered).disabled(monitor.busy)}
-            Picker("Connection",selection:$connectionRoute){ForEach(StadiumConnectionRoute.allCases,id:\.self){Text($0.rawValue).tag($0)}}.pickerStyle(.segmented)
-            if connectionRoute == .bridge {
+            Picker("Connection",selection:$connectionRoute){ForEach(StadiumConnectionRoute.allCases,id:\.self){Text($0.title).tag($0)}}.pickerStyle(.segmented).accessibilityIdentifier("stadium-connection-route")
+            if connectionRoute.usesHelper {
                 Picker("PedalBridge settings",selection:$bridgePreferencesTab){Text("Connection").tag(false);Text("PedalBridge").tag(true)}.pickerStyle(.segmented).accessibilityIdentifier("pedalbridge-settings-tabs")
                 if bridgePreferencesTab,let pair=bridgeSettings.pair {
                     PedalBridgePreferences(pair:pair,restarting:{monitor.waitForHelperRestart()})
@@ -321,12 +364,12 @@ struct StadiumView:View {
                 Text(bluetoothHelpers.message).font(.caption)
                 ScrollView {VStack(alignment:.leading,spacing:8){ForEach(bluetoothHelpers.helpers){helper in
                     Button {Task {choosingHelper=true;defer{choosingHelper=false}
-                        do {monitor.stop();let pair=try await PedalBridgeConnection.automaticBluetooth(helper.id);try bridgeSettings.configure(pair);monitor.connect(host:pair.host,route:.bridge,bridgePair:pair);showConnection=false}
+                        do {monitor.stop();let pair=try await PedalBridgeConnection.automaticBluetooth(helper.id);try bridgeSettings.configure(pair);monitor.connect(host:pair.host,route:connectionRoute,bridgePair:pair);showConnection=false}
                         catch{monitor.errorText=error.localizedDescription}
                     }} label:{Label(helper.name,systemImage:"antenna.radiowaves.left.and.right").frame(maxWidth:.infinity,alignment:.leading)}.buttonStyle(.bordered).disabled(choosingHelper)
                 }}}.frame(maxHeight:190).task{bluetoothHelpers.search()}.onDisappear{bluetoothHelpers.stopSearch()}
                 if choosingHelper {ProgressView("Connecting…")}
-                if let pair=bridgeSettings.pair,pair.bluetooth {Button("Reconnect last PedalBridge"){monitor.connect(host:pair.host,route:.bridge,bridgePair:pair);showConnection=false}.disabled(choosingHelper || monitor.busy)}
+                if let pair=bridgeSettings.pair,pair.bluetooth {Button("Reconnect last PedalBridge"){monitor.connect(host:pair.host,route:connectionRoute,bridgePair:pair);showConnection=false}.disabled(choosingHelper || monitor.busy)}
                 Text("Matrix requires Stadium connected to PedalBridge by USB.").font(.caption)
                 }
 
@@ -343,7 +386,7 @@ struct StadiumView:View {
             }
             Toggle("Follow the selected block on Stadium",isOn:$followExternal)
             Button("About StadiumPad & Acknowledgments"){showConnection=false;showAcknowledgments=true}
-            Text(connectionRoute == .usb ? "Connect Stadium directly by USB-C, enable Remote Access, then Search Network and choose its hostname. USB mode requires the cable and never falls back to Wi-Fi.":"Use the same local network with Remote Access enabled.").font(.caption).foregroundStyle(.secondary)
+            Text(connectionHelp).font(.caption).foregroundStyle(.secondary)
         }
     }
     private var presetInfo:some View {
@@ -425,7 +468,7 @@ private struct PresetFolderHarness:View {
     }
     let before=await waitForConnection(),preset=monitor.snapshot?.presetID
     let oldConnection=monitor.connectionID
-    if before,monitor.connectionRoute == .bridge {monitor.pauseForBackground();monitor.resumeFromBackground()}
+    if before,monitor.connectionRoute.usesHelper {monitor.pauseForBackground();monitor.resumeFromBackground()}
     let after=before ? await waitForConnection():false
     let result:[String:Any]=["connectedBefore":before,"connectedAfter":after,"freshConnection":monitor.connectionID != oldConnection,"presetUnchanged":preset != nil && preset==monitor.snapshot?.presetID]
     if let data=try? JSONSerialization.data(withJSONObject:result) {try? data.write(to:FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("bridge-resume-check.json"),options:.atomic)}
@@ -448,25 +491,35 @@ private struct PresetFolderHarness:View {
     record(["stage":"discovering"]);monitor.stop();let hub=BluetoothEditorHub.shared;hub.search()
     for _ in 0..<120 {if !hub.helpers.isEmpty {break};try? await Task.sleep(for:.milliseconds(250))}
     try? await Task.sleep(for:.seconds(2))
-    var chosen:BluetoothHelper?
+    var chosen:UUID?
     if let expected=ProcessInfo.processInfo.environment["STADIUM_VERIFY_HELPER_NAME"] {
-        for helper in hub.helpers {if let info=try? await hub.information(helper.id),info.name==expected {chosen=helper;break}}
-    }else if hub.helpers.count==1 {chosen=hub.helpers.first}
+        if let saved=settings.pair,saved.bluetooth,let id=UUID(uuidString:saved.host),let info=try? await hub.information(id),info.pin==saved.pin,info.name==expected {chosen=id}
+        if chosen==nil {for helper in hub.helpers {if let info=try? await hub.information(helper.id),info.name==expected {chosen=helper.id;break}}}
+    }else if hub.helpers.count==1 {chosen=hub.helpers.first?.id}
     guard let helper=chosen else{record(["stage":"discovery","helpers":hub.helpers.count,"message":hub.message]);return}
     do {
         record(["stage":"opening Bluetooth"])
-        let pair=try await PedalBridgeConnection.automaticBluetooth(helper.id);try settings.configure(pair)
+        let pair=try await PedalBridgeConnection.automaticBluetooth(helper);try settings.configure(pair)
         let helperSettings=try await PedalBridgeConnection.settings(pair)
-        UserDefaults.standard.set(StadiumConnectionRoute.bridge.rawValue,forKey:"stadiumConnectionRoute")
-        record(["stage":"reading native state"]);monitor.connect(host:pair.host,route:.bridge,bridgePair:pair)
+        let route:StadiumConnectionRoute=ProcessInfo.processInfo.arguments.contains("--verify-hybrid") ? .hybrid:.bridge
+        UserDefaults.standard.set(route.rawValue,forKey:"stadiumConnectionRoute")
+        record(["stage":"reading native state"]);monitor.connect(host:pair.host,route:route,bridgePair:pair)
         for _ in 0..<240 {if monitor.connected && monitor.snapshot != nil {break};try? await Task.sleep(for:.milliseconds(250))}
-        var result:[String:Any]=["stage":"complete","connected":monitor.connected,"bluetooth":pair.bluetooth,"hasSnapshot":monitor.snapshot != nil,"error":monitor.errorText ?? "","helperKind":helperSettings["kind"] as? String ?? "","settingsOnline":helperSettings["ok"] as? Bool ?? false]
+        if route == .hybrid {try await Task.sleep(for:.seconds(3))}
+        var result:[String:Any]=["stage":"complete","transport":monitor.tabletTransport,"matrixAvailable":monitor.bridgeMatrixAvailable,"connected":monitor.connected,"bluetooth":pair.bluetooth,"hasSnapshot":monitor.snapshot != nil,"error":monitor.errorText ?? "","helperKind":helperSettings["kind"] as? String ?? "","settingsOnline":helperSettings["ok"] as? Bool ?? false]
         if monitor.connected {result["timing"]=try await monitor.benchmarkReadTiming()}
         if ProcessInfo.processInfo.arguments.contains("--verify-bluetooth-restart") {
             let beforeRestart=monitor.connectionID
+            let beforeMatrixGeneration=monitor.bridgeConnection?.generation
             result["restartAcknowledged"]=(try await PedalBridgeConnection.settings(pair,action:"restart"))["restarting"] as? Bool ?? false
-            for _ in 0..<200 {if monitor.connected,monitor.snapshot != nil,monitor.connectionID != beforeRestart{break};try await Task.sleep(for:.milliseconds(250))}
-            result["reconnectedAfterServiceRestart"]=monitor.connected && monitor.connectionID != beforeRestart
+            if route == .hybrid,monitor.tabletTransport=="Hybrid" {
+                for _ in 0..<200 {if monitor.bridgeMatrixAvailable,monitor.bridgeConnection?.generation != beforeMatrixGeneration{break};try await Task.sleep(for:.milliseconds(250))}
+                result["directEditingStayedConnected"]=monitor.connected && monitor.connectionID==beforeRestart
+                result["matrixRestoredAfterServiceRestart"]=monitor.bridgeMatrixAvailable && monitor.bridgeConnection?.generation != beforeMatrixGeneration
+            }else{
+                for _ in 0..<200 {if monitor.connected,monitor.snapshot != nil,monitor.connectionID != beforeRestart{break};try await Task.sleep(for:.milliseconds(250))}
+                result["reconnectedAfterServiceRestart"]=monitor.connected && monitor.connectionID != beforeRestart
+            }
         }
         record(result)
     }catch{record(["stage":"failed","error":error.localizedDescription])}
@@ -483,3 +536,13 @@ private struct BluetoothConnectionGlyph:Shape {
         return path
     }
 }
+
+
+#if DEBUG
+@MainActor private func captureBluetoothScreen(_ name:String) {
+    guard let scene=UIApplication.shared.connectedScenes.compactMap({$0 as? UIWindowScene}).first(where:{$0.activationState == .foregroundActive}),let window=scene.windows.first(where:{$0.isKeyWindow}) else{return}
+    let image=UIGraphicsImageRenderer(bounds:window.bounds).image{_ in window.drawHierarchy(in:window.bounds,afterScreenUpdates:true)}
+    let file=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent(name)
+    try? image.pngData()?.write(to:file,options:.atomic)
+}
+#endif

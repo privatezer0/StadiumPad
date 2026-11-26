@@ -10,9 +10,12 @@ struct SignalChainView:View {
     @State private var dragged:EditContext?
     @State private var dragPoint:CGPoint?
     @GestureState private var dragActive=false
+    @State private var previewPositions:[Int:Int]=[:]
+    @State private var previewColumn:Int?
+    private var displayedBlocks:[SignalBlock] {monitor.pendingBlockOrder ?? state.blocks}
     private var lanes:[ChainLane] {
         (1...2).flatMap {path in (0...1).compactMap {row in
-            let blocks=state.blocks.filter{$0.path==path && $0.position/14==row}
+            let blocks=displayedBlocks.filter{$0.path==path && $0.position/14==row}
             guard row==0 || blocks.contains(where:{monitor.blockName($0) != "None"}) else{return nil}
             return ChainLane(path:path,row:row,blocks:blocks)
         }}
@@ -73,23 +76,31 @@ struct SignalChainView:View {
                                 Text(shortName(monitor.blockName(block))).font(.system(size:max(8,min(10,cell*0.17)))).lineLimit(1).foregroundStyle(active ? .white:.gray)
                             }.frame(width:cell,height:rowHeight)
                         .contentShape(Rectangle())
-                        .onTapGesture {select(block)}
+                        .onTapGesture {if !monitor.busy {select(block)}}
                         .accessibilityAddTraits(.isButton)
                         .accessibilityAction {select(block)}
                         .accessibilityLabel("Path \(lane.path), \(monitor.blockName(block))\(models.count>1 ? ", dual model":"")")
-                        .opacity(dragActive && dragged?.blockID==block.blockID && dragged?.path==block.path-1 ? 0.4:1)
+                        .zIndex(dragged?.blockID==block.blockID && dragged?.path==block.path-1 ? 2:0)
                         .highPriorityGesture(DragGesture(minimumDistance:14,coordinateSpace:.named("stadium-chain"))
                             .updating($dragActive){_,active,_ in active=true}
                             .onChanged {value in
                                 guard !monitor.busy,monitor.connected,(1...12).contains(block.position%14),let model=monitor.catalog[String(block.model)],model.ioRole==nil,!["split","join"].contains(model.category ?? "") else{return}
                                 if dragPoint==nil {dragged=try? state.context(for:block)}
                                 dragPoint=value.location
+                                let column=Int(floor((value.location.x-labelWidth)/cell))
+                                if previewColumn != column,let context=dragged {
+                                    previewColumn=column;previewPositions=[:]
+                                    let models=Dictionary(uniqueKeysWithValues:monitor.catalog.values.map{($0.id,$0)})
+                                    if let plan=try? BlockReorderPlan(state:state,context:context,to:lane.row*14+column,models:models) {
+                                        previewPositions=Dictionary(uniqueKeysWithValues:plan.expected.filter{$0.path==block.path && $0.slot==0}.map{($0.blockID,$0.position)})
+                                    }
+                                }
                             }
                             .onEnded {value in
                                 // GestureState can reset before onEnded. Keep the captured
                                 // edit identity until this callback consumes it.
                                 guard let context=dragged,context.blockID==block.blockID,context.path==block.path-1 else{return}
-                                dragged=nil;dragPoint=nil
+                                dragged=nil;dragPoint=nil;previewPositions=[:];previewColumn=nil
                                 let column=Int(floor((value.location.x-labelWidth)/cell)),row=Int(floor(value.location.y/rowHeight))
                                 guard lanes.indices.contains(row),lanes[row].path-1==context.path,lanes[row].row==context.position/14,(1...12).contains(column) else{monitor.errorText="Drag effects within the same signal row. Inputs, outputs and routing nodes remain fixed.";return}
                                 let destination=lanes[row].row*14+column
@@ -98,15 +109,20 @@ struct SignalChainView:View {
                             })
                         .accessibilityAction(named:Text("Move left")){moveAccessible(block,by:-1)}
                         .accessibilityAction(named:Text("Move right")){moveAccessible(block,by:1)}
-                        .position(x:labelWidth+(CGFloat(block.position%14)+0.5)*cell,y:CGFloat(index)*rowHeight+rowHeight/2)
+                        .position(position(block,lane:index,cell:cell,rowHeight:rowHeight,labelWidth:labelWidth))
                     }
                 }
             }.coordinateSpace(name:"stadium-chain")
             // Clear cancellation visuals, but do not erase the drop identity:
             // the gesture reset and onEnded are separate SwiftUI callbacks.
             // A subsequent drag captures a fresh identity when its point is nil.
-            .onChange(of:dragActive){_,active in if !active {dragPoint=nil}}
+            .onChange(of:dragActive){_,active in if !active {dragPoint=nil;previewPositions=[:];previewColumn=nil}}
         }.padding(.horizontal,6).padding(.vertical,8).background(.black)
+    }
+    private func position(_ block:SignalBlock,lane:Int,cell:CGFloat,rowHeight:CGFloat,labelWidth:CGFloat)->CGPoint {
+        if dragged?.path==block.path-1,dragged?.blockID==block.blockID,let point=dragPoint {return point}
+        let preview=dragged?.path==block.path-1 ? previewPositions[block.blockID]:nil
+        return CGPoint(x:labelWidth+(CGFloat((preview ?? block.position)%14)+0.5)*cell,y:CGFloat(lane)*rowHeight+rowHeight/2)
     }
     private func moveAccessible(_ block:SignalBlock,by step:Int) {
         guard let context=try? state.context(for:block) else{return}

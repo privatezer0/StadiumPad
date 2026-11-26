@@ -1,23 +1,29 @@
-## Bluetooth PedalBridge — private appliance development
+## Current helper modes — iPad 1.2.0 (60), Android 1.3.1 (11)
 
-The iPad and Android clients now select nearby Mac/Pi helpers over Bluetooth,
-without a login, QR code or pairing-link workflow. Home Wi-Fi stays available.
-The **PedalBridge** connection settings have a separate helper tab for pedal
-online/upstream status, Pi Wi-Fi configuration, optional troubleshooting web and
-worker restart without rebooting the computer. Each app keeps its own helper.
+- **Hybrid:** direct Stadium Wi-Fi editing, plus Bluetooth → PedalBridge → matching
+  USB Stadium for Matrix. If direct Wi-Fi is unavailable, a fresh connection uses
+  Full PedalBridge. Existing uncertain edits are never resent during handover.
+- **Full PedalBridge:** all editing through the selected helper, even when direct
+  Wi-Fi is available. Direct **Wi-Fi** and **USB** remain separate choices.
+- The top badge identifies the active route: Hybrid, Full PedalBridge, Wi-Fi, USB
+  or No connection. Helper/mode are remembered; normal launch does not open settings.
+  Tap the badge to manage the connection and dedicated PedalBridge settings tab.
 
-Stadium uses verified USB to the helper first, otherwise a unique matching Wi-Fi
-pedal. Matrix still requires a matching USB network/MIDI Stadium. Native edit
-validation, backup/readback and no-uncertain-write-retry behavior remain intact.
+Preset selection highlights immediately while actual contents load. Blocks follow
+finger motion and show their proposed order while the transaction confirms.
+Parameter controls retain the requested value; explicit subsequent gestures are
+coalesced per control and serialized behind confirmed operations. Presentation is
+separate from native transaction state. Failure clears unsent intents and restores
+confirmed presentation; it never retries a possibly applied edit.
 
-BLE metadata protocol2 uses one multiplexed credit-based L2CAP stream and bounded
-raw-DEFLATE frames. Real iPad/Pi/USB state reads pass; measured batched full-state
-read was about0.93s after compression versus2.01s before. This is not a complete
-edit-latency benchmark or a claim that Bluetooth avoids all2.4GHz interference.
-Mac helper switching/restart acceptance is being completed. Android1.3.0(code10)
-is signed; physical Android Bluetooth testing awaits a connected tablet. QCPad
-Bluetooth is deliberately deferred. No TestFlight upload is included here.
+Live updates drive refreshes. Full-state safety polling is five seconds rather than
+750 ms, and fresh guarded reads are pipelined into fewer trips. This does not remove
+Bluetooth transfer cost or native backup/context/readback requirements.
 
+Actual iPad/Pi and iPad/Mac Bluetooth reads, Pi service restart/reconnect, Hybrid
+Wi-Fi + Pi Matrix lease, and simulated no-direct-Wi-Fi fallback pass. Physical
+Android Bluetooth qualification remains pending; emulator tests cannot substitute
+for the tablet radio. No TestFlight upload is included in this task.
 
 ## Pi discovery — November 25, 2026
 

@@ -33,7 +33,7 @@ struct InlineBlockEditor:View {
                         VStack(alignment:.leading,spacing:2) {Text(style.title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(style.color);Text(monitor.blockName(block)).font(.title3.weight(.medium)).lineLimit(1)}
                         if let hype,let value=block.value(hype) {
                             Spacer(minLength:4)
-                            HypeKnob(definition:hype,value:value,enabled:monitor.connected && !monitor.busy,color:style.color) {desired,expected in
+                            HypeKnob(definition:hype,value:value,enabled:monitor.connected && (!monitor.busy || monitor.parameterEditing),working:monitor.busy,color:style.color) {desired,expected in
                                 Task {await monitor.edit(context:selection.context,definition:hype,value:desired,expected:expected)}
                             }.id(selection.focusIdentity+"-hype")
                         }
@@ -49,7 +49,7 @@ struct InlineBlockEditor:View {
                         LazyVGrid(columns:[GridItem(.flexible(),spacing:24),GridItem(.flexible())],alignment:.leading,spacing:0) {
                             ForEach(visible,id:\.identity) {definition in
                                 if let value=block.value(definition) {
-                                    ParameterRow(definition:definition,value:value,enabled:monitor.connected && !monitor.busy && selection.context.slot<2) {value in Task {await monitor.edit(context:selection.context,definition:definition,value:value,expected:block.value(definition) ?? .null)}}
+                                    ParameterRow(definition:definition,value:value,enabled:monitor.connected && (!monitor.busy || monitor.parameterEditing) && selection.context.slot<2,working:monitor.busy) {value in Task {await monitor.edit(context:selection.context,definition:definition,value:value,expected:block.value(definition) ?? .null)}}
                                         .id("\(selection.id)-\(definition.identity)").frame(height:76).tint(style.color)
                                 }
                             }
@@ -68,30 +68,53 @@ struct ParameterRow:View {
     let definition:ParameterDefinition
     let value:Value
     let enabled:Bool
+    let working:Bool
     let submit:(Value)->Void
     @State private var draft:Double
     @State private var dragging=false
-    init(definition:ParameterDefinition,value:Value,enabled:Bool,submit:@escaping(Value)->Void) {self.definition=definition;self.value=value;self.enabled=enabled;self.submit=submit;_draft=State(initialValue:min(definition.maximum,max(definition.minimum,value.numeric ?? definition.minimum)))}
+    @State private var pending:Value?
+    private var shown:Value {pending ?? value}
+    init(definition:ParameterDefinition,value:Value,enabled:Bool,working:Bool=false,submit:@escaping(Value)->Void) {self.definition=definition;self.value=value;self.enabled=enabled;self.working=working;self.submit=submit;_draft=State(initialValue:min(definition.maximum,max(definition.minimum,value.numeric ?? definition.minimum)))}
+    private func commit(_ next:Value) {pending=next;submit(next)}
     var body:some View {
         VStack(alignment:.leading,spacing:10) {
-            if definition.type=="b",let flag=value.boolean {
-                Toggle(isOn:Binding(get:{flag},set:{submit(.bool($0))})) {HStack {Text(definition.name);Spacer();Text(definition.display(value)).foregroundStyle(.secondary)}}
-            } else if let options=definition.options,definition.type=="i",let number=value.numeric,number.rounded()==number {
+            if definition.type=="b",let flag=shown.boolean {
+                Toggle(isOn:Binding(get:{flag},set:{commit(.bool($0))})) {HStack {Text(definition.name);Spacer();Text(definition.display(shown)).foregroundStyle(.secondary)}}
+            } else if let options=definition.options,definition.type=="i",let number=shown.numeric,number.rounded()==number {
                 HStack {
                     Text(definition.name)
                     Spacer(minLength:4)
-                    Picker(definition.name,selection:Binding(get:{Int(number)},set:{submit(.int(Int64($0)))})) {
+                    Picker(definition.name,selection:Binding(get:{Int(number)},set:{commit(.int(Int64($0)))})) {
                         ForEach(Array(options.enumerated()),id:\.offset){index,label in Text(label).tag(Int(definition.minimum)+index)}
                     }.pickerStyle(.menu).labelsHidden()
                 }
             } else if let number=value.numeric,number.isFinite,definition.minimum<definition.maximum,definition.containsWireValue(number) {
-                HStack {Text(definition.name);Spacer();Text(definition.display(dragging ? draftValue:value)).monospacedDigit().foregroundStyle(.secondary)}
-                Slider(value:$draft,in:definition.range,step:definition.type=="i" ? 1:max((definition.maximum-definition.minimum)/1000,0.000001),onEditingChanged:{active in dragging=active;if !active {submit(draftValue)}})
+                HStack {Text(definition.name);Spacer();Text(definition.display(dragging ? draftValue:shown)).monospacedDigit().foregroundStyle(.secondary)}
+                Slider(value:$draft,in:definition.range,step:definition.type=="i" ? 1:max((definition.maximum-definition.minimum)/1000,0.000001),onEditingChanged:{active in dragging=active;if !active {commit(draftValue)}})
             } else {
                 HStack {Text(definition.name);Spacer();Text(definition.display(value)).foregroundStyle(.secondary)}
             }
         }.padding(.vertical,8).disabled(!enabled)
-        .onChange(of:value){_,new in if !dragging,let number=new.numeric {draft=min(definition.maximum,max(definition.minimum,number))}}
+        .onChange(of:value){_,new in if !dragging,pending==nil,let number=new.numeric {draft=min(definition.maximum,max(definition.minimum,number))}}
+        .onChange(of:working){_,active in if !active {pending=nil;if !dragging,let number=value.numeric {draft=min(definition.maximum,max(definition.minimum,number))}}}
     }
     var draftValue:Value {definition.type=="i" ? .int(Int64(draft.rounded())):.number(draft)}
 }
+
+#if DEBUG
+/// Delayed rejection harness: exercises optimistic presentation without a pedal.
+struct OptimisticControlsHarness:View {
+    @State private var working=false
+    private var definition:ParameterDefinition {try! JSONDecoder().decode(ParameterDefinition.self,from:Data(#"{"id":1,"key":"test","name":"Test switch","type":"b","minimum":0,"maximum":1,"unit":"","harness":false}"#.utf8))}
+    var body:some View {
+        VStack(spacing:24) {
+            Text("Native state unchanged")
+            ParameterRow(definition:definition,value:.bool(false),enabled:!working,working:working){_ in
+                working=true
+                Task {try? await Task.sleep(for:.seconds(4));working=false}
+            }.accessibilityIdentifier("optimistic-toggle")
+            Text(working ? "Awaiting confirmation":"Ready").accessibilityIdentifier("confirmation-state")
+        }.padding(60).frame(width:500)
+    }
+}
+#endif
