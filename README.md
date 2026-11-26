@@ -302,3 +302,21 @@ of Git. A missing/incompatible map remains unavailable; no invented tone map is
 substituted. EQ displays control positions, not a live spectrum or a measured DSP
 response. Cabinet coordinates use native Position/Distance with quarter-inch
 Distance steps. Equipment backgrounds are original vector/SF-symbol treatments.
+
+
+## Matrix USB entry guard — November 26, 2026
+
+The top Matrix Mixer icon is gray when the current connection has no usable USB
+Matrix transport. Tapping it explains: “Stadium must be connected via USB to either
+PedalBridge or your tablet to use Matrix Mixer.” It does not open the popup, exit
+tuner mode or send pedal commands. Direct tablet USB still requires the existing
+identity confirmation before controls can write; bridged access uses the helper's
+verified Matrix capability. A connection/USB loss dismisses the iPad sheet.
+
+iPad 1.1.1 (52) builds and is installed on the owner's Pro. The unavailable-entry
+UI test passed; simulator layouts inspected. 102 Swift tests pass. Android1.2.2
+(code9) builds/signs, passes809 schema/routing checks plus8 loopback transaction
+tests, and its gray navigation was inspected on the emulator. The physical Android
+tablet was not available for this install. No live Matrix write test or TestFlight
+upload was performed. Physical iPad read-only diagnostics confirm a PedalBridge
+Wi-Fi connection,20 blocks and incoming events after the helper recovery.

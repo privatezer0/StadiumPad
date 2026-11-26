@@ -2,19 +2,32 @@ import SwiftUI
 import UIKit
 import StadiumProtocol
 
-/// Opens the Matrix console locally; channel editing still uses verified USB MIDI.
+/// USB-only entry; keep taps available to explain a disabled mixer.
 struct MatrixVolumeBar:View {
+    @EnvironmentObject private var monitor:StadiumMonitor
+    @StateObject private var presence=MatrixUSBMIDI()
     @State private var showingMixer=false
+    @State private var showingUSBRequirement=false
     @AppStorage("matrixLastOutput") private var lastOutput=1
     let preview:Bool
     var beforeOpen:()->Void = {}
-    var body:some View {
-        Button {beforeOpen();showingMixer=true}label:{VStack(spacing:2){
-            Image(systemName:"slider.vertical.3").font(.system(size:22,weight:.light)).foregroundStyle(.cyan)
-            Text("Matrix Mixer").font(.system(size:9))
-        }.frame(width:84,height:46)}.buttonStyle(.plain).accessibilityLabel("Open Matrix Mixer")
+    private var available:Bool {
         #if DEBUG
-        .task {if ProcessInfo.processInfo.arguments.contains("--show-matrix") {showingMixer=true}}
+        if ProcessInfo.processInfo.arguments.contains("--matrix-unavailable") {return false}
+        #endif
+        return preview || MatrixAvailability.canOpen(connected:monitor.connected,bridgeUSB:monitor.connectionRoute == .bridge ? monitor.bridgeMatrixAvailable:nil,tabletUSB:presence.online)
+    }
+    var body:some View {
+        Button {presence.refresh();guard available else{showingUSBRequirement=true;return};beforeOpen();showingMixer=true}label:{VStack(spacing:2){
+            Image(systemName:"slider.vertical.3").font(.system(size:22,weight:.light)).foregroundStyle(available ? Color.cyan:Color.gray)
+            Text("Matrix Mixer").foregroundStyle(available ? Color.white:Color.gray).font(.system(size:9))
+        }.frame(width:84,height:46)}.buttonStyle(.plain).accessibilityLabel("Open Matrix Mixer")
+        .accessibilityValue(available ? "Available":"USB required")
+        .accessibilityHint(available ? "Opens the mixer":MatrixAvailability.usbRequiredMessage)
+        .alert("USB connection required",isPresented:$showingUSBRequirement){Button("OK",role:.cancel){}}message:{Text(MatrixAvailability.usbRequiredMessage)}
+        .onChange(of:available){_,ready in if !ready {showingMixer=false}}
+        #if DEBUG
+        .task {if ProcessInfo.processInfo.arguments.contains("--show-matrix"),available {showingMixer=true}}
         #endif
         .sheet(isPresented:$showingMixer) {
             MatrixMixerView(initialOutput:(1...3).contains(lastOutput) ? lastOutput:1,preview:preview)

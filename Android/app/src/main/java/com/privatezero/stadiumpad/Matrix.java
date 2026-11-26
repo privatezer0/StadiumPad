@@ -1,6 +1,9 @@
 package com.privatezero.stadiumpad;
 import java.io.*;import java.util.*;import static com.privatezero.stadiumpad.Data.*;
 final class Matrix {
+ static final String USB_REQUIRED="Stadium must be connected via USB to either PedalBridge or your tablet to use Matrix Mixer.";
+ static boolean canOpen(boolean connected,Boolean bridgeUSB,boolean tabletUSB){return connected&&(bridgeUSB==null?tabletUSB:bridgeUSB);}
+
  static final int[] ORDER={5,1,2,3,4,14,6,7,8,9,10,11,12,13,15,16,17,18,19};
  static final String[] FIELD={"vol_","pan_","mute","solo"},EVENT={"/syncMixChannelVolume","/syncMixChannelPan","/syncMixChannelMute","/syncMixChannelSolo"},MIDI={"global.midi.matrix.ch.qtr","global.midi.matrix.ch.xlr","global.midi.matrix.ch.phones"};
  static int index(int source){for(int i=0;i<ORDER.length;i++)if(ORDER[i]==source)return i;return -1;}

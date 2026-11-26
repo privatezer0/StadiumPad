@@ -38,4 +38,18 @@ import XCTest
         fader.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.7)).press(forDuration:0.05,thenDragTo:fader.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.3)))
         XCTAssertNotEqual(app.staticTexts["matrix-qa-changes"].label,"Changes: 0")
     }
+    func testUnavailableMatrixExplainsUSBWithoutOpeningMixer() {
+        continueAfterFailure=false
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app=XCUIApplication();app.launchArguments=["--matrix-unavailable"];app.launch()
+        let button=app.buttons["Open Matrix Mixer"]
+        XCTAssertTrue(button.waitForExistence(timeout:10))
+        XCTAssertEqual(button.value as? String,"USB required")
+        button.tap()
+        let alert=app.alerts["USB connection required"]
+        XCTAssertTrue(alert.waitForExistence(timeout:3))
+        XCTAssertTrue(alert.staticTexts["Stadium must be connected via USB to either PedalBridge or your tablet to use Matrix Mixer."].exists)
+        alert.buttons["OK"].tap()
+        XCTAssertFalse(app.buttons["Close"].exists)
+    }
 }
