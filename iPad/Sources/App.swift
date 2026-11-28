@@ -9,11 +9,13 @@ import UIKit
     @Environment(\.scenePhase) private var phase
     var body:some Scene {WindowGroup {
         Group {
+            if ProcessInfo.processInfo.arguments.contains("--desktop-preview") {StadiumView(preview:true)}else {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--optimistic-controls-harness") {OptimisticControlsHarness()}else if ProcessInfo.processInfo.arguments.contains("--preset-folder-harness") {PresetFolderHarness()}else if ProcessInfo.processInfo.arguments.contains("--matrix-scroll-harness") {MatrixScrollHarness()}else{StadiumView()}
             #else
             StadiumView()
             #endif
+            }
         }.environmentObject(monitor).environmentObject(discovery).preferredColorScheme(.dark)
             .onAppear{UIApplication.shared.isIdleTimerDisabled=true}
             .onChange(of:phase){_,value in
@@ -60,6 +62,13 @@ struct StadiumView:View {
     let preview:Bool
     let libraryCategory:LibraryCategory
     init(initialSelection:BlockSelection?=nil,preview:Bool=false,initialSection:EditorSection = .home,initialMode:EditorMode = .preset,initialFocus:Bool=false,initialLibraryCategory:LibraryCategory = .presets) {_showFocus=State(initialValue:initialFocus);_mode=State(initialValue:initialMode);_selected=State(initialValue:initialSelection);_section=State(initialValue:initialSection);self.preview=preview;self.libraryCategory=initialLibraryCategory}
+    private var platformWelcome:String {
+        #if targetEnvironment(macCatalyst)
+        return "Your Stadium, on your Mac"
+        #else
+        return "Your Stadium, on your iPad"
+        #endif
+    }
     private var editorCanvas:some View {
         GeometryReader {geometry in
             VStack(spacing:0) {
@@ -90,7 +99,7 @@ struct StadiumView:View {
                                     }
                                 }
                             } else {
-                                VStack(spacing:18) {Image(systemName:"waveform.path").font(.system(size:42,weight:.ultraLight));Text("Your Stadium, on your iPad").font(.title2);Button("Connect to Stadium"){showConnection=true}.buttonStyle(.borderedProminent)}.foregroundStyle(.secondary).frame(maxWidth:.infinity,maxHeight:.infinity)
+                                VStack(spacing:18) {Image(systemName:"waveform.path").font(.system(size:42,weight:.ultraLight));Text(platformWelcome).font(.title2);Button("Connect to Stadium"){showConnection=true}.buttonStyle(.borderedProminent)}.foregroundStyle(.secondary).frame(maxWidth:.infinity,maxHeight:.infinity)
                             }
                         } else if section == .librarian {LibrarianView(openEditor:{section = .home},pairingLink:pendingCompanionLink,initialCategory:libraryCategory).id(libraryLinkRevision).onAppear{pendingCompanionLink=nil}}
                         else if section == .commands {CommandCenterView(preview:preview)}

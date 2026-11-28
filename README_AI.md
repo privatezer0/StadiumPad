@@ -1,3 +1,25 @@
+## Mac host and Android refresh — November27,2026
+
+The new Mac Catalyst target (macOS15+, Apple silicon build) compiles the same SwiftUI/editor/transport sources as
+iPad, including direct Wi-Fi/USB, Full PedalBridge and Hybrid, Matrix, Command
+Center, EQ, performance views and librarian. It uses a separate Mac bundle ID and
+settings; it does not replace the optional StadiumPad Companion. Android1.3.2(12)
+rebuilds the current equivalent feature set with retained PedalBridge/Hybrid
+support. Version numbers are platform-specific, not an indication of feature lag.
+
+Mac: generate with `STADIUMPAD_MAC=1 STADIUMPAD_DEVELOPMENT_TEAM=YOUR_TEAM python3
+Scripts/generate_project.py`, then build `StadiumPadMac.xcodeproj` for macOS /
+Mac Catalyst. Use your own signing identity. The source target shares the iPad
+UI rather than maintaining a separate desktop imitation. The `--desktop-preview`
+argument is a local no-connect layout preview.
+
+Validation: signed optimized Catalyst build;112 Swift tests;815 Java schema/routing
+checks and8 native loopback transactions. Physical Mac/Android direct USB, radio
+and live editing are not newly qualified in this session; existing Matrix/EQ
+qualification limits still apply. Owner practice audio, live pedals and the Pi
+service were left unchanged. Installers are development builds, not notarized
+Mac/App Store or Google Play releases. No new StadiumPad TestFlight upload.
+
 # Current direction — Hybrid and Full PedalBridge (2026-11-26)
 
 This section supersedes the older BLE-only direction below. Keep explicit Hybrid

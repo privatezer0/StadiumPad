@@ -5,6 +5,7 @@ resources=root/'iPad/Resources';resources.mkdir(exist_ok=True)
 if not (resources/'ModelNames.json').exists():(resources/'ModelNames.json').write_text('{}')
 if not (resources/'CommandCatalog.json').exists():(resources/'CommandCatalog.json').write_text('{}')
 if not (resources/'ParameterCatalog.json').exists():(resources/'ParameterCatalog.json').write_text('{}')
+mac=os.environ.get('STADIUMPAD_MAC')=='1'
 objects={}
 def obj(key,body):
  i=hashlib.sha256(key.encode()).hexdigest()[:24].upper();objects[i]=body;return i
@@ -28,6 +29,8 @@ for name in ['StadiumProtocol','StadiumNetwork']:
  frameworks.append(obj('framework:'+name,f'isa = PBXBuildFile; productRef = {dep};'))
 fp=obj('frameworks' ,f'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = ({",".join(frameworks)},); runOnlyForDeploymentPostprocessing = 0;')
 base=dict(ASSETCATALOG_COMPILER_APPICON_NAME='AppIcon',ALWAYS_SEARCH_USER_PATHS='NO',SDKROOT='iphoneos',IPHONEOS_DEPLOYMENT_TARGET='18.0',TARGETED_DEVICE_FAMILY='2',SUPPORTED_PLATFORMS='iphoneos iphonesimulator',SWIFT_VERSION='5.0',ENABLE_USER_SCRIPT_SANDBOXING='NO',PRODUCT_BUNDLE_IDENTIFIER=os.environ.get('STADIUMPAD_BUNDLE_ID','com.example.stadiumpad'),PRODUCT_NAME='StadiumPad',PRODUCT_MODULE_NAME='StadiumPad',INFOPLIST_FILE='iPad/Info.plist',GENERATE_INFOPLIST_FILE='NO',DEVELOPMENT_TEAM=os.environ.get('STADIUMPAD_DEVELOPMENT_TEAM',''),CODE_SIGN_IDENTITY='Apple Development',CODE_SIGN_STYLE='Automatic',ENABLE_PREVIEWS='YES')
+if mac:
+ base.update(SUPPORTS_MACCATALYST='YES',SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD='NO',DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER='NO',PRODUCT_BUNDLE_IDENTIFIER='com.privatezero.stadiumpad.mac',MACOSX_DEPLOYMENT_TARGET='14.0')
 def config(prefix,overrides=None):
  a=[]
  for name in ['Debug','Release']:
@@ -36,7 +39,7 @@ def config(prefix,overrides=None):
 pc=config('project');tc=config('target')
 target=obj('target',f'isa = PBXNativeTarget; buildConfigurationList = {tc}; buildPhases = ({sp},{fp},{rp},); buildRules = (); dependencies = (); name = StadiumPad; packageProductDependencies = ({",".join(products)},); productName = "StadiumPad"; productReference = {product}; productType = "com.apple.product-type.application";')
 targets=[target];attributes='LastUpgradeCheck = 1600;'
-destination=root/'StadiumPad.xcodeproj';destination.mkdir(exist_ok=True)
+destination=root/('StadiumPadMac.xcodeproj' if mac else 'StadiumPad.xcodeproj');destination.mkdir(exist_ok=True)
 if os.environ.get('STADIUMPAD_UI_TESTS')=='1':
  testfiles=[];testbuild=[]
  testpaths=list((root/'iPad/UITests').glob('*.swift'))

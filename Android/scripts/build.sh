@@ -16,7 +16,7 @@ done
 find "$ROOT/app/src/main/java" -name '*.java' > "$BUILD/sources.txt"
 javac --release 8 -encoding UTF-8 -classpath "$JAR" -d "$BUILD/classes" @"$BUILD/sources.txt"
 "$BT/aapt2" compile --dir "$ROOT/app/src/main/res" -o "$BUILD/res.zip"
-"$BT/aapt2" link -o "$BUILD/resources.apk" -I "$JAR" --manifest "$ROOT/app/src/main/AndroidManifest.xml" -A "$BUILD/assets" --version-code 11 --version-name 1.3.1 "$BUILD/res.zip"
+"$BT/aapt2" link -o "$BUILD/resources.apk" -I "$JAR" --manifest "$ROOT/app/src/main/AndroidManifest.xml" -A "$BUILD/assets" --version-code 12 --version-name 1.3.2 "$BUILD/res.zip"
 find "$BUILD/classes" -name '*.class' > "$BUILD/classes.txt"
 "$BT/d8" --min-api 26 --lib "$JAR" --output "$BUILD/dex" @"$BUILD/classes.txt"
 cp "$BUILD/resources.apk" "$BUILD/unsigned.apk"
@@ -24,6 +24,6 @@ cp "$BUILD/resources.apk" "$BUILD/unsigned.apk"
 "$BT/zipalign" -f 4 "$BUILD/unsigned.apk" "$BUILD/aligned.apk"
 KEY=${STADIUMPAD_ANDROID_KEYSTORE:-$BUILD/signing/stadiumpad.jks}
 if [[ ! -f "$KEY" ]]; then keytool -genkeypair -keystore "$KEY" --storepass android --keypass android -alias stadiumpad -keyalg RSA -keysize 3072 -validity 10000 -dname 'CN=StadiumPad Personal Android, O=Private Zero, C=US';chmod 600 "$KEY";fi
-"$BT/apksigner" sign --ks "$KEY" --ks-pass pass:android --ks-key-alias stadiumpad --out "$BUILD/StadiumPad-Android-1.3.1.apk" "$BUILD/aligned.apk"
-"$BT/apksigner" verify --verbose "$BUILD/StadiumPad-Android-1.3.1.apk"
-shasum -a 256 "$BUILD/StadiumPad-Android-1.3.1.apk"
+"$BT/apksigner" sign --ks "$KEY" --ks-pass pass:android --ks-key-alias stadiumpad --out "$BUILD/StadiumPad-Android-1.3.2.apk" "$BUILD/aligned.apk"
+"$BT/apksigner" verify --verbose "$BUILD/StadiumPad-Android-1.3.2.apk"
+shasum -a 256 "$BUILD/StadiumPad-Android-1.3.2.apk"
