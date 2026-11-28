@@ -1,3 +1,8 @@
+## Public downloads and platform delivery
+
+The repository is now public. See [platform delivery receipts](docs/PLATFORM_DELIVERY.md)
+for Mac/Android or Mac/Pi downloads, checksums and actual qualification limits.
+
 ## Mac host and Android refresh — November27,2026
 
 The new Mac Catalyst target (macOS15+, Apple silicon build) compiles the same SwiftUI/editor/transport sources as
