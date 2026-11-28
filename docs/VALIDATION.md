@@ -1,3 +1,23 @@
+## Android Bluetooth hardware checks - November27,2026
+
+StadiumPad Android1.3.3(code13): actual TCL Android read checks passed. Normal
+OS Bluetooth enable/nearby permission dialogs were used. Discovery now advertises
+BlueZ Discoverable; Android retains its high-priority GATT link with editor streams.
+No benchmarked edit-latency improvement is claimed. Saved Mac-helper route read a
+live Stadium Wi-Fi snapshot and correctly reported Matrix unavailable. A separate
+explicit read-only probe against the known Pi identity read39blocks, three Matrix
+outputs and verified USB availability while iPad QCPad retained QC's independent
+lease. Saved production helper choice remained unchanged. Different tablets can
+control different pedals on one Pi; one editor per pedal remains enforced.
+
+No pedal writes or preset recalls in this increment. Full original unsaved QC tone
+(all15effects/settings) matched the private baseline. Direct Android USB and full
+physical touch/write acceptance remain pending. QCPad's safe history64-entry cap
+was removed with100-step regression; all-operation save/load history remains
+unfinished. A helper import-path deployment regression was corrected and a clean
+vendored-engine import regression added. Mac/Pi startup and packaging are checked
+separately from fresh-Pi installation, which remains unqualified.
+
 ## Mac host and Android refresh — November27,2026
 
 The new Mac Catalyst target (macOS15+, Apple silicon build) compiles the same SwiftUI/editor/transport sources as

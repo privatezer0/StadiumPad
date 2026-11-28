@@ -1,3 +1,12 @@
+## Android1.3.3 physical Bluetooth checks
+
+Actual TCL tablet read the saved Mac helper's Wi-Fi Stadium and, in a separate
+explicit known-helper probe, the Pi USB Stadium with all three Matrix outputs.
+The iPad concurrently retained QC on that Pi. Normal saved helper selection was
+preserved. Bluetooth enable/permission uses Android's own dialogs; active editor
+streams retain a high-priority metadata GATT link. See docs/VALIDATION.md for
+read-only results and remaining direct-USB/touch/write qualification limits.
+
 ## Mac host and Android refresh — November27,2026
 
 The new Mac Catalyst target (macOS15+, Apple silicon build) compiles the same SwiftUI/editor/transport sources as
